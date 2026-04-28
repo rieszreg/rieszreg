@@ -4,7 +4,7 @@ Gradient boosting for Riesz representers, in **Python** and **R** — directly e
 
 The default backend wraps **xgboost's custom-objective interface**, so the inner loop is the same C++ histogram-based, sparsity-aware, GPU-capable booster the world's fastest tabular learners are built on — no Python-level boosting code in the hot path. Drop in `SklearnBackend(...)` to swap in any sklearn-compatible base learner (`KernelRidge`, MLPs, etc.) when you need a smooth fitter; the xgboost path stays the default precisely because there's nothing faster for tabular Riesz regression. The R package wraps the Python core with bitwise-identical predictions. Jump to the [R quickstart](#quickstart-r) below.
 
-📖 **[User guide](https://alejandroschuler.github.io/rieszboost/)** — narrative reference with executable R + Python examples on every page. (Goes live after the first CI run on `main` + GitHub Pages enable; setup in [docs/developing.qmd](docs/developing.qmd).)
+📖 **[User guide](https://alejandroschuler.github.io/rieszboost/)** — narrative reference with executable R + Python examples on every page.
 
 ## Status
 
