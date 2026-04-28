@@ -1,11 +1,13 @@
-from .estimands import ATE, TSM, AdditiveShift
+from .estimands import ATE, ATT, TSM, AdditiveShift
 from .tracer import LinearForm, Tracer, trace
 
 __all__ = [
     "ATE",
+    "ATT",
     "AdditiveShift",
     "CrossFitResult",
     "Diagnostics",
+    "GeneralRieszBooster",
     "LinearForm",
     "RieszBooster",
     "TSM",
@@ -14,6 +16,7 @@ __all__ = [
     "crossfit",
     "diagnose",
     "fit",
+    "general_fit",
     "trace",
 ]
 
@@ -26,6 +29,8 @@ _LAZY = {
     "CrossFitResult": ("crossfit", "CrossFitResult"),
     "diagnose": ("diagnostics", "diagnose"),
     "Diagnostics": ("diagnostics", "Diagnostics"),
+    "general_fit": ("general", "general_fit"),
+    "GeneralRieszBooster": ("general", "GeneralRieszBooster"),
 }
 
 

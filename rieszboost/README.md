@@ -101,16 +101,18 @@ def m_att(z, alpha):
 | Factory | m(z, α) | Notes |
 |---|---|---|
 | `rieszboost.ATE(treatment, covariates)` | α(1, x) − α(0, x) | Binary treatment ATE |
+| `rieszboost.ATT(p_treated, treatment, covariates)` | (a/P(A=1))·(α(1, x) − α(0, x)) | Average treatment on the treated |
 | `rieszboost.TSM(level, treatment, covariates)` | α(level, x) | Treatment-specific mean |
 | `rieszboost.AdditiveShift(delta, treatment, covariates)` | α(a + δ, x) − α(a, x) | Continuous-treatment shift effect |
 
-More planned: `ATT`, `Longitudinal` (LMTP-style), stochastic-shift variants.
+More planned: stochastic-shift / IPSI variants. Full LMTP-style longitudinal interventions with time-varying confounding require multi-stage orchestration (a separate Riesz fit per time-stage); the single-stage `rieszboost.fit(...)` API is the right upstream for an LMTP wrapper to call repeatedly.
 
 ## What works today
 
 - Opaque `m(z, alpha)` API with linearity enforced by construction.
 - Fast path: data augmentation + xgboost custom objective (gradient `2aF + b`, Hessian `2a`).
-- ATE / TSM / AdditiveShift estimand factories.
+- Slow general path: Friedman MART on the augmented dataset with any sklearn-compatible base learner — `rieszboost.general_fit(..., base_learner=lambda: KernelRidge(...))`.
+- ATE / ATT / TSM / AdditiveShift estimand factories.
 - `init={0, float, "m1"}` initialization.
 - Early stopping on held-out Riesz loss (`valid_rows=` + `early_stopping_rounds=`).
 - K-fold cross-fitting (`rieszboost.crossfit(...)`) with optional inner-split early stopping.
@@ -119,9 +121,9 @@ More planned: `ATT`, `Longitudinal` (LMTP-style), stochastic-shift variants.
 ## On the roadmap
 
 - lightgbm engine adapter.
-- Slow general path with sklearn / JAX base learners (for derivatives, integrals against known densities).
-- Longitudinal/LMTP estimand factory and ATT factory.
+- Stochastic-intervention / IPSI estimands (slow path with integral evaluation).
 - R wrapper via reticulate.
+- Examples gallery (Lalonde, NHEFS shift, two-stage longitudinal).
 - Bregman extension (Hines & Miles / Kato 2026).
 
 See `CLAUDE.md` and `~/.claude/plans/i-d-like-to-write-crystalline-raven.md` for the full plan.

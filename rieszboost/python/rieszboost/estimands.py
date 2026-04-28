@@ -42,3 +42,26 @@ def AdditiveShift(
         )
 
     return m
+
+
+def ATT(
+    p_treated: float, treatment: str = "a", covariates: Sequence[str] = ("x",)
+) -> Callable:
+    """Average treatment effect on the treated.
+
+    m(z, alpha) = (a / p_treated) * (alpha(1, x) - alpha(0, x)).
+    For control rows (a=0) the contribution is zero — those rows contribute
+    only the alpha^2 term in the loss. `p_treated` is the marginal P(A=1)
+    (estimate as `np.mean(a)` outside).
+    """
+    cov = tuple(covariates)
+
+    def m(z, alpha):
+        a = z[treatment]
+        x_kwargs = {k: z[k] for k in cov}
+        weight = a / p_treated
+        return weight * (
+            alpha(**{treatment: 1, **x_kwargs}) - alpha(**{treatment: 0, **x_kwargs})
+        )
+
+    return m

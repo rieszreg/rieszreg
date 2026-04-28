@@ -32,12 +32,17 @@ General-purpose gradient-boosting library for Riesz representers, implementing L
 
 - `LinearForm` tracer + linearity enforcement via algebra.
 - `build_augmented` + `fit` + `RieszBooster.predict` on the xgboost fast path.
-- ATE / TSM / AdditiveShift estimand factories.
+- `general_fit` slow path: Friedman MART on augmented dataset with arbitrary sklearn-compatible base learners (line-searched step size each round).
+- ATE / ATT / TSM / AdditiveShift estimand factories.
 - `init={0, float, 'm1'}` initialization; m1 traces m on a constant alpha=1.
-- Early stopping on held-out Riesz loss; `RieszBooster.best_iteration` and predict-with-best-iteration baked in.
+- Early stopping on held-out Riesz loss in both engines; `best_iteration` + predict-with-best-iteration baked in.
 - K-fold cross-fitting (`crossfit.crossfit`) with optional inner-split early stopping.
 - Diagnostics (`diagnostics.diagnose`) — RMS, |α| quantiles, extreme-row count, near-positivity and outlier-extrapolation warnings, held-out Riesz loss.
-- 24 tests passing, including end-to-end ATE Riesz recovery on the Lee-Schuler binary-treatment DGP (RMSE 0.64 at n=4000 — better than Lee-Schuler's reported 0.92 at n=500, as expected).
+- 31 tests passing, including end-to-end ATE/ATT Riesz recovery on the Lee-Schuler binary-treatment DGP (ATE RMSE 0.64 at n=4000, ATT RMSE 0.33 — both better than Lee-Schuler's reported numbers at n=500).
+
+## Longitudinal / LMTP
+
+Full LMTP support requires multi-stage orchestration (one Riesz fit per time-stage in the nested g-formula). That belongs in a downstream wrapper, not in this library. The single-stage `fit(rows, m, ...)` API IS the upstream that an LMTP wrapper calls; do not add a half-built `Longitudinal` factory that only handles the no-time-varying-confounding case.
 
 ## Known sharp edges
 
