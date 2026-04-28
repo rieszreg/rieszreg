@@ -2,7 +2,7 @@
 
 Gradient boosting for Riesz representers, in **Python** and **R** — directly estimate the Riesz representer α₀ of a linear functional θ(P) = E[m(Z, g₀)] without ever deriving or inverting a propensity-style ratio. Implements [Lee & Schuler, *RieszBoost* (arXiv:2501.04871)](https://arxiv.org/abs/2501.04871).
 
-The Python package (xgboost-backed fast path + sklearn-compatible slow path) is the source of truth; the R package wraps it with bitwise-identical predictions. Jump to the [R quickstart](#quickstart-r) below.
+The default backend wraps **xgboost's custom-objective interface**, so the inner loop is the same C++ histogram-based, sparsity-aware, GPU-capable booster the world's fastest tabular learners are built on — no Python-level boosting code in the hot path. Drop in `SklearnBackend(...)` to swap in any sklearn-compatible base learner (`KernelRidge`, MLPs, etc.) when you need a smooth fitter; the xgboost path stays the default precisely because there's nothing faster for tabular Riesz regression. The R package wraps the Python core with bitwise-identical predictions. Jump to the [R quickstart](#quickstart-r) below.
 
 ## Status
 
@@ -200,16 +200,20 @@ R-side and Python-side predictions are bitwise-identical on the same data.
 
 ## On the roadmap
 
-Not yet shipped, sized roughly small → large:
+Active priorities:
 
-- **Serialization** — `RieszBooster.save(path)` / `load(path)` so fitted models survive a session, with the metadata sidecar (loss spec, estimand name, feature_keys, base_score) written alongside the xgboost binary.
-- **More example datasets.** Lalonde (ATE under selection), NHEFS (continuous shift), a two-stage longitudinal example demonstrating how to compose `RieszBooster(...).fit(...)` calls across time-stages. The current `examples/` covers Lee-Schuler's synthetic DGPs only.
-- **R-side custom `m()`.** The `LinearForm` tracer is Python-only — R users currently use the built-in factories or write Python via reticulate. Porting the tracer to R is non-trivial; alternative is a JSON-spec syntax that round-trips through Python.
-- **lightgbm backend.** Same augmentation trick should work via lightgbm's custom objective. Modest speed/memory tradeoffs vs xgboost; deprioritized.
-- **Bregman: more built-in losses.** Currently `SquaredLoss` and `KLLoss`. Logistic / clipped-α losses (for representers known to lie in [0, M]) would round out the toolkit.
-- **Packaging.** PyPI release for the Python package, CRAN submission for the R wrapper. Pinned-dependency lockfile, CI, etc.
+1. **Serialization** — `RieszBooster.save(path)` / `load(path)` so fitted models survive a session, with the metadata sidecar (loss spec, estimand identity, feature_keys, base_score) written alongside the xgboost binary. Round-trip across Python and R.
+2. **Per-estimand worked examples.** Currently `examples/lee_schuler/` covers ATE/ATT/ASE/LASE under their synthetic DGPs. We want one realistic worked example per built-in estimand — Lalonde for ATE, NHEFS for shift, a stochastic-intervention demo for `StochasticIntervention`, etc.
+3. **More Bregman losses.** Currently `SquaredLoss` and `KLLoss`. Logistic / clipped-α losses for representers known to lie in [0, M] would round out the toolkit.
+4. **Testing plan** — see [docs/TESTING_PLAN.md](docs/TESTING_PLAN.md). Property-based tests, numerical regression baselines, sklearn `check_estimator` conformance, backend-equivalence checks, performance regression tracking.
 
-See `CLAUDE.md` and `~/.claude/plans/i-d-like-to-write-crystalline-raven.md` for design notes.
+Considered and dropped:
+
+- ~~lightgbm backend~~ — xgboost already provides histogram-based splits, GPU support, sparsity-aware finding, and the second-order Newton step. lightgbm's main differentiators (leaf-wise growth, native categorical handling) don't help our augmented dataset, which is mostly continuous and not categorical-heavy. No compelling speed or quality win.
+- ~~R-side custom `m()`~~ — porting the `LinearForm` tracer to R is more trouble than it's worth. R users get the full set of built-in estimands; if a user needs a brand-new functional, they write the m() in Python and the R booster reads through reticulate.
+- ~~PyPI / CRAN packaging~~ — premature pre-1.0. Pin when the API has stabilized.
+
+See `CLAUDE.md` for design notes and the API design rule.
 
 ## Tests
 

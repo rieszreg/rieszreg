@@ -8,6 +8,18 @@ General-purpose gradient-boosting library for Riesz representers, implementing L
 
 The README's `## Status` and `## Roadmap` sections must stay current too — when a roadmap item ships, move it to "What works today" (or remove if mentioned elsewhere) **in the same commit**. When scope shifts (an item is dropped, deferred, or replaced by something new), update the roadmap with the rationale. Don't let either section drift behind reality. Same applies to any analogous status table in `examples/README.md`.
 
+## Per-estimand example rule
+
+**Every built-in estimand factory must have a worked example** in `examples/`. When you add a new factory (e.g. a new shift variant, a new IPSI form, a longitudinal helper), the change is not done until there's a runnable script demonstrating it on a realistic DGP, with the EEE/one-step plug-in built around it where applicable.
+
+This is non-negotiable: an estimand without an example is a hidden trap — users find it in `dir(rieszboost)`, guess at the API, and silently misuse it. Worked examples are the documentation.
+
+## R wrapper scope
+
+The R wrapper exposes *only the built-in estimands* (`ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`, `StochasticIntervention`). **Do not** add an R-side custom-m() entry point — the `LinearForm` tracer is Python-only and porting it is more trouble than the use case warrants. R users who need a brand-new functional write the m() in Python (as an `Estimand`) and call into it from R via reticulate; that path already works today.
+
+If a new estimand factory is added on the Python side, it should also be exposed in the R `NAMESPACE` and have an integration check in `r/rieszboost/tests/testthat/`.
+
 ## API design rule
 
 The public API should feel like **ngboost / sklearn**:
