@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rieszboost"
+version = "0.0.1"
+description = "Gradient boosting for Riesz representers (Lee & Schuler 2025)."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "xgboost>=2.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+lgb = ["lightgbm>=4.0"]
+jax = ["jax>=0.4"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rieszboost*"]
