@@ -1,0 +1,17 @@
+{
+  "ate_binary_n4000_seed42": {
+    "description": "ATE on Lee-Schuler binary DGP, n=4000, seed=42, n_estimators=300, lr=0.05, max_depth=4, random_state=0. No early stopping.",
+    "alpha_rmse": 0.6272,
+    "tol": 0.10
+  },
+  "att_partial_binary_n4000_seed0": {
+    "description": "ATT partial-parameter on binary DGP, n=4000, seed=0, n_estimators=2000, ES=20, val=0.2, lr=0.05, depth=3, reg_lambda=10, random_state=0.",
+    "alpha_rmse": 0.1984,
+    "tol": 0.10
+  },
+  "lase_partial_continuous_n4000_seed0": {
+    "description": "LocalShift (LASE partial) on continuous DGP, delta=1, threshold=0, n=4000, seed=0, n_estimators=2000, ES=20, val=0.2, lr=0.05, depth=3, reg_lambda=10, random_state=0.",
+    "alpha_rmse": 0.1511,
+    "tol": 0.10
+  }
+}
