@@ -44,6 +44,47 @@ def AdditiveShift(
     return m
 
 
+def StochasticIntervention(
+    samples_key: str = "shift_samples",
+    treatment: str = "a",
+    covariates: Sequence[str] = ("x",),
+) -> Callable:
+    """Stochastic intervention via pre-computed Monte Carlo samples.
+
+    The functional is θ = E[∫ μ(a', X) g(a' | A, X) da'] for some intervention
+    density g. We approximate the integral by Monte Carlo: each row `z` must
+    contain a sequence `z[samples_key]` of treatment values drawn from
+    g(· | a, x). The empirical m is
+
+        m(z, alpha) = (1/K) Σ_k alpha(a' = z[samples_key][k], x)
+
+    Pre-sample once before calling `fit(...)`, e.g.:
+
+        rng = np.random.default_rng(0)
+        for row in rows:
+            row["shift_samples"] = rng.normal(
+                row["a"] + delta, sigma, size=n_mc_samples
+            )
+
+    Increasing `n_mc_samples` reduces Monte Carlo noise; common choice is
+    10–50. Note `feature_keys` should NOT include `samples_key` (it's not
+    a tree feature, just a per-row payload).
+    """
+    cov = tuple(covariates)
+
+    def m(z, alpha):
+        x_kwargs = {k: z[k] for k in cov}
+        samples = z[samples_key]
+        K = len(samples)
+        if K == 0:
+            return 0
+        return sum(
+            alpha(**{treatment: float(s), **x_kwargs}) for s in samples
+        ) / K
+
+    return m
+
+
 def ATT(
     p_treated: float, treatment: str = "a", covariates: Sequence[str] = ("x",)
 ) -> Callable:

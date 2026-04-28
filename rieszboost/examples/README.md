@@ -38,24 +38,12 @@ Lee-Schuler tune over a grid (`learning_rate ∈ {0.001, 0.01, 0.1, 0.25}`, `max
 
 ### Cross-check vs the Lee-Schuler reference implementation
 
-`_compare_with_reference.py` runs both fitters on identical data and reports their disagreement. The reference is [`kaitlynjlee/boosting_for_rr`](https://github.com/kaitlynjlee/boosting_for_rr) (`ATE_ES_stochastic`, `ATT_ES_stochastic`). Our `rieszboost.fit(gradient_only=True, learning_rate=lr/2, reg_lambda=0)` reproduces it.
+A standalone comparison script verifies that our `gradient_only=True` engine reproduces Lee-Schuler's reference implementation ([`kaitlynjlee/boosting_for_rr`](https://github.com/kaitlynjlee/boosting_for_rr)). See [COMPARISON.md](lee_schuler/COMPARISON.md) for the full writeup, including the math walkthrough behind the `learning_rate/2` rescaling and a bug we caught in the reference's no-early-stopping path. Headline:
 
-The factor of 2 in learning_rate is intentional: their per-row residual for the squared Riesz loss is half ours (their loss expansion drops a factor of 2 that we keep). With `lr/2` ours matches their dynamics; the remaining tiny disagreement is xgboost's histogram-based split-finding vs sklearn `DecisionTreeRegressor`'s exhaustive scan.
-
-```sh
-git clone https://github.com/kaitlynjlee/boosting_for_rr /tmp/lee_ref
-PYTHONPATH=/tmp/lee_ref .venv/bin/python examples/lee_schuler/_compare_with_reference.py \
-    --n 500 --n_seeds 10 --lr 0.1 --n_estimators 100 --max_depth 3
-```
-
-Typical output (10 seeds, n=500, lr=0.1, n_est=100, depth=3):
-
-```
-ATE: Pearson(ref, ours) = 0.998, RMSE(ref vs ours) = 0.13 vs RMSE(truth) ~ 1.0
-ATT: Pearson(ref, ours) = 0.986, RMSE(ref vs ours) = 0.19 vs RMSE(truth) ~ 0.75
-```
-
-This verifies the augmentation, gradient, and loss are mathematically equivalent.
+| | Pearson(ref, ours) | RMSE(ref vs ours) | RMSE vs truth |
+|---|---|---|---|
+| ATE | 0.998 | 0.13 | ~1.0 |
+| ATT | 0.986 | 0.19 | ~0.75 |
 
 ### Caveat — LASE
 

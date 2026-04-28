@@ -108,8 +108,20 @@ def m_att(z, alpha):
 | `rieszboost.ATT(p_treated, treatment, covariates)` | (a/P(A=1))·(α(1, x) − α(0, x)) | Average treatment on the treated |
 | `rieszboost.TSM(level, treatment, covariates)` | α(level, x) | Treatment-specific mean |
 | `rieszboost.AdditiveShift(delta, treatment, covariates)` | α(a + δ, x) − α(a, x) | Continuous-treatment shift effect |
+| `rieszboost.StochasticIntervention(samples_key, ...)` | (1/K) Σₖ α(a'ₖ, x) | Stochastic interventions / IPSI via Monte Carlo over the intervention density |
 
-More planned: stochastic-shift / IPSI variants. Full LMTP-style longitudinal interventions with time-varying confounding require multi-stage orchestration (a separate Riesz fit per time-stage); the single-stage `rieszboost.fit(...)` API is the right upstream for an LMTP wrapper to call repeatedly.
+For stochastic interventions, pre-sample treatment values from g(·\|a, x) per row and attach them under `samples_key`:
+
+```python
+rng = np.random.default_rng(0)
+for row in rows:
+    row["shift_samples"] = rng.normal(row["a"] + delta, sigma, size=20)
+
+booster = rieszboost.fit(rows, rieszboost.StochasticIntervention(),
+                         feature_keys=("a", "x"), ...)
+```
+
+Full LMTP-style longitudinal interventions with time-varying confounding require multi-stage orchestration (a separate Riesz fit per time-stage); the single-stage `rieszboost.fit(...)` API is the right upstream for an LMTP wrapper to call repeatedly.
 
 ## What works today
 
@@ -117,7 +129,7 @@ More planned: stochastic-shift / IPSI variants. Full LMTP-style longitudinal int
 - Fast path: data augmentation + xgboost custom objective. Pass `gradient_only=True` to disable the second-order Newton step and use first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2 exactly).
 - Slow general path: first-order gradient boosting (Friedman 2001) on the augmented dataset with any sklearn-compatible base learner — `rieszboost.general_fit(..., base_learner=lambda: KernelRidge(...))`.
 - **Bregman-Riesz losses** via `loss_spec=`: `SquaredLoss()` (default — the standard Lee-Schuler / Chernozhukov objective) and `KLLoss()` (φ = t log t with exp link, for density-ratio targets like TSM / IPSI). Plug in your own by implementing the `LossSpec` protocol. Follows Hines & Miles ([2510.16127](https://arxiv.org/abs/2510.16127)) and Kato ([2601.07752](https://arxiv.org/abs/2601.07752)).
-- ATE / ATT / TSM / AdditiveShift estimand factories.
+- ATE / ATT / TSM / AdditiveShift / StochasticIntervention estimand factories.
 - R wrapper via reticulate — bitwise-identical predictions across languages.
 - `init={float, "m1"}` initialization (in α space; loss spec handles the link transform).
 - Early stopping on held-out Riesz loss (`valid_rows=` + `early_stopping_rounds=`).
@@ -127,7 +139,6 @@ More planned: stochastic-shift / IPSI variants. Full LMTP-style longitudinal int
 ## On the roadmap
 
 - lightgbm engine adapter.
-- Stochastic-intervention / IPSI estimands (slow path with integral evaluation).
 - More examples (Lalonde, NHEFS, two-stage longitudinal via repeated single-stage fits).
 
 See `CLAUDE.md` and `~/.claude/plans/i-d-like-to-write-crystalline-raven.md` for the full plan.

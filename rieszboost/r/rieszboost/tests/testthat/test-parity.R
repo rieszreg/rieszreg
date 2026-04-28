@@ -105,6 +105,30 @@ test_that("gradient_only=TRUE works end-to-end", {
 })
 
 
+test_that("StochasticIntervention works from R via list-column payload", {
+  set.seed(7)
+  n <- 400L
+  x <- runif(n, 0, 2)
+  a <- rnorm(n, x^2 - 1, sqrt(2))
+  shift_samples <- lapply(seq_len(n), function(i) rnorm(20, a[i] + 1, 0.5))
+  df <- data.frame(a = a, x = x)
+  df$shift_samples <- shift_samples   # list-column
+
+  fit <- fit_riesz(
+    data = df,
+    m = StochasticIntervention(samples_key = "shift_samples",
+                               treatment = "a", covariates = "x"),
+    feature_keys = c("a", "x"),
+    num_boost_round = 30L,
+    learning_rate = 0.05,
+    max_depth = 3L
+  )
+  alpha_hat <- predict(fit, df)
+  expect_length(alpha_hat, n)
+  expect_true(all(is.finite(alpha_hat)))
+})
+
+
 test_that("R and Python produce identical predictions on the same data", {
   s <- simulate(400L, seed = 4L)
   fit <- fit_riesz(

@@ -1,6 +1,7 @@
 export(ATE)
 export(ATT)
 export(AdditiveShift)
+export(StochasticIntervention)
 export(TSM)
 export(crossfit)
 export(diagnose_alpha)

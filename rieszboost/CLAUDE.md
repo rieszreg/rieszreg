@@ -33,7 +33,7 @@ General-purpose gradient-boosting library for Riesz representers, implementing L
 - `LinearForm` tracer + linearity enforcement via algebra.
 - `build_augmented` + `fit` + `RieszBooster.predict` on the xgboost fast path.
 - `general_fit` slow path: first-order gradient boosting (Friedman 2001) on the augmented dataset with arbitrary sklearn-compatible base learners (line-searched step size each round).
-- ATE / ATT / TSM / AdditiveShift estimand factories.
+- ATE / ATT / TSM / AdditiveShift / StochasticIntervention estimand factories. StochasticIntervention is Monte Carlo: user pre-samples K treatment values per row from the intervention density and stores them under `samples_key`; m averages alpha over those samples (1/K each). Tracer sees finite-point linear combination → fast path works without engine changes.
 - `init={0, float, 'm1'}` initialization; m1 traces m on a constant alpha=1.
 - Early stopping on held-out Riesz loss in both engines; `best_iteration` + predict-with-best-iteration baked in.
 - K-fold cross-fitting (`crossfit.crossfit`) with optional inner-split early stopping.

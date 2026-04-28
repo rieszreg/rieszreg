@@ -47,11 +47,17 @@ use_python_rieszboost <- function(python = NULL, required = TRUE) {
   if (length(missing) > 0) {
     stop("data is missing required columns: ", paste(missing, collapse = ", "))
   }
+  cols <- colnames(data)
   rl <- vector("list", nrow(data))
   for (i in seq_len(nrow(data))) {
     row <- list()
-    for (k in feature_keys) {
-      row[[k]] <- data[[k]][i]
+    for (k in cols) {
+      v <- data[[k]][i]
+      # Unwrap list-columns: data[[k]][i] for a list-column returns a length-1
+      # list whose element is the per-row vector. The Python side expects the
+      # vector itself (e.g. for StochasticIntervention's shift_samples).
+      if (is.list(v) && length(v) == 1L) v <- v[[1]]
+      row[[k]] <- v
     }
     rl[[i]] <- reticulate::r_to_py(row)
   }
@@ -98,6 +104,25 @@ TSM <- function(level, treatment = "a", covariates = "x") {
 AdditiveShift <- function(delta, treatment = "a", covariates = "x") {
   .module()$AdditiveShift(
     delta = delta,
+    treatment = treatment,
+    covariates = as.list(covariates)
+  )
+}
+
+
+#' Stochastic intervention via pre-computed Monte Carlo samples.
+#'
+#' The functional is `theta = E[integral mu(a', X) g(a' | A, X) da']` for some
+#' intervention density g. Pre-sample treatment values from g per row and
+#' attach them under `samples_key`; the empirical m averages alpha over those
+#' samples.
+#' @param samples_key Per-row column holding a numeric vector of MC samples.
+#' @inheritParams ATE
+#' @export
+StochasticIntervention <- function(samples_key = "shift_samples",
+                                   treatment = "a", covariates = "x") {
+  .module()$StochasticIntervention(
+    samples_key = samples_key,
     treatment = treatment,
     covariates = as.list(covariates)
   )
