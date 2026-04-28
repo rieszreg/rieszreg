@@ -145,7 +145,7 @@ Full LMTP-style longitudinal interventions with time-varying confounding require
 
 Not yet shipped, sized roughly small → large:
 
-- **CV hyperparameter tuning helper.** Currently users wrap `fit(...)` in their own `GridSearchCV`-style loop; a `tune_riesz()` that handles the inner-fold CV with held-out Riesz loss as the criterion would be a small ergonomic win.
+- **sklearn-compatible wrapper for `GridSearchCV`.** `rieszboost.fit()` takes a list of row-dicts and an opaque `m()` callable, so vanilla `GridSearchCV` doesn't accept it directly. The right fix is to expose a thin `BaseEstimator` subclass (with `.fit(X) / .predict(X) / .score(X)` returning negative held-out Riesz loss) and a tuning-loop recipe in `examples/`, not a bespoke `tune_riesz()` helper. Lee-Schuler's reference is sklearn-shaped end-to-end and gets tuning from `GridSearchCV` for free; we should match that.
 - **Serialization** — `RieszBooster.save(path)` / `load(path)` so fitted models survive a session, with the metadata sidecar (loss spec, feature_keys, base_score) written alongside the xgboost binary.
 - **More example datasets.** Lalonde (ATE under selection), NHEFS (continuous shift), a two-stage longitudinal example demonstrating how to compose `rieszboost.fit(...)` calls across time-stages. The current `examples/` covers Lee-Schuler's synthetic DGPs only.
 - **R-side custom `m()`.** The `LinearForm` tracer is Python-only — R users currently use the built-in factories or write Python via reticulate. Porting the tracer to R is non-trivial; alternative is a JSON-spec syntax (`m: list(coef=c(1,-1), points=...)`) that round-trips through Python.
