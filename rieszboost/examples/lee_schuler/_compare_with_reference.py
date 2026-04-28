@@ -57,20 +57,19 @@ def compare_ate(seed: int, n: int, lr_ref: float, n_estimators: int, max_depth: 
     alpha_ref = ref.predict(np.column_stack([A, X]))
 
     # --- Ours: gradient_only=True, lr_ref/2 to match their gradient scale ---
-    rows = [{"a": float(a_i), "x": float(X[i, 0])} for i, a_i in enumerate(A)]
-    booster = rieszboost.fit(
-        rows,
-        rieszboost.ATE(treatment="a", covariates=("x",)),
-        feature_keys=("a", "x"),
-        gradient_only=True,
+    import pandas as pd
+    df = pd.DataFrame({"a": A.astype(float), "x": X[:, 0]})
+    booster = rieszboost.RieszBooster(
+        estimand=rieszboost.ATE(treatment="a", covariates=("x",)),
+        backend=rieszboost.XGBoostBackend(gradient_only=True),
         learning_rate=lr_ref / 2.0,
-        num_boost_round=n_estimators,
+        n_estimators=n_estimators,
         max_depth=max_depth,
-        reg_lambda=0.0,            # no shrinkage to match sklearn DT mean
-        seed=0,
+        reg_lambda=0.0,
+        random_state=0,
         init=0.0,
-    )
-    alpha_ours = booster.predict(rows)
+    ).fit(df)
+    alpha_ours = booster.predict(df)
 
     # Truth
     alpha_truth = ate_dgp.riesz_rep(A, X)
@@ -107,19 +106,19 @@ def compare_att(seed, n, lr_ref, n_estimators, max_depth):
     ref.fit(np.column_stack([A, X]))
     alpha_ref = ref.predict(np.column_stack([A, X]))
 
-    rows = [{"a": float(a_i), "x": float(X[i, 0])} for i, a_i in enumerate(A)]
-    booster = rieszboost.fit(
-        rows, rieszboost.ATT(),
-        feature_keys=("a", "x"),
-        gradient_only=True,
+    import pandas as pd
+    df = pd.DataFrame({"a": A.astype(float), "x": X[:, 0]})
+    booster = rieszboost.RieszBooster(
+        estimand=rieszboost.ATT(),
+        backend=rieszboost.XGBoostBackend(gradient_only=True),
         learning_rate=lr_ref / 2.0,
-        num_boost_round=n_estimators,
+        n_estimators=n_estimators,
         max_depth=max_depth,
         reg_lambda=0.0,
-        seed=0,
+        random_state=0,
         init=0.0,
-    )
-    alpha_ours = booster.predict(rows)
+    ).fit(df)
+    alpha_ours = booster.predict(df)
 
     # Truth: ATT partial representer alpha_0(A, X) = A - (1-A) pi(X)/(1-pi(X))
     pi = ate_dgp.expected_trt(X)

@@ -27,6 +27,7 @@ import argparse
 import time
 
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 
 import rieszboost
@@ -88,23 +89,22 @@ m_lase_partial = rieszboost.LocalShift(
 
 
 _RIESZ_PARAMS = dict(
-    num_boost_round=3000,
+    n_estimators=3000,
     early_stopping_rounds=20,
+    validation_fraction=0.2,
     learning_rate=0.01,
     max_depth=3,
     reg_lambda=1.0,
-    seed=0,
+    random_state=0,
 )
 
 
-def fit_alpha(rows_train, rows_valid, m):
-    return rieszboost.fit(
-        rows_train,
-        m,
-        feature_keys=("a", "x"),
-        valid_rows=rows_valid,
-        **_RIESZ_PARAMS,
-    )
+def _df(a, x):
+    return pd.DataFrame({"a": a.astype(float), "x": x.astype(float)})
+
+
+def fit_alpha(df_train, estimand):
+    return rieszboost.RieszBooster(estimand=estimand, **_RIESZ_PARAMS).fit(df_train)
 
 
 def eee_ase(a, x, y, mu_hat, alpha_hat):
@@ -137,17 +137,16 @@ def run_one_rep(rng, n=1000, train_frac=0.5):
 
     a_tr, x_tr, y_tr = a[:n_tr], x[:n_tr], y[:n_tr]
     a_es, x_es, y_es = a[n_tr:], x[n_tr:], y[n_tr:]
-    rows_tr = [{"a": float(ai), "x": float(xi)} for ai, xi in zip(a_tr, x_tr)]
-    rows_es = [{"a": float(ai), "x": float(xi)} for ai, xi in zip(a_es, x_es)]
+    df_tr = _df(a_tr, x_tr)
+    df_es = _df(a_es, x_es)
 
-    n_inner = int(0.8 * len(rows_tr))
     mu_hat = fit_outcome_regression(a_tr, x_tr, y_tr)
 
-    booster_ase = fit_alpha(rows_tr[:n_inner], rows_tr[n_inner:], m_ase)
-    booster_lase = fit_alpha(rows_tr[:n_inner], rows_tr[n_inner:], m_lase_partial)
+    booster_ase = fit_alpha(df_tr, m_ase)
+    booster_lase = fit_alpha(df_tr, m_lase_partial)
 
-    alpha_hat_ase = booster_ase.predict(rows_es)
-    alpha_hat_lase = booster_lase.predict(rows_es)
+    alpha_hat_ase = booster_ase.predict(df_es)
+    alpha_hat_lase = booster_lase.predict(df_es)
 
     alpha_true_ase = alpha_truth_ase(a_es, x_es)
     alpha_true_lase = alpha_truth_lase_partial(a_es, x_es)

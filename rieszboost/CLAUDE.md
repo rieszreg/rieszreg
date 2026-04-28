@@ -8,12 +8,23 @@ General-purpose gradient-boosting library for Riesz representers, implementing L
 
 The README's `## Status` and `## Roadmap` sections must stay current too — when a roadmap item ships, move it to "What works today" (or remove if mentioned elsewhere) **in the same commit**. When scope shifts (an item is dropped, deferred, or replaced by something new), update the roadmap with the rationale. Don't let either section drift behind reality. Same applies to any analogous status table in `examples/README.md`.
 
+## API design rule
+
+The public API should feel like **ngboost / sklearn**:
+
+- Object-oriented factories that bake in configuration (estimand, loss, backend, hyperparameters) at construction; `BaseEstimator`-compatible `fit / predict / score` on every fittable thing; swappable orthogonal components (backend, loss, estimand). Anything that can't compose with `sklearn.model_selection` (`GridSearchCV`, `cross_val_predict`, `Pipeline`) is a regression and should be fixed.
+- **No `feature_keys` (or other input-schema args) on `fit()` / `predict()`.** The estimand owns its input schema — `feature_keys`, `extra_keys`, anything else. If a new estimand needs different inputs, that's a property of the estimand object, not a separate argument the user repeats every call.
+- Cross-fitting is `sklearn.model_selection.cross_val_predict`. Don't reintroduce a bespoke `crossfit()` function.
+- Hyperparameter tuning is `sklearn.model_selection.GridSearchCV` (or `HalvingGridSearchCV`, etc.). Don't introduce a `tune_riesz()`.
+
+R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df)$predict(df)`) rather than functional `fit_riesz()` shims.
+
 ## Layout
 
 - `python/` — primary implementation. Library is `rieszboost/`; tests in `tests/`. Build/dependency config in `pyproject.toml`.
 - `reference/` — arXiv source for the relevant papers (gitignored). See `reference/README.md` for the index and refetch script.
 - `.venv/` — local Python venv (gitignored once we add a top-level `.gitignore`).
-- `r/rieszboost/` — R wrapper via reticulate. Same API as Python: `fit_riesz`, `predict.RieszBooster`, `crossfit`, `diagnose_alpha`, and the `ATE`/`ATT`/`TSM`/`AdditiveShift` factories. Custom user-supplied m() must currently be written in Python — the LinearForm tracer is Python-only. Run R tests via `pkgload::load_all` + `testthat::test_dir`; the parity test confirms R/Python predictions are bitwise-identical.
+- `r/rieszboost/` — R6 wrapper via reticulate. Construct with `RieszBooster$new(estimand=, loss=, ...)`; `$fit(df)`, `$predict(df)`, `$score(df)`, `$diagnose(df)`. All estimand factories (`ATE()`, `ATT()`, `TSM()`, `AdditiveShift()`, `LocalShift()`, `StochasticIntervention()`) and loss specs (`SquaredLoss()`, `KLLoss()`) and backends (`XGBoostBackend()`, `SklearnBackend()`) are exposed. Custom user-supplied m() must currently be written in Python — the LinearForm tracer is Python-only. Run R tests via `pkgload::load_all` + `testthat::test_dir`; the parity test confirms R/Python predictions are bitwise-identical.
 
 ## Run tests
 
@@ -32,19 +43,17 @@ The README's `## Status` and `## Roadmap` sections must stay current too — whe
 
 ## What's done (v0.0.1)
 
-- `LinearForm` tracer + linearity enforcement via algebra.
-- `build_augmented` + `fit` + `RieszBooster.predict` on the xgboost fast path.
-- `general_fit` slow path: first-order gradient boosting (Friedman 2001) on the augmented dataset with arbitrary sklearn-compatible base learners (line-searched step size each round).
-- ATE / ATT / LocalShift / TSM / AdditiveShift / StochasticIntervention estimand factories.
-  - **ATT and LocalShift fit partial-parameter representers**: ATT uses `m(z, μ) = A·(μ(1,X) − μ(0,X))`, LocalShift uses `m(z, μ) = 1(A < threshold)·(μ(A+δ,X) − μ(A,X))`. The full ATT and LASE involve dividing by P(A=…) — these are NOT Riesz functionals and need delta-method downstream. **Do not** introduce an `ATT(p_treated)` "direct" factory; that hides where the variability comes from and can mislead users into using the wrong EIF.
-  - StochasticIntervention is Monte Carlo: user pre-samples K treatment values per row from the intervention density and stores them under `samples_key`; m averages alpha over those samples (1/K each). Tracer sees finite-point linear combination → fast path works without engine changes.
-- `init={0, float, 'm1'}` initialization; m1 traces m on a constant alpha=1.
-- Early stopping on held-out Riesz loss in both engines; `best_iteration` + predict-with-best-iteration baked in.
-- K-fold cross-fitting (`crossfit.crossfit`) with optional inner-split early stopping.
-- Diagnostics (`diagnostics.diagnose`) — RMS, |α| quantiles, extreme-row count, near-positivity and outlier-extrapolation warnings, held-out Riesz loss.
-- 36 Python tests + 13 R tests passing.
-- R wrapper via reticulate — same surface as Python.
-- Bregman-Riesz framework: `LossSpec` protocol with `link_to_alpha` / `alpha_to_eta` so xgboost boosts in η-space and predictions live in α-space. Concrete: `SquaredLoss` (identity link), `KLLoss` (exp link, requires non-negative m-coefficients). Note: KL on the Lee-Schuler-style augmented dataset is structurally less stable than squared because pure-counterfactual rows (a=0, b<0) have no minimum in η, so leaf weights at low-overlap points can extrapolate. Document this when promoting KL.
+- **sklearn-compatible `RieszBooster(BaseEstimator)`** in `python/rieszboost/estimator.py`. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`. Configuration objects (estimand, loss, backend) baked in at construction; `.fit / .predict / .score / .diagnose` at use time. Accepts ndarray (columns matched to `estimand.feature_keys`) or DataFrame (columns matched by name; `extra_keys` payload pulled through).
+- **`Estimand` class** owns its input schema (`feature_keys`, `extra_keys`, m). No more `feature_keys=` arg on `fit()`. Factories: `ATE / ATT / LocalShift / TSM / AdditiveShift / StochasticIntervention`. ATT and LocalShift fit *partial-parameter* representers (full ATT/LASE require delta-method downstream).
+- **Backends** (swappable): `XGBoostBackend(hessian_floor=2.0, gradient_only=False)` and `SklearnBackend(base_learner_factory)`. New backends slot in without touching `RieszBooster`.
+- **Bregman-Riesz losses**: `LossSpec` protocol with `link_to_alpha` / `alpha_to_eta`. `SquaredLoss` (identity link, default), `KLLoss` (exp link, for density-ratio targets; requires non-negative m-coefficients).
+- `LinearForm` tracer + linearity enforcement; `build_augmented` extracted to `augmentation.py`.
+- `init={float, 'm1', None}` in α-space; loss spec converts to η for the booster.
+- Early stopping via `validation_fraction` (auto internal split) or explicit `eval_set=`; `best_iteration_` + predict-with-best-iteration baked in.
+- Cross-fitting via `sklearn.model_selection.cross_val_predict` (no bespoke `crossfit()` function).
+- Diagnostics: `booster.diagnose(X)` or top-level `rieszboost.diagnose(...)`.
+- R wrapper is R6-style: `RieszBooster$new(estimand=, loss=, ...)` with `$fit/$predict/$score/$diagnose`. Bitwise-identical predictions vs Python.
+- 51 Python tests + R parity test passing. Includes acceptance gates for `clone`, `GridSearchCV`, `cross_val_predict`.
 
 ## Longitudinal / LMTP
 
@@ -57,10 +66,6 @@ Full LMTP support requires multi-stage orchestration (one Riesz fit per time-sta
 - `gradient_only=True` on `fit(...)` short-circuits the LossSpec hessian and sends `hess=ones_like(grad)` to xgboost — exactly first-order gradient boosting (Lee-Schuler Algorithm 2). Empirically on the binary-DGP example it's *worse* than the floored second-order path at matched hyperparameters (ATE α-RMSE ~2.0 vs ~1.2; ATT ~1.0 vs ~0.8). Even though the second-order Hessian is artificial (it's just our floor), the leaf-weight balancing seems to help relative to first-order.
 - Cross-check vs Kaitlyn Lee's reference implementation (`kaitlynjlee/boosting_for_rr`): our `gradient_only=True, learning_rate=lr_ref/2, reg_lambda=0` reproduces `ATE_ES_stochastic` / `ATT_ES_stochastic` to Pearson 0.998 / 0.986 on identical data. The factor of 2 is real: their per-row residual is `f - (2a-1)` (drops a factor of 2 from the natural Riesz loss gradient `2(2aF + b)`), ours is `2aF + b`. Their `fit_internal` (no early stopping path) has a shape bug — `A.reshape(-1,1)` then `A == 1` for indexing 1D arrays — only `fit_internal_early_stopping` works.
 
-## What's next (per `~/.claude/plans/i-d-like-to-write-crystalline-raven.md`)
+## What's next
 
-- lightgbm engine adapter.
-- Slow general path with sklearn/JAX base learners.
-- Longitudinal/LMTP estimand factory and ATT factory.
-- R wrapper via reticulate.
-- Bregman extension (v2; design `LossSpec` abstraction now so v2 is additive).
+See README's `## On the roadmap` section. Headlines: serialization, more example datasets (Lalonde / NHEFS / two-stage longitudinal), R-side custom m(), lightgbm backend, more Bregman losses, packaging.

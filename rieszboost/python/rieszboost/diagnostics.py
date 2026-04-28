@@ -9,7 +9,7 @@ plug-in estimator's variance will inflate.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -55,20 +55,29 @@ def diagnose(
     alpha_hat: np.ndarray | None = None,
     *,
     booster=None,
+    X=None,
     rows: Sequence[dict[str, Any]] | None = None,
-    m: Callable | None = None,
+    m=None,
     extreme_threshold: float = 30.0,
     extreme_fraction_warn: float = 0.01,
 ) -> Diagnostics:
-    """Compute diagnostics from either pre-computed `alpha_hat` or by predicting
-    with `booster` on `rows`. If `m` is also provided, the held-out Riesz loss
-    is computed."""
+    """Compute diagnostics from either pre-computed `alpha_hat` or by
+    predicting with `booster.predict(X)`. If `(booster, X)` is given, the
+    held-out Riesz loss is computed automatically using the booster's
+    estimand and loss spec.
+
+    `rows` / `m` are accepted for backward compatibility (legacy callers) —
+    if you have a fitted `RieszBooster`, just pass `booster=…, X=…`.
+    """
     if alpha_hat is None:
-        if booster is None or rows is None:
-            raise ValueError(
-                "diagnose requires either alpha_hat or (booster, rows)"
-            )
-        alpha_hat = np.asarray(booster.predict(rows))
+        if booster is None:
+            raise ValueError("diagnose requires either alpha_hat or booster + X")
+        if X is None and rows is None:
+            raise ValueError("diagnose requires X (or rows for legacy boosters)")
+        if X is not None:
+            alpha_hat = np.asarray(booster.predict(X))
+        else:
+            alpha_hat = np.asarray(booster.predict(rows))
     alpha_hat = np.asarray(alpha_hat)
 
     abs_alpha = np.abs(alpha_hat)
@@ -77,8 +86,16 @@ def diagnose(
     extreme_fraction = float(n_extreme / len(alpha_hat))
 
     riesz_loss = None
-    if booster is not None and rows is not None and m is not None:
-        riesz_loss = booster.riesz_loss(rows, m)
+    if booster is not None:
+        if X is not None and hasattr(booster, "riesz_loss") and callable(booster.riesz_loss):
+            try:
+                riesz_loss = booster.riesz_loss(X)
+            except TypeError:
+                # Legacy signature `riesz_loss(rows, m)`
+                if rows is not None and m is not None:
+                    riesz_loss = booster.riesz_loss(rows, m)
+        elif rows is not None and m is not None and hasattr(booster, "riesz_loss"):
+            riesz_loss = booster.riesz_loss(rows, m)
 
     warnings: list[str] = []
     if extreme_fraction > extreme_fraction_warn:

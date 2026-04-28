@@ -1,43 +1,56 @@
-from .estimands import ATE, ATT, LocalShift, TSM, AdditiveShift, StochasticIntervention
-from .tracer import LinearForm, Tracer, trace
+"""rieszboost: gradient boosting for Riesz representers.
 
+Public API: a sklearn-compatible `RieszBooster` estimator with swappable
+estimand / loss / backend objects baked in at construction.
+
+    from rieszboost import RieszBooster, ATE, SquaredLoss
+    booster = RieszBooster(estimand=ATE(), n_estimators=200, learning_rate=0.05)
+    booster.fit(X)
+    alpha_hat = booster.predict(X)
+"""
+
+from .augmentation import AugmentedDataset, build_augmented
+from .diagnostics import Diagnostics, diagnose
+from .estimand import (
+    ATE,
+    ATT,
+    AdditiveShift,
+    Estimand,
+    LocalShift,
+    StochasticIntervention,
+    TSM,
+)
 from .losses import KLLoss, LossSpec, SquaredLoss
+from .tracer import LinearForm, Tracer, trace
 
 __all__ = [
     "ATE",
     "ATT",
     "AdditiveShift",
-    "CrossFitResult",
+    "AugmentedDataset",
     "Diagnostics",
-    "GeneralRieszBooster",
+    "Estimand",
     "KLLoss",
     "LinearForm",
     "LocalShift",
     "LossSpec",
     "RieszBooster",
+    "SklearnBackend",
     "SquaredLoss",
     "StochasticIntervention",
     "TSM",
     "Tracer",
+    "XGBoostBackend",
     "build_augmented",
-    "crossfit",
     "diagnose",
-    "fit",
-    "general_fit",
     "trace",
 ]
 
 
 _LAZY = {
-    "RieszBooster": ("engine", "RieszBooster"),
-    "build_augmented": ("engine", "build_augmented"),
-    "fit": ("engine", "fit"),
-    "crossfit": ("crossfit", "crossfit"),
-    "CrossFitResult": ("crossfit", "CrossFitResult"),
-    "diagnose": ("diagnostics", "diagnose"),
-    "Diagnostics": ("diagnostics", "Diagnostics"),
-    "general_fit": ("general", "general_fit"),
-    "GeneralRieszBooster": ("general", "GeneralRieszBooster"),
+    "RieszBooster": ("estimator", "RieszBooster"),
+    "XGBoostBackend": ("backends", "XGBoostBackend"),
+    "SklearnBackend": ("backends", "SklearnBackend"),
 }
 
 

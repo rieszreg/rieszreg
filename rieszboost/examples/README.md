@@ -25,7 +25,7 @@ Two of the four estimands in Lee-Schuler are not themselves Riesz functionals �
 | **ASE** = E[μ(A+δ,X) − μ(A,X)] | yes — `m(O,μ) = μ(A+δ,X) − μ(A,X)` | `α₀ = p(A−δ\|X)/p(A\|X) − 1` | none |
 | **LASE** = E[μ(A+δ,X) − μ(A,X) \| A < t] | **no** — equals `θ_partial / P(A<t)` | partial: `m(O,μ) = 1(A<t)·(μ(A+δ,X) − μ(A,X))`. `α_partial = 1(A<t+δ)·p(A−δ\|X)/p(A\|X) − 1(A<t)` | `ψ_LASE = ψ_partial / p̂_t` with EIF correction |
 
-`rieszboost`'s built-in `ATT()` and `LocalShift(delta, threshold)` factories return the *partial-parameter* m for ATT and LASE respectively. The example scripts then build the EIF and EEE estimator inline.
+`rieszboost.ATT()` and `rieszboost.LocalShift(delta, threshold)` return `Estimand` objects for the *partial-parameter* m. The example scripts wrap them in `RieszBooster(estimand=...)` and build the EIF + EEE estimator inline.
 
 ## Reproducing the paper
 

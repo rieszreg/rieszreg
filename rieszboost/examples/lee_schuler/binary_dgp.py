@@ -22,6 +22,7 @@ import argparse
 import time
 
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 
 import rieszboost
@@ -63,39 +64,36 @@ def predict_mu(mu_hat: xgb.Booster, a: np.ndarray, x: np.ndarray) -> np.ndarray:
 
 
 # Lee-Schuler tune hyperparameters via CV; we use moderate fixed defaults.
-# With the engine's hessian_floor=2.0 (Friedman-style row weighting), standard
-# xgboost-style defaults work — no sledgehammer reg_lambda needed.
 _RIESZ_PARAMS = dict(
-    num_boost_round=3000,
+    n_estimators=3000,
     early_stopping_rounds=20,
+    validation_fraction=0.2,
     learning_rate=0.01,
     max_depth=3,
     reg_lambda=1.0,
-    seed=0,
+    random_state=0,
 )
 
 
-def fit_alpha_ate(rows_train, rows_valid):
-    return rieszboost.fit(
-        rows_train,
-        rieszboost.ATE(treatment="a", covariates=("x",)),
-        feature_keys=("a", "x"),
-        valid_rows=rows_valid,
+def _df(a, x):
+    return pd.DataFrame({"a": a.astype(float), "x": x.astype(float)})
+
+
+def fit_alpha_ate(df_train):
+    return rieszboost.RieszBooster(
+        estimand=rieszboost.ATE(treatment="a", covariates=("x",)),
         **_RIESZ_PARAMS,
-    )
+    ).fit(df_train)
 
 
-def fit_alpha_att(rows_train, rows_valid):
+def fit_alpha_att(df_train):
     """Fits the Riesz representer of the ATT *partial parameter*
     `theta_partial = E[A*(mu(1,X) - mu(0,X))]`. The full ATT is
     `theta_partial / P(A=1)` and is handled by `eee_att` via delta method."""
-    return rieszboost.fit(
-        rows_train,
-        rieszboost.ATT(treatment="a", covariates=("x",)),
-        feature_keys=("a", "x"),
-        valid_rows=rows_valid,
+    return rieszboost.RieszBooster(
+        estimand=rieszboost.ATT(treatment="a", covariates=("x",)),
         **_RIESZ_PARAMS,
-    )
+    ).fit(df_train)
 
 
 def eee_ate(a, x, y, mu_hat, alpha_hat):
@@ -144,20 +142,16 @@ def run_one_rep(rng, n=1000, train_frac=0.5):
     x_tr, a_tr, y_tr = x[:n_tr], a[:n_tr], y[:n_tr]
     x_es, a_es, y_es, pi_es = x[n_tr:], a[n_tr:], y[n_tr:], pi[n_tr:]
 
-    rows_tr = [{"a": float(ai), "x": float(xi)} for ai, xi in zip(a_tr, x_tr)]
-    rows_es = [{"a": float(ai), "x": float(xi)} for ai, xi in zip(a_es, x_es)]
-
-    n_inner = int(0.8 * len(rows_tr))
-    rb_train = rows_tr[:n_inner]
-    rb_valid = rows_tr[n_inner:]
+    df_tr = _df(a_tr, x_tr)
+    df_es = _df(a_es, x_es)
 
     mu_hat = fit_outcome_regression(a_tr, x_tr, y_tr)
 
-    booster_ate = fit_alpha_ate(rb_train, rb_valid)
-    booster_att = fit_alpha_att(rb_train, rb_valid)
+    booster_ate = fit_alpha_ate(df_tr)
+    booster_att = fit_alpha_att(df_tr)
 
-    alpha_hat_ate = booster_ate.predict(rows_es)
-    alpha_hat_att = booster_att.predict(rows_es)
+    alpha_hat_ate = booster_ate.predict(df_es)
+    alpha_hat_att = booster_att.predict(df_es)
 
     alpha_true_ate = alpha_truth_ate(a_es, pi_es)
     alpha_true_att = alpha_truth_att_partial(a_es, pi_es)
