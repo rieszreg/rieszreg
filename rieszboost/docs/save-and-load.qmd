@@ -4,7 +4,7 @@ title: "Save and load"
 
 {{< include _setup.qmd >}}
 
-A fitted `RieszBooster` serializes to a directory containing the model binary plus a JSON metadata sidecar (loss spec, estimand identity, feature schema, base score, best iteration). Built-in estimands are reconstructed automatically on load; custom estimands have to be re-passed.
+A fitted `RieszBooster` serializes to a directory containing the model binary and a JSON metadata sidecar (loss spec, estimand identity, feature schema, base score, best iteration). Built-in estimands are reconstructed automatically on load. Custom estimands must be re-passed.
 
 ## Round-trip
 
@@ -76,7 +76,7 @@ unlink(td, recursive = TRUE)
 
 ## Cross-language
 
-Save in one language, load in the other. The on-disk format is the same — the xgboost model is xgboost's native UBJSON, and the metadata sidecar is plain JSON.
+Save in one language, load in the other. The xgboost model is xgboost's native UBJSON, and the metadata sidecar is plain JSON.
 
 ```r
 # In R: save the booster
@@ -89,7 +89,7 @@ loaded = RieszBooster.load("alpha_ate")
 loaded.predict(new_df)
 ```
 
-The R parity test exercises both directions with `tolerance = 1e-12`, and our test suite asserts that predictions are bitwise-identical pre- and post-save.
+The R parity test exercises both directions with `tolerance = 1e-12`. The Python suite asserts that predictions are bitwise-identical pre- and post-save.
 
 ## Custom estimands
 

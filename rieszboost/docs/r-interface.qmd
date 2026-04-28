@@ -4,13 +4,13 @@ title: "R interface"
 
 {{< include _setup.qmd >}}
 
-The R wrapper is an [R6](https://r6.r-lib.org/) mirror of the Python `RieszBooster`. R-side and Python-side predictions are **bitwise-identical** on the same data because the R wrapper delegates every numerical step to Python via [reticulate](https://rstudio.github.io/reticulate/) — the R object holds a reference to the underlying Python `RieszBooster` instance and forwards method calls.
+The R wrapper is an [R6](https://r6.r-lib.org/) class that calls the Python `RieszBooster` through [reticulate](https://rstudio.github.io/reticulate/). Predictions are bitwise-identical to the Python results on the same input.
 
-This page is a focused R reference. The R API is covered throughout the rest of the guide via the bilingual tabsets — install in [install.qmd](install.qmd), the standard fit pattern in [quickstart.qmd](quickstart.qmd), the full estimand inventory in [estimands.qmd](estimands.qmd), and so on.
+The R API is covered throughout the guide via the bilingual tabsets: see [install](install.qmd) for setup, [quickstart](quickstart.qmd) for the standard fit pattern, and [estimands](estimands.qmd) for the full estimand inventory. This page is the focused R reference.
 
-## One-time setup
+## Setup
 
-After installing `rieszboost` into a Python venv (see [install.qmd](install.qmd)):
+After installing `rieszboost` into a Python venv (see [install](install.qmd)):
 
 ```r
 # Option A: env var, set before R starts
@@ -20,11 +20,9 @@ Sys.setenv(RETICULATE_PYTHON = "/path/to/rieszboost/.venv/bin/python")
 use_python_rieszboost("/path/to/rieszboost/.venv/bin/python")
 ```
 
-`use_python_rieszboost()` accepts either a path to a Python interpreter or a path to a virtualenv directory; it forwards to the appropriate reticulate function. It also imports the Python `rieszboost` module up front so any subsequent `ATE()`, `RieszBooster$new(...)`, etc. work without per-call import overhead.
+`use_python_rieszboost()` accepts a path to a Python interpreter or a virtualenv directory and forwards to the appropriate reticulate function. It also imports the Python `rieszboost` module so subsequent calls have no per-call import overhead.
 
-## API surface (R-side)
-
-Every public Python class and function except the symbolic tracer is exposed in R:
+## API surface
 
 | R | Python equivalent |
 |---|---|
@@ -36,6 +34,8 @@ Every public Python class and function except the symbolic tracer is exposed in 
 | `StochasticIntervention(samples_key, treatment, covariates)` | `rieszboost.StochasticIntervention(...)` |
 | `SquaredLoss()` | `rieszboost.SquaredLoss()` |
 | `KLLoss(max_eta)` | `rieszboost.KLLoss(max_eta)` |
+| `BernoulliLoss(max_abs_eta)` | `rieszboost.BernoulliLoss(...)` |
+| `BoundedSquaredLoss(lo, hi, max_abs_eta)` | `rieszboost.BoundedSquaredLoss(...)` |
 | `XGBoostBackend(hessian_floor, gradient_only)` | `rieszboost.XGBoostBackend(...)` |
 | `SklearnBackend(base_learner_factory)` | `rieszboost.SklearnBackend(...)` |
 | `RieszBooster$new(estimand, ...)` | `rieszboost.RieszBooster(estimand, ...)` |
@@ -43,14 +43,16 @@ Every public Python class and function except the symbolic tracer is exposed in 
 | &nbsp;&nbsp;`$predict(df)` | `.predict(X)` |
 | &nbsp;&nbsp;`$score(df)` | `.score(X)` |
 | &nbsp;&nbsp;`$riesz_loss(df)` | `.riesz_loss(X)` |
-| &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(X)` (returns a list, with `$summary` as a string) |
-| &nbsp;&nbsp;`$py` | the underlying Python object (escape hatch) |
+| &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(X)` (returns a list with `$summary` as a string) |
+| &nbsp;&nbsp;`$save(path)` | `.save(path)` |
+| `load_riesz_booster(path)` | `RieszBooster.load(path)` |
+| &nbsp;&nbsp;`$py` | the underlying Python object |
 
-R6's `$method()` syntax invariably maps to Python's `.method()`. Integer-typed kwargs (`n_estimators`, `max_depth`, `random_state`, `early_stopping_rounds`) need an `L` suffix in R, e.g. `n_estimators = 200L`. Other kwargs are auto-converted by reticulate.
+R6's `$method()` syntax maps to Python's `.method()`. Integer-typed kwargs (`n_estimators`, `max_depth`, `random_state`, `early_stopping_rounds`) take an `L` suffix in R: `n_estimators = 200L`. Other kwargs are auto-converted by reticulate.
 
-## Verifying parity
+## Parity
 
-The parity claim is not aspirational — it's tested in CI. Here's the same fit run from both languages, comparing predictions row-by-row.
+The same fit produces the same predictions in both languages. The R test suite verifies this with `tolerance = 1e-12`.
 
 ::: {.panel-tabset group="lang"}
 
@@ -92,14 +94,13 @@ head(alpha_r, 5)
 
 :::
 
-(The two RNGs are different — Python's `default_rng(0)` and R's `set.seed(0)` give different `x` and `a` columns, so `alpha_py` and `alpha_r` are not directly comparable here. To verify parity end-to-end, generate the data in one language, pass it to the other via reticulate, and compare predictions on the *same* `df`. The R package's test suite includes exactly that test.)
+The two columns above use different RNGs (`default_rng(0)` versus `set.seed(0)`), so the `df` and the predictions differ between tabs. To verify parity end-to-end, fit on the same data in both languages and compare predictions row-by-row.
 
-## Calling Python-only features from R
+## Custom Python objects from R
 
-The `LinearForm` tracer is Python-only — for now, custom estimands (those needing the tracer) require defining `m()` in Python. From R you can still drive a custom Python `m()` end-to-end via reticulate:
+The `LinearForm` tracer is Python-only. To use a custom estimand or `LossSpec` subclass from R, define it in Python via reticulate:
 
 ```r
-# Define a custom m in Python (e.g. in a script you `source` from R)
 reticulate::py_run_string("
 def m_my_thing(z, alpha):
     return 2.0 * (alpha(a=2, x=z['x']) - alpha(a=0, x=z['x']))
@@ -114,29 +115,17 @@ booster$fit(df_r)
 booster$predict(df_r)[1:5]
 ```
 
-The same pattern works for custom `LossSpec` subclasses: define the class in Python, grab the instance via `reticulate::py$...`, pass to `RieszBooster$new(loss = ...)`.
+The same pattern works for custom `LossSpec` subclasses: subclass in Python and pass the instance via `loss=`.
 
-## Escape hatch
+## Reaching the Python object directly
 
-Every R6 method ultimately calls into the underlying Python object. If something isn't yet wrapped, you can always reach through:
+`booster$py` is the underlying Python `RieszBooster`. Use it for attributes the R6 wrapper doesn't expose:
 
 ```r
 booster <- RieszBooster$new(estimand = ATE(), n_estimators = 50L)
 booster$fit(df_r)
 
-# These exist on the Python side:
 reticulate::py_to_r(booster$py$best_iteration_)
 reticulate::py_to_r(booster$py$best_score_)
 reticulate::py_to_r(booster$py$base_score_)
 ```
-
-The `$py` field is the underlying Python object; reticulate handles the conversion both ways. Use this for occasional access to attributes the R6 wrapper doesn't expose; if you find yourself using it constantly, file an issue and we'll add an R-side accessor.
-
-## What's not in R yet
-
-| Feature | Workaround |
-|---|---|
-| Custom `m()` for new estimands (the symbolic tracer is Python-only) | Define `m()` in Python via `reticulate::py_run_string`, then pass the resulting `Estimand` to `RieszBooster$new(estimand=...)`. See above. |
-| Custom `LossSpec` subclasses | Same pattern: subclass in Python via `reticulate::py_run_string`, pass via `loss=`. |
-
-Everything else — every built-in estimand, both backends, both losses, the full `RieszBooster` API including `cross_val_predict` via reticulate (see [sklearn-integration.qmd](sklearn-integration.qmd)) — is first-class in R.
