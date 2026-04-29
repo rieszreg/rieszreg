@@ -1,13 +1,13 @@
 # forestriesz
 
-Random-forest Riesz regression, in **Python** and **R**. Sister package to [krrr](../krrr/) and [rieszboost](../rieszboost/) in the [RieszReg family](../README.md): same scope (Riesz representers for linear functionals; θ(P) = E[m(Z, g₀)]), same user-facing API, but the fitter is a generalized random forest.
+Random-forest Riesz regression, in **Python** and **R**. Sister package to [krrr](https://github.com/rieszreg/krrr) and [rieszboost](https://github.com/rieszreg/rieszboost) in the [RieszReg family](https://github.com/rieszreg/rieszreg): same scope (Riesz representers for linear functionals; θ(P) = E[m(Z, g₀)]), same user-facing API, but the fitter is a generalized random forest.
 
 Two backends ship side-by-side, both built on EconML's `BaseGRF`:
 
 - **`ForestRieszRegressor`** — moment-style. Implements [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (ICML 2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf). Trains on n original rows; needs a sieve (auto-resolved for ATE/ATT/TSM via `default_riesz_features`). Supports honest-split `predict_interval` for single-basis fits.
 - **`AugForestRieszRegressor`** — augmentation-style. Trains on the M = k·n augmented `(a, b)` dataset. **Estimand-agnostic** — works on every built-in estimand and any custom user `Estimand` without a sieve. No CIs in v1 (the augmented training set has correlated blocks per original row, breaking GRF's iid variance assumption).
 
-The augmentation-style variant is novel — see `forestriesz/python/tests/test_aug_vs_moment.py` for a benchmark and the [forest backend docs page](../docs/backends/forest.qmd) for the full comparison.
+The augmentation-style variant is novel — see `forestriesz/python/tests/test_aug_vs_moment.py` for a benchmark and the [forest backend docs page](https://rieszreg.github.io/rieszreg/backends/forest.html) for the full comparison.
 
 ## Status
 
@@ -19,7 +19,7 @@ Forests are the natural fit for problems where (a) you want a non-parametric Rie
 
 ## Install
 
-`forestriesz` depends on the [rieszreg](../rieszreg/) meta-package. From the [RieszReg](..) repo root:
+`forestriesz` depends on the [rieszreg](https://github.com/rieszreg/rieszreg) meta-package. From the [RieszReg](https://github.com/rieszreg/rieszreg) repo root:
 
 ```sh
 git clone https://github.com/rieszreg/forestriesz.git
@@ -258,7 +258,7 @@ alpha_hat = est.predict(df)   # all strictly positive by construction
 
 ## Living-doc rule
 
-`README.md` is a living document — update it in the same edit whenever a change touches the public API surface. The user guide is the unified Quarto site at [`../docs/`](../docs/); the forest-specific page is [`../docs/backends/forest.qmd`](../docs/backends/forest.qmd).
+`README.md` is a living document — update it in the same edit whenever a change touches the public API surface. The user guide is the unified Quarto site at [rieszreg.github.io/rieszreg](https://rieszreg.github.io/rieszreg/); the forest-specific page is [forest backend](https://rieszreg.github.io/rieszreg/backends/forest.html).
 
 ## License
 
