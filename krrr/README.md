@@ -1,6 +1,6 @@
 # krrr
 
-Kernel ridge Riesz regression, in **Python** and **R**. Sister package to [rieszboost](https://github.com/alejandroschuler/rieszboost) in the [RieszReg family](https://github.com/alejandroschuler/rieszreg): same scope (Riesz representers for linear functionals; `θ(P) = E[m(Z, g₀)]`), same user-facing API, but the fitter is kernel ridge regression instead of gradient boosting.
+Kernel ridge Riesz regression, in **Python** and **R**. Sister package to [rieszboost](https://github.com/rieszreg/rieszboost) in the [RieszReg family](https://github.com/rieszreg/rieszreg): same scope (Riesz representers for linear functionals; `θ(P) = E[m(Z, g₀)]`), same user-facing API, but the fitter is kernel ridge regression instead of gradient boosting.
 
 Implements [Singh, *Kernel Ridge Riesz Representers* (arXiv:2102.11076)](https://arxiv.org/abs/2102.11076) for the full set of estimands the rieszreg framework supports — not just TSM1 — by piping rieszreg's augmentation engine into a kernel solve. Includes scalable solvers (Nyström-preconditioned conjugate gradient; random Fourier features; optional Falkon for GPU / very large n).
 
@@ -14,11 +14,11 @@ Singh (2021) gives a closed-form RKHS estimator for the Riesz representer when t
 
 ## Install
 
-`krrr` depends on the [rieszreg](https://github.com/alejandroschuler/rieszreg) meta-package. Clone both as siblings:
+`krrr` depends on the [rieszreg](https://github.com/rieszreg/rieszreg) meta-package. Clone both as siblings:
 
 ```sh
-git clone https://github.com/alejandroschuler/krrr.git
-git clone https://github.com/alejandroschuler/rieszreg.git
+git clone https://github.com/rieszreg/krrr.git
+git clone https://github.com/rieszreg/rieszreg.git
 cd krrr
 python3 -m venv .venv
 .venv/bin/pip install -e ../rieszreg/python

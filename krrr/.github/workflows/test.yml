@@ -21,7 +21,7 @@ jobs:
       - name: Checkout rieszreg (sibling repo)
         uses: actions/checkout@v4
         with:
-          repository: alejandroschuler/rieszreg
+          repository: rieszreg/rieszreg
           path: _rieszreg
 
       - uses: actions/setup-python@v5
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout rieszreg (sibling repo)
         uses: actions/checkout@v4
         with:
-          repository: alejandroschuler/rieszreg
+          repository: rieszreg/rieszreg
           path: _rieszreg
 
       - uses: actions/setup-python@v5
