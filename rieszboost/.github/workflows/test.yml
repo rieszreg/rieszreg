@@ -91,9 +91,12 @@ jobs:
           Rscript -e '
             pkgload::load_all("_rieszreg/rieszreg/r/rieszreg", quiet=TRUE)
             pkgload::load_all("r/rieszboost", quiet=TRUE)
-            stopifnot(testthat::test_dir(
+            # stop_on_failure=TRUE makes test_dir throw on any test failure;
+            # a stopifnot wrapper would always fail because test_dir returns
+            # a testthat_results list (not literal TRUE) on success.
+            testthat::test_dir(
               "r/rieszboost/tests/testthat",
               reporter = "summary",
               stop_on_failure = TRUE
-            ))
+            )
           '
