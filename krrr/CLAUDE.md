@@ -1,8 +1,13 @@
 # krrr
 
+> **Read the family design doc first.** It lives in the rieszreg meta-package
+> at `rieszreg/DESIGN.md` (clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling, then it's at
+> [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md)). Part B is the contract this package implements —
+> anything in this CLAUDE.md is krrr-specific notes layered on top.
+
 Kernel-ridge backend for the [RieszReg meta-package](../README.md), implementing Singh ([arXiv:2102.11076](https://arxiv.org/abs/2102.11076)) for the full set of estimands the rieszreg framework supports.
 
-This package now depends on `rieszreg` for the shared abstractions (`Estimand`, `LossSpec`, `AugmentedDataset`, `build_augmented`, `Diagnostics`, `Backend` Protocol, `RieszEstimator` orchestrator). See [`../RIESZREG_DESIGN.md`](../RIESZREG_DESIGN.md) for the meta-package design and the contract every implementation package follows. `krrr` contributes:
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `LossSpec`, `AugmentedDataset`, `build_augmented`, `Diagnostics`, `Backend` Protocol, `RieszEstimator` orchestrator). `krrr` contributes:
 
 - `KernelRidgeBackend` — `Backend` Protocol implementation; closed-form solve over the augmented dataset.
 - `KernelRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with kernel-specific hyperparameters (`kernel`, `lambda_grid`, `solver`, ...) on the constructor.
