@@ -78,7 +78,10 @@ jobs:
             any::R6
             any::pkgload
             any::testthat
-          working-directory: r/rieszboost
+          # No working-directory: pak only installs the explicit list above.
+          # If we pointed at r/rieszboost, pak would read DESCRIPTION and try
+          # to resolve `Imports: rieszreg` via CRAN — rieszreg isn't on CRAN;
+          # the test step dev-loads it from the sibling _rieszreg checkout.
 
       - name: Point reticulate at the project Python
         run: echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> $GITHUB_ENV
