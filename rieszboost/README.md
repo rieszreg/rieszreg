@@ -1,8 +1,8 @@
 # rieszboost
 
-Gradient boosting for Riesz representers, in **Python** and **R** — directly estimate the Riesz representer α₀ of a linear functional θ(P) = E[m(Z, g₀)] without ever deriving or inverting a propensity-style ratio. Implements [Lee & Schuler, *RieszBoost* (arXiv:2501.04871)](https://arxiv.org/abs/2501.04871).
+Gradient boosting for Riesz representers, in **Python** and **R** — directly estimate the Riesz representer α of a linear estimand ψ = E[m(μ)(Z)] without ever deriving or inverting a propensity-style ratio. Implements [Lee & Schuler, *RieszBoost* (arXiv:2501.04871)](https://arxiv.org/abs/2501.04871).
 
-The default backend wraps **xgboost's custom-objective interface**, so the inner loop is the same C++ histogram-based, sparsity-aware, GPU-capable booster the world's fastest tabular learners are built on — no Python-level boosting code in the hot path. Drop in `SklearnBackend(...)` to swap in any sklearn-compatible base learner (`KernelRidge`, MLPs, etc.) when you need a smooth fitter; the xgboost path stays the default precisely because there's nothing faster for tabular Riesz regression. The R package wraps the Python core with bitwise-identical predictions. Jump to the [R quickstart](#quickstart-r) below.
+The default backend wraps **xgboost's custom-objective interface**, so the inner loop is the same C++ histogram-based, sparsity-aware, GPU-capable booster the world's fastest tabular learners are built on — no Python-level boosting code in the hot path. Drop in `SklearnBackend(...)` to swap in any sklearn-compatible base learner (`KernelRidge`, MLPs, etc.) when you need a smooth learner; the xgboost path stays the default precisely because there's nothing faster for tabular Riesz regression. The R package wraps the Python core with bitwise-identical predictions. Jump to the [R quickstart](#quickstart-r) below.
 
 📖 **[User guide](https://rieszreg.github.io/rieszreg/)** — narrative reference with executable R + Python examples on every page.
 
@@ -14,7 +14,7 @@ Multi-stage longitudinal LMTP is intentionally out of scope — that belongs in 
 
 ## Why
 
-In semiparametric estimation (ATE, treatment-specific means, shift interventions, longitudinal interventions) one-step / TMLE / DML estimators require α̂ — the Riesz representer of the target functional. The classical approach derives α₀'s analytical form (e.g. inverse propensity score for ATE), estimates its components, and substitutes them in. That breaks down under positivity violations and gets unwieldy for non-standard estimands. Riesz regression directly minimizes a loss whose minimum is α₀ regardless of analytical form. RieszBoost does this with gradient boosting — fast, tabular-data-friendly, and easy to tune.
+In semiparametric estimation (ATE, treatment-specific means, shift interventions, longitudinal interventions) one-step / TMLE / DML estimators require α̂ — the Riesz representer of the estimand. The classical approach derives α₀'s analytical form (e.g. inverse propensity score for ATE), estimates its components, and substitutes them in. That breaks down under positivity violations and gets unwieldy for non-standard estimands. Riesz regression directly minimizes a loss whose minimum is α₀ regardless of analytical form. RieszBoost does this with gradient boosting — fast, tabular-data-friendly, and easy to tune.
 
 ## Install
 
@@ -104,13 +104,15 @@ Each fold's `RieszBooster` does its own internal validation split for early stop
 
 ## Custom estimands
 
-The natural API is to write `m(z, alpha)` opaquely. The library traces it to extract the linear-form structure. Wrap the result in an `Estimand` and you're done — `feature_keys` / `extra_keys` belong to the estimand:
+Write `m(alpha)` as an operator that returns a function of `z`. The library traces it to extract the linear-form structure. Wrap the result in an `Estimand` and you're done — `feature_keys` / `extra_keys` belong to the estimand:
 
 ```python
 from rieszboost import Estimand
 
-def m_my_thing(z, alpha):
-    return alpha(a=2, x=z["x"]) - 0.5 * alpha(a=1, x=z["x"])
+def m_my_thing(alpha):
+    def inner(z):
+        return alpha(a=2, x=z["x"]) - 0.5 * alpha(a=1, x=z["x"])
+    return inner
 
 est = Estimand(feature_keys=("a", "x"), m=m_my_thing, name="MyThing")
 
@@ -121,13 +123,13 @@ booster = RieszBooster(estimand=est, n_estimators=200).fit(df)
 
 ## Built-in estimands
 
-| Factory | m(z, α) | Notes |
+| Factory | m(α)(z) | Notes |
 |---|---|---|
 | `ATE(treatment, covariates)` | α(1, x) − α(0, x) | Average treatment effect |
-| `ATT(treatment, covariates)` | a · (α(1, x) − α(0, x)) | ATT *partial parameter*. Full ATT divides by P(A=1) and is **not** a Riesz functional — combine α̂_partial with a delta-method EIF (Hubbard 2011) downstream. |
+| `ATT(treatment, covariates)` | a · (α(1, x) − α(0, x)) | ATT *partial-estimand* surface. Full ATT divides by P(A=1) and is **not** a Riesz functional — combine α̂_partial with a delta-method EIF (Hubbard 2011) downstream. |
 | `TSM(level, treatment, covariates)` | α(level, x) | Treatment-specific mean |
 | `AdditiveShift(delta, ...)` | α(a + δ, x) − α(a, x) | Continuous-treatment shift effect |
-| `LocalShift(delta, threshold, ...)` | 1(a < threshold) · (α(a + δ, x) − α(a, x)) | LASE *partial parameter*; same caveat as ATT |
+| `LocalShift(delta, threshold, ...)` | 1(a < threshold) · (α(a + δ, x) − α(a, x)) | LASE *partial-estimand* surface; same caveat as ATT |
 | `StochasticIntervention(samples_key, ...)` | (1/K) Σₖ α(a'ₖ, x) | Stochastic interventions / IPSI via Monte Carlo over the intervention density |
 
 For stochastic interventions, attach a list-column of pre-sampled treatment values:

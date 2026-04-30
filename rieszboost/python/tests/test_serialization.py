@@ -121,8 +121,10 @@ def test_round_trip_with_sklearn_backend(tmp_path):
 
 def test_custom_estimand_requires_explicit_estimand_on_load(tmp_path):
     df = _df(seed=5)
-    def m_custom(z, alpha):
-        return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
+    def m_custom(alpha):
+        def inner(z):
+            return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
+        return inner
     custom = Estimand(feature_keys=("a", "x"), m=m_custom, name="my_custom")
     b = RieszBooster(estimand=custom, n_estimators=10).fit(df)
     b.save(tmp_path / "custom")
