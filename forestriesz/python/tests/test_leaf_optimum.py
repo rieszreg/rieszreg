@@ -61,6 +61,7 @@ def test_single_basis_leaf_matches_closed_form_tsm():
         max_samples=0.999,
         max_features=None,
         l2=0.0,
+        init=0.0,    # closed-form θ = A_sum/J_sum assumes zero base_score
         random_state=0,
     )
     est.fit(df)
@@ -101,6 +102,7 @@ def test_sieve_leaf_matches_closed_form_ate():
         max_samples=0.999,
         max_features=None,
         l2=0.0,
+        init=0.0,    # ATE has m̄=0 so default is also 0; keep explicit for clarity
         random_state=0,
     )
     est.fit(df)

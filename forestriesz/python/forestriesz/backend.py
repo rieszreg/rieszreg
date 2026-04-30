@@ -144,10 +144,7 @@ class ForestRieszBackend:
         estimand: Estimand,
         loss: LossSpec,
         *,
-        n_estimators: int,
-        learning_rate: float,
         base_score: float,
-        early_stopping_rounds: int | None,
         random_state: int,
         hyperparams: dict[str, Any],
     ) -> FitResult:
@@ -162,8 +159,7 @@ class ForestRieszBackend:
                 "different per-leaf gradients than the loss API exposes; "
                 "planned for v3."
             )
-        # Forests are non-iterative; orchestrator-level boosting knobs are ignored.
-        del n_estimators, learning_rate, early_stopping_rounds, hyperparams
+        del hyperparams
 
         seed = random_state if random_state is not None else self.random_state
         feature_keys = estimand.feature_keys

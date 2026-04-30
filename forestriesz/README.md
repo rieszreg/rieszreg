@@ -248,6 +248,7 @@ alpha_hat = est.predict(df)   # all strictly positive by construction
 - **R wrapper exposes `ForestRieszRegressor` only.** `AugForestRieszRegressor` would also work from R but isn't wrapped in v1; call from Python via reticulate if needed.
 - **Constant basis with `ForestRieszRegressor` is degenerate for built-in estimands.** Forcing `riesz_feature_fns=None` raises a row-constant check error. The default `"auto"` does the right thing. `AugForestRieszRegressor` doesn't have this issue.
 - **`KLLoss` and `BernoulliLoss` require non-negative m-coefficients** (density-ratio-style estimands like TSM and IPSI). They reject ATE / ATT / shift-style data at fit time with a clear error.
+- **Forest backends don't take `validation_fraction`.** Forests don't use a held-out slice for fit-time logic; validation loss is reported only when you pass `eval_set=` explicitly to `fit()`. (See rieszreg `DESIGN.md §A.2` for the agnostic-orchestrator rule that puts `validation_fraction` on the backends that actually use it: boosting, kernel ridge, neural.)
 
 ## On the roadmap
 

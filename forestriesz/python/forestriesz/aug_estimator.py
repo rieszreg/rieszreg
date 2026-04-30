@@ -35,7 +35,6 @@ class AugForestRieszRegressor(RieszEstimator):
         Forwarded to EconML's ``BaseGRF``.
     loss : rieszreg.LossSpec, default=SquaredLoss()
     init : float, "m1", or None
-    validation_fraction : float, default=0.0
     random_state : int, default=0
     """
 
@@ -62,20 +61,16 @@ class AugForestRieszRegressor(RieszEstimator):
         verbose: int = 0,
         loss: LossSpec | None = None,
         init: float | str | None = None,
-        validation_fraction: float = 0.0,
         random_state: int = 0,
     ):
         super().__init__(
             estimand=estimand,
             backend=None,
             loss=loss,
-            n_estimators=n_estimators,
-            learning_rate=0.0,
-            early_stopping_rounds=None,
-            validation_fraction=validation_fraction,
             init=init,
             random_state=random_state,
         )
+        self.n_estimators = n_estimators
         self.riesz_feature_fns = riesz_feature_fns
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
@@ -176,7 +171,6 @@ class AugForestRieszRegressor(RieszEstimator):
             n_estimators=hyperparameters.get("n_estimators", 100),
             loss=loss,
             init=hyperparameters.get("init"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.0),
             random_state=hyperparameters.get("random_state", 0),
             **kwargs,
         )

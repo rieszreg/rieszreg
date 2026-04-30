@@ -26,7 +26,7 @@ def diagnose_forest(estimator, X, **kwargs) -> ForestDiagnostics:
     Falls back gracefully when extras can't be computed (e.g. predictor was
     loaded without OOB info or feature_importances unavailable).
     """
-    base = diagnose(booster=estimator, X=X, **kwargs)
+    base = diagnose(estimator=estimator, X=X, **kwargs)
 
     forest = getattr(estimator.predictor_, "forest", None)
     importances = np.zeros(0)

@@ -96,14 +96,11 @@ class AugForestRieszBackend:
         aug_valid: AugmentedDataset | None,
         loss: LossSpec,
         *,
-        n_estimators: int,
-        learning_rate: float,
         base_score: float,
-        early_stopping_rounds: int | None,
         random_state: int,
         hyperparams: dict[str, Any],
     ) -> FitResult:
-        del n_estimators, learning_rate, early_stopping_rounds, hyperparams
+        del hyperparams
 
         # All four built-in losses are supported. For non-squared Bregman
         # losses we still fit the tree structure under the squared MSE

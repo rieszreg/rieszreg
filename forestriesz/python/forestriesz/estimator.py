@@ -54,9 +54,6 @@ class ForestRieszRegressor(RieszEstimator):
         Currently only ``SquaredLoss`` is supported.
     init : float, "m1", or None
         α-space initialization. None defers to ``loss.default_init_alpha()``.
-    validation_fraction : float, default=0.0
-        Hold out this fraction for a validation Riesz loss (surfaced as
-        ``best_score_``).
     random_state : int, default=0
     """
 
@@ -84,20 +81,16 @@ class ForestRieszRegressor(RieszEstimator):
         verbose: int = 0,
         loss: LossSpec | None = None,
         init: float | str | None = None,
-        validation_fraction: float = 0.0,
         random_state: int = 0,
     ):
         super().__init__(
             estimand=estimand,
             backend=None,                # built lazily in _resolved_backend
             loss=loss,
-            n_estimators=n_estimators,   # carried through; forest backend ignores
-            learning_rate=0.0,           # ignored by forest backend
-            early_stopping_rounds=None,
-            validation_fraction=validation_fraction,
             init=init,
             random_state=random_state,
         )
+        self.n_estimators = n_estimators
         self.riesz_feature_fns = riesz_feature_fns
         self.split_feature_indices = split_feature_indices
         self.max_depth = max_depth
@@ -232,7 +225,6 @@ class ForestRieszRegressor(RieszEstimator):
             n_estimators=hyperparameters.get("n_estimators", 100),
             loss=loss,
             init=hyperparameters.get("init"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.0),
             random_state=hyperparameters.get("random_state", 0),
             **kwargs,
         )

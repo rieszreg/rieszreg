@@ -81,7 +81,6 @@ ForestRieszRegressor <- R6::R6Class(
                           n_jobs = -1L,
                           loss = NULL,
                           init = NULL,
-                          validation_fraction = 0.0,
                           random_state = 0L) {
       args <- list(
         estimand = estimand,
@@ -96,7 +95,6 @@ ForestRieszRegressor <- R6::R6Class(
         subforest_size = as.integer(subforest_size),
         l2 = l2,
         n_jobs = as.integer(n_jobs),
-        validation_fraction = validation_fraction,
         random_state = as.integer(random_state)
       )
       if (!is.null(max_depth)) args$max_depth <- as.integer(max_depth)
