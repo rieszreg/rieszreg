@@ -44,14 +44,20 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
     """For any scalars c1, c2 and any two linear m's,
         trace(c1·m1 + c2·m2) == c1·trace(m1) + c2·trace(m2)
     term-by-term."""
-    def m1(z, alpha):
-        return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
+    def m1(alpha):
+        def inner(z):
+            return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
+        return inner
 
-    def m2(z, alpha):
-        return alpha(a=1, x=z["x"])  # ATE-like and TSM-like
+    def m2(alpha):
+        def inner(z):
+            return alpha(a=1, x=z["x"])  # ATE-like and TSM-like
+        return inner
 
-    def m_combined(z, alpha):
-        return c1 * m1(z, alpha) + c2 * m2(z, alpha)
+    def m_combined(alpha):
+        def inner(z):
+            return c1 * m1(alpha)(z) + c2 * m2(alpha)(z)
+        return inner
 
     z = {"a": 0, "x": x_val}
     pairs = trace(m_combined, z)

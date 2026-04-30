@@ -22,7 +22,7 @@ class RieszBooster(RieszEstimator):
     Parameters
     ----------
     estimand : Estimand
-        Carries `feature_keys`, `extra_keys`, and the `m(z, alpha)` callable.
+        Carries `feature_keys`, `extra_keys`, and the `m(alpha)(z)` operator.
         Required.
     backend : Backend, default=XGBoostBackend()
         Where the actual tree fitting happens. Swap to `SklearnBackend(...)`

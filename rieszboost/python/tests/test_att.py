@@ -1,4 +1,4 @@
-"""ATT partial-parameter estimand: m(z, alpha) = a * (alpha(1,x) - alpha(0,x))."""
+"""ATT partial-parameter estimand: m(α)(z) = a * (α(1,x) - α(0,x))."""
 
 import numpy as np
 import pandas as pd

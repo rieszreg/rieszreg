@@ -104,13 +104,15 @@ Each fold's `RieszBooster` does its own internal validation split for early stop
 
 ## Custom estimands
 
-The natural API is to write `m(z, alpha)` opaquely. The library traces it to extract the linear-form structure. Wrap the result in an `Estimand` and you're done — `feature_keys` / `extra_keys` belong to the estimand:
+Write `m(alpha)` as an operator that returns a function of `z`. The library traces it to extract the linear-form structure. Wrap the result in an `Estimand` and you're done — `feature_keys` / `extra_keys` belong to the estimand:
 
 ```python
 from rieszboost import Estimand
 
-def m_my_thing(z, alpha):
-    return alpha(a=2, x=z["x"]) - 0.5 * alpha(a=1, x=z["x"])
+def m_my_thing(alpha):
+    def inner(z):
+        return alpha(a=2, x=z["x"]) - 0.5 * alpha(a=1, x=z["x"])
+    return inner
 
 est = Estimand(feature_keys=("a", "x"), m=m_my_thing, name="MyThing")
 
@@ -121,7 +123,7 @@ booster = RieszBooster(estimand=est, n_estimators=200).fit(df)
 
 ## Built-in estimands
 
-| Factory | m(z, α) | Notes |
+| Factory | m(α)(z) | Notes |
 |---|---|---|
 | `ATE(treatment, covariates)` | α(1, x) − α(0, x) | Average treatment effect |
 | `ATT(treatment, covariates)` | a · (α(1, x) − α(0, x)) | ATT *partial parameter*. Full ATT divides by P(A=1) and is **not** a Riesz functional — combine α̂_partial with a delta-method EIF (Hubbard 2011) downstream. |

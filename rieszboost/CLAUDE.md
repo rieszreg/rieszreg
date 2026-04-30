@@ -79,7 +79,7 @@ R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df
 
 ## Architecture notes
 
-- **m() is opaque, JAX-style.** Users write `m(z, alpha) -> LinearForm` using `+`, `-`, scalar `*`, and calls to `alpha(**kwargs)`. The `Tracer` (`rieszboost/tracer.py`) records each call as a `LinearTerm` and composes them into a `LinearForm`. Anything that leaves the linear-form algebra raises (signal to dispatch to slow path, when the slow path lands).
+- **m() is opaque, JAX-style.** Users write `m(alpha)` as an operator that returns a function of `z`, built with `+`, `-`, scalar `*`, and calls to `alpha(**kwargs)`. The `Tracer` (`rieszboost/tracer.py`) records each call as a `LinearTerm` and composes them into a `LinearForm`. Anything that leaves the linear-form algebra raises (signal to dispatch to slow path, when the slow path lands).
 - **Fast path = data augmentation + xgboost custom objective.** `engine.build_augmented` traces m on each row and assembles per-row (a, b) coefficients so the loss is `Σ a_j α(z̃_j)² + b_j α(z̃_j)`. xgboost's custom objective consumes gradient `2aF + b` and Hessian `2a` directly. Augmented rows with `a=0` get a small `eps` floor in the Hessian to keep leaf-weight optimization stable.
 - **Slow general path** (not yet implemented): Friedman-style gradient boosting against arbitrary base learners (sklearn, JAX, etc.) for non-finite-point m (integrals, derivatives).
 - **xgboost is lazy-imported** so the rest of the rieszboost / rieszreg API is usable without xgboost or libomp.
