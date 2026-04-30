@@ -54,7 +54,7 @@ def diagnose_kernel(regressor: KernelRieszRegressor, X) -> KernelDiagnostics:
     eigendecomposition. For solvers other than "direct" (which already has
     the spectrum), the diagnostic skips these fields.
     """
-    base = diagnose(booster=regressor, X=X)
+    base = diagnose(estimator=regressor, X=X)
 
     result: SolveResult = regressor.predictor_.result
     lambda_selected = result.extra.get("lambda") if result.extra else None

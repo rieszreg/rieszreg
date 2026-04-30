@@ -31,10 +31,10 @@ def test_backend_via_riesz_estimator(binary_ate_data):
     df, _, _ = binary_ate_data
     est = RieszEstimator(
         estimand=ATE("a", ("x",)),
-        backend=KernelRidgeBackend(lambda_grid=np.logspace(-3, 0, 6)),
-        validation_fraction=0.25,
-        n_estimators=1,
-        learning_rate=0.0,
+        backend=KernelRidgeBackend(
+            lambda_grid=np.logspace(-3, 0, 6),
+            validation_fraction=0.25,
+        ),
     )
     est.fit(df)
     alpha_hat = est.predict(df)

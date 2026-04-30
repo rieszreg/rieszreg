@@ -47,6 +47,7 @@ def test_tsm1_matches_dml_tmle_reference():
         lambda_grid=[lam],
         solver="direct",
         validation_fraction=0.0,
+        init=0.0,    # match the R reference's implicit zero baseline
     ).fit(df)
     alpha_K = krr.predict(df)
 

@@ -75,10 +75,6 @@ class KernelRieszRegressor(RieszEstimator):
             estimand=estimand,
             backend=None,            # built lazily in _resolved_backend
             loss=loss,
-            n_estimators=1,          # ignored by KRR
-            learning_rate=0.0,       # ignored by KRR
-            early_stopping_rounds=None,
-            validation_fraction=validation_fraction,
             init=init,
             random_state=random_state,
         )
@@ -89,6 +85,7 @@ class KernelRieszRegressor(RieszEstimator):
         self.n_features = n_features
         self.cg_tol = cg_tol
         self.cg_max_iter = cg_max_iter
+        self.validation_fraction = validation_fraction
 
     # ---- defaults / backend construction ----
 
@@ -112,6 +109,7 @@ class KernelRieszRegressor(RieszEstimator):
             n_features=self.n_features,
             cg_tol=self.cg_tol,
             cg_max_iter=self.cg_max_iter,
+            validation_fraction=self.validation_fraction,
             random_state=self.random_state,
         )
 
@@ -125,6 +123,11 @@ class KernelRieszRegressor(RieszEstimator):
         return self
 
     # ---- save/load: defer to base class via the registry ----
+
+    def _save_hyperparameters(self) -> dict:
+        base = super()._save_hyperparameters()
+        base.update(validation_fraction=self.validation_fraction)
+        return base
 
     @classmethod
     def _construct_for_load(cls, *, estimand, loss, hyperparameters: dict) -> "KernelRieszRegressor":

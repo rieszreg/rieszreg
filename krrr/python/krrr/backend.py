@@ -49,6 +49,7 @@ class KernelRidgeBackend:
     n_features: int = 1024
     cg_tol: float = 1e-6
     cg_max_iter: int = 200
+    validation_fraction: float = 0.2
     random_state: int = 0
 
     def fit_augmented(
@@ -57,15 +58,11 @@ class KernelRidgeBackend:
         aug_valid: AugmentedDataset | None,
         loss: LossSpec,
         *,
-        n_estimators: int,
-        learning_rate: float,
         base_score: float,
-        early_stopping_rounds: int | None,
         random_state: int,
         hyperparams: dict[str, Any],
     ) -> FitResult:
-        # KRR is non-iterative; boosting hyperparameters are ignored.
-        del n_estimators, learning_rate, early_stopping_rounds
+        # KRR is non-iterative; ignore the catch-all hyperparams dict.
         del hyperparams
 
         if not isinstance(loss, SquaredLoss):
