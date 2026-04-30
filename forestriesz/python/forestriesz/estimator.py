@@ -27,7 +27,7 @@ class ForestRieszRegressor(RieszEstimator):
     Parameters
     ----------
     estimand : rieszreg.Estimand
-        Carries ``feature_keys``, ``extra_keys``, and m(z, alpha).
+        Carries ``feature_keys``, ``extra_keys``, and the ``m(alpha)(z)`` operator.
     riesz_feature_fns : list of callables, "auto", or None
         Sieve basis ``[φ_1, …, φ_p]`` for the locally linear flavor. Each
         callable takes a feature matrix ``(n, n_features)`` (columns ordered

@@ -87,8 +87,10 @@ def test_aug_custom_estimand_runs():
     from rieszreg import Estimand
 
     # Custom moment: alpha(a + 1, x) - alpha(a - 1, x).
-    def m(z, alpha):
-        return alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(a=z["a"] - 1.0, x=z["x"])
+    def m(alpha):
+        def inner(z):
+            return alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(a=z["a"] - 1.0, x=z["x"])
+        return inner
 
     estimand = Estimand(feature_keys=("a", "x"), m=m)
 
