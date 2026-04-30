@@ -56,8 +56,10 @@ def test_stochastic_intervention(stochastic_intervention_data):
 def test_custom_estimand(continuous_a_data):
     df = continuous_a_data
 
-    def m_mix(z, alpha):
-        return 0.6 * alpha(a=1, x=z["x"]) - 0.4 * alpha(a=0, x=z["x"])
+    def m_mix(alpha):
+        def inner(z):
+            return 0.6 * alpha(a=1, x=z["x"]) - 0.4 * alpha(a=0, x=z["x"])
+        return inner
 
     krr = KernelRieszRegressor(
         estimand=Estimand(feature_keys=("a", "x"), m=m_mix, name="MyMix"),

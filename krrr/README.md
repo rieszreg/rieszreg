@@ -83,8 +83,10 @@ Custom `m()` works too (write the functional opaquely; `LinearForm` tracing extr
 ```python
 from krrr import KernelRieszRegressor, Estimand
 
-def m_my_thing(z, alpha):
-    return 0.7 * alpha(a=1, x=z["x"]) - 0.3 * alpha(a=0, x=z["x"])
+def m_my_thing(alpha):
+    def inner(z):
+        return 0.7 * alpha(a=1, x=z["x"]) - 0.3 * alpha(a=0, x=z["x"])
+    return inner
 
 est = Estimand(feature_keys=("a", "x"), m=m_my_thing, name="MyMix")
 krr = KernelRieszRegressor(estimand=est).fit(df)

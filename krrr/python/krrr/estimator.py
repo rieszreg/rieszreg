@@ -31,7 +31,7 @@ class KernelRieszRegressor(RieszEstimator):
     Parameters
     ----------
     estimand : rieszreg.Estimand
-        Carries `feature_keys`, `extra_keys`, and m(z, alpha).
+        Carries `feature_keys`, `extra_keys`, and the `m(alpha)(z)` operator.
     kernel : krrr.Kernel, default=Gaussian(length_scale="median")
         Reproducing kernel. Length-scale "median" resolves to the median
         pairwise Euclidean distance on the augmented training points.
