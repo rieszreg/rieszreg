@@ -1,0 +1,21 @@
+Package: riesznet
+Type: Package
+Title: Neural-Network Riesz Regression
+Version: 0.0.1
+Authors@R: person("Alejandro", "Schuler", role = c("aut", "cre"), email = "alejandro.schuler@gmail.com")
+Description: R wrapper around the Python 'riesznet' package — neural-network
+    estimation of the Riesz representer of a linear functional. Trains a
+    PyTorch model against the Bregman-Riesz loss. Sister package to
+    'rieszboost', 'krrr', and 'forestriesz'. Reuses 'rieszreg' for estimand
+    specification.
+License: file LICENSE
+Encoding: UTF-8
+Imports:
+    R6,
+    reticulate (>= 1.30),
+    rieszreg (>= 0.0.1)
+Suggests:
+    testthat (>= 3.0.0),
+    pkgload
+Config/testthat/edition: 3
+RoxygenNote: 7.3.2

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "riesznet"
+version = "0.0.1"
+description = "Neural-network backend for Riesz regression. Implements the moment-style fit_rows entry point of rieszreg with a PyTorch training loop. Sister package to rieszboost, krrr, forestriesz."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.0",
+    "rieszreg>=0.0.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pandas>=2.0", "scikit-learn>=1.3"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["riesznet*"]
