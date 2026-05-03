@@ -92,9 +92,9 @@ def phi_prime_alpha(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
         return 2.0 * eta
     if t == "KLLoss":
         # φ(t) = t log t, φ'(t) = log t + 1; the augmentation absorbs the
-        # constant 1 (so the linear term in the augmented loss is (b/2)·log α
-        # not (b/2)·(log α + 1)). Mirror that convention here so the analytic
-        # `loss.gradient(a, b, eta)` parity check passes.
+        # constant 1 (so the linear term in the augmented loss is C·log α not
+        # C·(log α + 1)). Mirror that convention here so the analytic
+        # `loss.aug_grad_eta(D, C, eta)` parity check passes.
         return _clamp_for_loss(loss_spec, eta)
     if t == "BernoulliLoss":
         # φ'(α) = log(α/(1-α)) = η, with the loss spec's clamp.

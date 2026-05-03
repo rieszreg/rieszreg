@@ -63,13 +63,13 @@ def _torch_grad_per_row(loss, eta_orig_np, eta_pts_np, coefs_np, pt_to_row_np):
 def _analytic_grad(loss, eta_orig_np, eta_pts_np, coefs_np, pt_to_row_np):
     """Compute analytic dL/d eta_orig and dL/d eta_pts using the loss spec.
 
-    The augmented loss is ``a · ψ(α) + (b/2) · φ'(α)``. Original rows are
-    ``(a=1, b=0)`` so dL_i/dη_orig_i = gradient(1, 0, eta_orig_i). Trace
-    points are ``(a=0, b=-2·coef)`` so dL_i/dη_pts_j = gradient(0, -2·coef_j,
+    The augmented loss is ``D · ψ(α) + C · φ'(α)``. Original rows are
+    ``(D=1, C=0)`` so dL_i/dη_orig_i = aug_grad_eta(1, 0, eta_orig_i). Trace
+    points are ``(D=0, C=-coef)`` so dL_i/dη_pts_j = aug_grad_eta(0, -coef_j,
     eta_pts_j) for the row j belongs to.
     """
-    grad_orig = loss.gradient(np.ones_like(eta_orig_np), np.zeros_like(eta_orig_np), eta_orig_np)
-    grad_pts = loss.gradient(np.zeros_like(eta_pts_np), -2.0 * coefs_np, eta_pts_np)
+    grad_orig = loss.aug_grad_eta(np.ones_like(eta_orig_np), np.zeros_like(eta_orig_np), eta_orig_np)
+    grad_pts = loss.aug_grad_eta(np.zeros_like(eta_pts_np), -coefs_np, eta_pts_np)
     return grad_orig, grad_pts
 
 

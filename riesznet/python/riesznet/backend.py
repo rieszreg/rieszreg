@@ -159,17 +159,6 @@ def _prepare_rows(
     return x, pts, coefs, pt_to_row
 
 
-def _validate_row_coefs_for_loss(
-    coefs: np.ndarray, loss: LossSpec
-) -> None:
-    """Reuse the loss spec's augmented-`b` validator. Augmentation maps a
-    moment with coefficient ``coef`` to ``b = -2 * coef``, so the loss spec's
-    sign convention is the same as ours after that transform.
-    """
-    b_equiv = -2.0 * coefs
-    loss.validate_coefficients(b_equiv)
-
-
 def _row_batches(
     n_rows: int, batch_size: int | None, generator: torch.Generator
 ) -> list[torch.Tensor]:
@@ -375,12 +364,10 @@ class TorchBackend:
         train_x, train_pts, train_coefs, train_p2r = _prepare_rows(
             rows_train, estimand
         )
-        _validate_row_coefs_for_loss(train_coefs, loss)
         if rows_valid:
             valid_x, valid_pts, valid_coefs, valid_p2r = _prepare_rows(
                 rows_valid, estimand
             )
-            _validate_row_coefs_for_loss(valid_coefs, loss)
         else:
             valid_x = valid_pts = valid_coefs = valid_p2r = None
 
