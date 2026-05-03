@@ -13,7 +13,12 @@ from typing import Any, Callable
 
 import numpy as np
 
-from rieszreg.augmentation import AugmentedDataset
+from rieszreg.augmentation import (
+    AugmentedDataset,
+    aug_grad_eta,
+    aug_hess_eta,
+    aug_loss_alpha,
+)
 from rieszreg.backends.base import FitResult, Predictor, register_predictor_loader
 from rieszreg.losses import LossSpec
 
@@ -75,12 +80,18 @@ class SklearnPredictor:
         )
 
 
-def _line_search(loss: LossSpec, a: np.ndarray, b: np.ndarray, F: np.ndarray, h: np.ndarray) -> float:
-    """Closed-form γ minimizing E[loss_row(a, b, α(F + γ h))] under the
-    second-order quadratic surrogate (correct for SquaredLoss; approximate but
-    well-behaved for general convex losses)."""
-    grad_F = loss.gradient(a, b, F)
-    hess_F = loss.hessian(a, b, F, hessian_floor=1e-6)
+def _line_search(
+    loss: LossSpec,
+    is_original: np.ndarray,
+    potential_deriv_coef: np.ndarray,
+    F: np.ndarray,
+    h: np.ndarray,
+) -> float:
+    """Closed-form γ minimizing the augmented loss along the direction `h` under
+    the second-order quadratic surrogate (correct for SquaredLoss; approximate
+    but well-behaved for general convex losses)."""
+    grad_F = aug_grad_eta(loss, is_original, potential_deriv_coef, F)
+    hess_F = aug_hess_eta(loss, is_original, potential_deriv_coef, F, hessian_floor=1e-6)
     # numerator = -∇·h, denom = h·H·h (diagonal-Hessian surrogate)
     num = -float(np.sum(h * grad_F))
     denom = float(np.sum(h * h * hess_F))
@@ -114,11 +125,8 @@ class SklearnBackend:
         # discard anything passed (xgboost-only params don't apply here).
         del random_state, hyperparams
 
-        loss.validate_coefficients(aug_train.b)
-        if aug_valid is not None:
-            loss.validate_coefficients(aug_valid.b)
-
-        a, b = aug_train.a, aug_train.b
+        is_original = aug_train.is_original
+        potential_deriv_coef = aug_train.potential_deriv_coef
         F_train = np.full(aug_train.features.shape[0], base_score)
 
         have_valid = aug_valid is not None
@@ -138,14 +146,14 @@ class SklearnBackend:
         no_improve = 0
 
         for it in range(self.n_estimators):
-            grad_train = loss.gradient(a, b, F_train)
+            grad_train = aug_grad_eta(loss, is_original, potential_deriv_coef, F_train)
             residual = -grad_train
 
             learner = self.base_learner_factory()
             learner.fit(aug_train.features, residual)
             h_train = np.asarray(learner.predict(aug_train.features))
 
-            gamma = _line_search(loss, a, b, F_train, h_train)
+            gamma = _line_search(loss, is_original, potential_deriv_coef, F_train, h_train)
             step = self.learning_rate * gamma
             F_train = F_train + step * h_train
 
@@ -157,7 +165,12 @@ class SklearnBackend:
                 F_val = F_val + step * h_val
                 alpha_val = loss.link_to_alpha(F_val)
                 val_loss = float(
-                    np.sum(loss.loss_row(aug_valid.a, aug_valid.b, alpha_val))
+                    np.sum(aug_loss_alpha(
+                        loss,
+                        aug_valid.is_original,
+                        aug_valid.potential_deriv_coef,
+                        alpha_val,
+                    ))
                     / aug_valid.n_rows
                 )
                 history.append(val_loss)

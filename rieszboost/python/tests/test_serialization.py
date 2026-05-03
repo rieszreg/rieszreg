@@ -9,7 +9,7 @@ import pytest
 import rieszboost
 from rieszboost import RieszBooster
 from rieszboost.backends import SklearnBackend
-from rieszboost.estimand import Estimand
+from rieszboost.estimand import LinearFormEstimand
 from rieszboost.losses import KLLoss
 
 
@@ -125,7 +125,7 @@ def test_custom_estimand_requires_explicit_estimand_on_load(tmp_path):
         def inner(z):
             return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
         return inner
-    custom = Estimand(feature_keys=("a", "x"), m=m_custom, name="my_custom")
+    custom = LinearFormEstimand(feature_keys=("a", "x"), m=m_custom, name="my_custom")
     b = RieszBooster(estimand=custom, n_estimators=10).fit(df)
     b.save(tmp_path / "custom")
 

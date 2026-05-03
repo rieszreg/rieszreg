@@ -59,8 +59,10 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
             return c1 * m1(alpha)(z) + c2 * m2(alpha)(z)
         return inner
 
+    from rieszreg import LinearFormEstimand
+
     z = {"a": 0, "x": x_val}
-    pairs = trace(m_combined, z)
+    pairs = trace(LinearFormEstimand(feature_keys=("a", "x"), m=m_combined), z)
     by_a = {p["a"]: c for c, p in pairs}
     # Expected: {1: c1 + c2, 0: -c1}, modulo float-equality jitter.
     assert by_a.get(1, 0.0) == pytest.approx(c1 + c2, abs=1e-10)
@@ -72,7 +74,7 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
     seed=st.integers(min_value=0, max_value=2**31 - 1),
 )
 def test_augmentation_invariant_under_row_permutation(n: int, seed: int):
-    """Shuffling rows produces the same multiset of augmented (a, b) coefficients."""
+    """Shuffling rows produces the same multiset of augmented (D, C) coefficients."""
     rng = np.random.default_rng(seed)
     rows = [{"a": float(rng.integers(0, 2)), "x": float(rng.uniform())} for _ in range(n)]
 
@@ -80,9 +82,9 @@ def test_augmentation_invariant_under_row_permutation(n: int, seed: int):
     perm = list(rng.permutation(n))
     aug2 = build_augmented([rows[i] for i in perm], ATE())
 
-    # Compare the multiset of (a, b) coefficients — independent of order.
-    sig1 = sorted(zip(aug1.a.tolist(), aug1.b.tolist()))
-    sig2 = sorted(zip(aug2.a.tolist(), aug2.b.tolist()))
+    # Compare the multiset of (D, C) coefficients — independent of order.
+    sig1 = sorted(zip(aug1.is_original.tolist(), aug1.potential_deriv_coef.tolist()))
+    sig2 = sorted(zip(aug2.is_original.tolist(), aug2.potential_deriv_coef.tolist()))
     assert sig1 == sig2
 
 
@@ -190,19 +192,22 @@ def test_loss_spec_round_trip_through_to_spec(eta: float):
 
 @given(
     eta=st.floats(min_value=-3.0, max_value=3.0, allow_nan=False),
-    a_val=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
-    b_val=st.floats(min_value=-2.0, max_value=2.0, allow_nan=False),
+    is_original_val=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+    pdc_val=st.floats(min_value=-1.0, max_value=1.0, allow_nan=False),
 )
 @settings(max_examples=30)
-def test_squared_loss_gradient_matches_finite_diff(eta: float, a_val: float, b_val: float):
-    """Analytic gradient should match numerical finite-difference of loss_row(α(η))."""
+def test_squared_loss_gradient_matches_finite_diff(
+    eta: float, is_original_val: float, pdc_val: float
+):
+    """Analytic gradient should match numerical finite-difference of aug_loss_alpha(α(η))."""
+    from rieszreg import aug_loss_alpha
     loss = SquaredLoss()
-    a = np.array([a_val])
-    b = np.array([b_val])
+    is_original = np.array([is_original_val])
+    pdc = np.array([pdc_val])
     e = np.array([eta])
     h = 1e-5
-    L_plus = loss.loss_row(a, b, loss.link_to_alpha(e + h))[0]
-    L_minus = loss.loss_row(a, b, loss.link_to_alpha(e - h))[0]
+    L_plus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(e + h))[0]
+    L_minus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(e - h))[0]
     fd = (L_plus - L_minus) / (2 * h)
-    analytic = loss.gradient(a, b, e)[0]
+    analytic = loss.aug_grad_eta(is_original, pdc, e)[0]
     assert analytic == pytest.approx(fd, abs=1e-3)

@@ -32,8 +32,8 @@ def test_augmentation_shape_for_ate():
     assert aug.features.shape == (2 * len(rows), 2)
     for i in range(len(rows)):
         idx = np.where(aug.origin_index == i)[0]
-        assert pytest.approx(aug.b[idx].sum()) == 0.0
-        assert pytest.approx(aug.a[idx].sum()) == 1.0
+        assert pytest.approx(aug.potential_deriv_coef[idx].sum()) == 0.0
+        assert pytest.approx(aug.is_original[idx].sum()) == 1.0
 
 
 def test_ate_recovers_inverse_propensity_dataframe():

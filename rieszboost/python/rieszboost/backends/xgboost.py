@@ -14,7 +14,12 @@ from typing import Any
 import numpy as np
 import xgboost as xgb
 
-from rieszreg.augmentation import AugmentedDataset
+from rieszreg.augmentation import (
+    AugmentedDataset,
+    aug_grad_eta,
+    aug_hess_eta,
+    aug_loss_alpha,
+)
 from rieszreg.backends.base import FitResult, Predictor, register_predictor_loader
 from rieszreg.losses import LossSpec
 
@@ -61,30 +66,33 @@ class XGBoostPredictor:
 
 
 def _make_objective(
-    a: np.ndarray,
-    b: np.ndarray,
+    is_original: np.ndarray,
+    potential_deriv_coef: np.ndarray,
     loss: LossSpec,
     hessian_floor: float,
     gradient_only: bool,
 ):
     def obj(preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
         del dtrain
-        grad = loss.gradient(a, b, preds)
+        grad = aug_grad_eta(loss, is_original, potential_deriv_coef, preds)
         if gradient_only:
             hess = np.ones_like(grad)
         else:
-            hess = loss.hessian(a, b, preds, hessian_floor)
+            hess = aug_hess_eta(loss, is_original, potential_deriv_coef, preds, hessian_floor)
         return grad, hess
     return obj
 
 
 def _make_metric(
-    a_val: np.ndarray, b_val: np.ndarray, n_val_rows: int, loss: LossSpec
+    is_original_val: np.ndarray,
+    potential_deriv_coef_val: np.ndarray,
+    n_val_rows: int,
+    loss: LossSpec,
 ):
     def metric(predt: np.ndarray, dval) -> tuple[str, float]:
         del dval
         alpha = loss.link_to_alpha(predt)
-        per_row = loss.loss_row(a_val, b_val, alpha)
+        per_row = aug_loss_alpha(loss, is_original_val, potential_deriv_coef_val, alpha)
         return "riesz_loss", float(np.sum(per_row) / n_val_rows)
     return metric
 
@@ -115,10 +123,6 @@ class XGBoostBackend:
         random_state: int,
         hyperparams: dict[str, Any],
     ) -> FitResult:
-        loss.validate_coefficients(aug_train.b)
-        if aug_valid is not None:
-            loss.validate_coefficients(aug_valid.b)
-
         dtrain = xgb.DMatrix(aug_train.features)
 
         params = {
@@ -135,7 +139,10 @@ class XGBoostBackend:
             dvalid = xgb.DMatrix(aug_valid.features)
             evals = [(dvalid, "valid")]
             custom_metric = _make_metric(
-                aug_valid.a, aug_valid.b, aug_valid.n_rows, loss
+                aug_valid.is_original,
+                aug_valid.potential_deriv_coef,
+                aug_valid.n_rows,
+                loss,
             )
         elif self.early_stopping_rounds is not None:
             raise ValueError(
@@ -149,7 +156,9 @@ class XGBoostBackend:
             dtrain,
             num_boost_round=self.n_estimators,
             obj=_make_objective(
-                aug_train.a, aug_train.b, loss,
+                aug_train.is_original,
+                aug_train.potential_deriv_coef,
+                loss,
                 hessian_floor=self.hessian_floor,
                 gradient_only=self.gradient_only,
             ),

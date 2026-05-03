@@ -30,14 +30,6 @@ def test_squared_loss_explicit_matches_default():
     np.testing.assert_array_equal(b1.predict(df), b2.predict(df))
 
 
-def test_kl_loss_rejects_signed_coefficients():
-    df, _ = _simulate_df(200, seed=1)
-    booster = RieszBooster(estimand=rieszboost.ATE(), loss=KLLoss(),
-                           n_estimators=5, learning_rate=0.1, max_depth=3)
-    with pytest.raises(ValueError, match="non-negative"):
-        booster.fit(df)
-
-
 def test_kl_loss_predicts_positive_alpha():
     df, _ = _simulate_df(1000, seed=0)
     booster = RieszBooster(
@@ -94,17 +86,6 @@ def test_bernoulli_predicts_in_zero_one():
     alpha_hat = booster.predict(df)
     assert alpha_hat.min() > 0.0
     assert alpha_hat.max() < 1.0
-
-
-def test_bernoulli_rejects_signed_coefficients():
-    from rieszboost.losses import BernoulliLoss
-    df, _ = _simulate_df(200, seed=1)
-    with pytest.raises(ValueError, match="non-negative"):
-        RieszBooster(
-            estimand=rieszboost.ATE(),
-            loss=BernoulliLoss(),
-            n_estimators=5, learning_rate=0.1,
-        ).fit(df)
 
 
 def test_bounded_squared_predicts_in_range():

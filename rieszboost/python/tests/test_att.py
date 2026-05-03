@@ -21,8 +21,8 @@ def test_att_augmentation_skips_controls():
     aug = build_augmented(rows, rieszboost.ATT())
     assert aug.features.shape == (3, 2)
     ctrl_idx = np.where(aug.origin_index == 1)[0]
-    assert aug.a[ctrl_idx].sum() == 1.0
-    assert aug.b[ctrl_idx].sum() == 0.0
+    assert aug.is_original[ctrl_idx].sum() == 1.0
+    assert aug.potential_deriv_coef[ctrl_idx].sum() == 0.0
 
 
 def _logit(z):

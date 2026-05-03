@@ -58,5 +58,5 @@ def test_local_shift_augmentation_skips_above_threshold():
     aug = build_augmented(rows, rieszboost.LocalShift(delta=1.0, threshold=0.0))
     assert aug.features.shape == (3, 2)
     above_idx = np.where(aug.origin_index == 1)[0]
-    assert aug.a[above_idx].sum() == 1.0
-    assert aug.b[above_idx].sum() == 0.0
+    assert aug.is_original[above_idx].sum() == 1.0
+    assert aug.potential_deriv_coef[above_idx].sum() == 0.0
