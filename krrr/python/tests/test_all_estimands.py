@@ -13,8 +13,8 @@ from krrr import (
     ATE,
     ATT,
     AdditiveShift,
+    FiniteEvalEstimand,
     KernelRieszRegressor,
-    LinearFormEstimand,
     LocalShift,
     StochasticIntervention,
     TSM,
@@ -62,7 +62,7 @@ def test_custom_estimand(continuous_a_data):
         return inner
 
     krr = KernelRieszRegressor(
-        estimand=LinearFormEstimand(feature_keys=("a", "x"), m=m_mix, name="MyMix"),
+        estimand=FiniteEvalEstimand(feature_keys=("a", "x"), m=m_mix, name="MyMix"),
         lambda_grid=np.logspace(-3, 0, 6),
         validation_fraction=0.2,
     ).fit(df)
