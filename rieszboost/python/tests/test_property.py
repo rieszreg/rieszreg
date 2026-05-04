@@ -59,10 +59,10 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
             return c1 * m1(alpha)(z) + c2 * m2(alpha)(z)
         return inner
 
-    from rieszreg import LinearFormEstimand
+    from rieszreg import FiniteEvalEstimand
 
     z = {"a": 0, "x": x_val}
-    pairs = trace(LinearFormEstimand(feature_keys=("a", "x"), m=m_combined), z)
+    pairs = trace(FiniteEvalEstimand(feature_keys=("a", "x"), m=m_combined), z)
     by_a = {p["a"]: c for c, p in pairs}
     # Expected: {1: c1 + c2, 0: -c1}, modulo float-equality jitter.
     assert by_a.get(1, 0.0) == pytest.approx(c1 + c2, abs=1e-10)
