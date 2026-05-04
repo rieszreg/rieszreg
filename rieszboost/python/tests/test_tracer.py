@@ -1,11 +1,11 @@
 import pytest
 
 from rieszboost.tracer import LinearForm, Tracer, trace
-from rieszreg import LinearFormEstimand
+from rieszreg import FiniteEvalEstimand
 
 
 def _est(m):
-    return LinearFormEstimand(feature_keys=("a", "x"), m=m)
+    return FiniteEvalEstimand(feature_keys=("a", "x"), m=m)
 
 
 def test_ate_traces_to_two_terms():
