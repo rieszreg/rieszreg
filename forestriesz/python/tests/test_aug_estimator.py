@@ -84,7 +84,7 @@ def test_aug_additive_shift_runs(df_continuous):
 
 def test_aug_custom_estimand_runs():
     """Augmentation-style must work on a fully custom Estimand."""
-    from rieszreg import LinearFormEstimand
+    from rieszreg import FiniteEvalEstimand
 
     # Custom moment: alpha(a + 1, x) - alpha(a - 1, x).
     def m(alpha):
@@ -92,7 +92,7 @@ def test_aug_custom_estimand_runs():
             return alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(a=z["a"] - 1.0, x=z["x"])
         return inner
 
-    estimand = LinearFormEstimand(feature_keys=("a", "x"), m=m)
+    estimand = FiniteEvalEstimand(feature_keys=("a", "x"), m=m)
 
     rng = np.random.default_rng(0)
     n = 300

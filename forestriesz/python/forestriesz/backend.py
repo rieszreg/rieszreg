@@ -16,8 +16,8 @@ import numpy as np
 from rieszreg import (
     AugmentedDataset,
     Estimand,
+    FiniteEvalEstimand,
     FitResult,
-    LinearFormEstimand,
     LossSpec,
     SquaredLoss,
     aug_loss_alpha,
