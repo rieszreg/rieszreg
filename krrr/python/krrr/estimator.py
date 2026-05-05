@@ -115,8 +115,8 @@ class KernelRieszRegressor(RieszEstimator):
 
     # ---- fit override exposes lambda_ ----
 
-    def fit(self, X, y=None, eval_set=None) -> "KernelRieszRegressor":
-        super().fit(X, y=y, eval_set=eval_set)
+    def fit(self, Z, y=None, eval_set=None) -> "KernelRieszRegressor":
+        super().fit(Z, y=y, eval_set=eval_set)
         # Convenience: surface the chosen λ on the regressor.
         if self.predictor_.result.extra is not None:
             self.lambda_ = self.predictor_.result.extra.get("lambda")

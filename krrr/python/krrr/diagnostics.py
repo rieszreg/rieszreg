@@ -1,6 +1,6 @@
 """KRR-specific diagnostics on top of `rieszboost.diagnose`.
 
-`diagnose_kernel(regressor, X)` returns the same `Diagnostics` fields as the
+`diagnose_kernel(regressor, Z)` returns the same `Diagnostics` fields as the
 rieszboost version, plus kernel-specific extras: chosen λ, condition number
 of the o-block kernel matrix, and an effective-degrees-of-freedom estimate.
 """
@@ -46,7 +46,7 @@ def _effective_dof(eigvals: np.ndarray, n_lam: float) -> float:
     return float(np.sum(eigvals / (eigvals + n_lam)))
 
 
-def diagnose_kernel(regressor: KernelRieszRegressor, X) -> KernelDiagnostics:
+def diagnose_kernel(regressor: KernelRieszRegressor, Z) -> KernelDiagnostics:
     """Full-fat diagnostics including λ, effective d.o.f. and condition number.
 
     Effective d.o.f. and condition number are computed from the training-time
@@ -54,7 +54,7 @@ def diagnose_kernel(regressor: KernelRieszRegressor, X) -> KernelDiagnostics:
     eigendecomposition. For solvers other than "direct" (which already has
     the spectrum), the diagnostic skips these fields.
     """
-    base = diagnose(estimator=regressor, X=X)
+    base = diagnose(estimator=regressor, Z=Z)
 
     result: SolveResult = regressor.predictor_.result
     lambda_selected = result.extra.get("lambda") if result.extra else None
@@ -69,9 +69,9 @@ def diagnose_kernel(regressor: KernelRieszRegressor, X) -> KernelDiagnostics:
         # Re-derive K̃_oo on the o-block (is_original > 0 rows). We reproduce the
         # construction in solvers/direct.py — a small redundant cost.
         from rieszreg import build_augmented
-        from rieszreg.estimator import _rows_from_X
+        from rieszreg.estimator import _rows_from_Z
 
-        rows = _rows_from_X(X, regressor.estimand)
+        rows = _rows_from_Z(Z, regressor.estimand)
         aug = build_augmented(rows, regressor.estimand)
         n_rows = aug.n_rows
         o_mask = aug.is_original > 0
