@@ -102,6 +102,18 @@ alpha_oof = cross_val_predict(booster, df, cv=5)  # OOF predictions, shape (n,)
 
 Each fold's `RieszBooster` does its own internal validation split for early stopping.
 
+## Predicting at every tree count from one fit
+
+`predict_path` returns α̂ at each `n_estimators` value in a grid, extracted from a single fit using xgboost's `iteration_range`. Column `j` is bit-equal to a fresh fit with `n_estimators=n_estimators_grid[j]`.
+
+```python
+booster = RieszBooster(estimand=ATE(), n_estimators=200).fit(df)
+path = booster.predict_path(df, n_estimators_grid=[10, 50, 100, 200])
+# path.shape == (n_rows, 4); column 3 == booster.predict(df)
+```
+
+Use this to plot the validation curve over tree count, or to pick a complexity post hoc by minimizing held-out Riesz loss across columns. The R6 wrapper exposes the same method; column names are `"trees=10"`, `"trees=50"`, etc.
+
 ## Custom estimands
 
 Write `m(alpha)` as an operator that returns a function of `(z, y)`. The library traces it to extract the linear-form structure. Wrap the result in a `FiniteEvalEstimand`:
