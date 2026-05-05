@@ -17,7 +17,7 @@ from typing import Sequence
 import numpy as np
 
 from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
-from rieszreg.estimator import _features_from_rows, _rows_from_X
+from rieszreg.estimator import _features_from_rows, _rows_from_Z
 
 from .backend import TorchBackend, auto_snapshot_epochs
 from .modules import build_adam, build_mlp
@@ -64,7 +64,7 @@ class RieszNet(RieszEstimator):
         improvement; restore best-validation weights at end of fit.
     snapshot_epochs : sequence of int or None, default None
         Epoch ticks at which to snapshot ``state_dict`` during training so
-        ``predict_path(X, epochs=...)`` can return α̂ at each tick. ``None``
+        ``predict_path(Z, epochs=...)`` can return α̂ at each tick. ``None``
         builds an auto-grid of ~20 log-spaced ticks across ``[1, epochs]``
         (see :func:`riesznet.backend.auto_snapshot_epochs`). Pass an empty
         sequence to disable snapshotting entirely.
@@ -156,7 +156,7 @@ class RieszNet(RieszEstimator):
         )
 
     def predict_path(
-        self, X, epochs: Sequence[int] | None = None
+        self, Z, epochs: Sequence[int] | None = None
     ) -> np.ndarray:
         """Predict α̂ at every snapshot epoch from one training run.
 
@@ -171,7 +171,7 @@ class RieszNet(RieszEstimator):
             raise RuntimeError(
                 f"{type(self).__name__} is not fitted yet. Call .fit() first."
             )
-        rows = _rows_from_X(X, self.estimand)
+        rows = _rows_from_Z(Z, self.estimand)
         feats = _features_from_rows(rows, self.estimand)
         return self.predictor_.predict_alpha_path(feats, epochs)
 

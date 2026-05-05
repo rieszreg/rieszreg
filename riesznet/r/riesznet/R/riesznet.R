@@ -121,16 +121,17 @@ RieszNet <- R6::R6Class(
     #'
     #' Requires `snapshot_epochs` (or the auto-grid default) to have been
     #' enabled at construction.
-    #' @param X Feature data.frame.
+    #' @param Z Predictor data.frame (treatment + covariates in
+    #'   `feature_keys` order).
     #' @param epochs Integer vector of epoch ticks (subset of stored grid);
     #'   defaults to the full stored grid.
-    predict_path = function(X, epochs = NULL) {
+    predict_path = function(Z, epochs = NULL) {
       if (is.null(epochs)) {
         py_ep <- NULL
       } else {
         py_ep <- reticulate::r_to_py(as.list(as.integer(epochs)))
       }
-      out <- self$py$predict_path(rieszreg::df_to_py(X), py_ep)
+      out <- self$py$predict_path(rieszreg::df_to_py(Z), py_ep)
       m <- as.matrix(reticulate::py_to_r(out))
       ep_used <- if (is.null(epochs)) {
         as.integer(reticulate::py_to_r(self$py$predictor_$snapshot_epochs))
