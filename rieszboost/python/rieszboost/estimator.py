@@ -13,7 +13,7 @@ from typing import Sequence
 import numpy as np
 
 from rieszreg.estimands.base import Estimand
-from rieszreg.estimator import RieszEstimator, _features_from_rows, _rows_from_X
+from rieszreg.estimator import RieszEstimator, _features_from_rows, _rows_from_Z
 from rieszreg.losses import LossSpec
 
 from .backends import Backend, XGBoostBackend
@@ -78,7 +78,7 @@ class RieszBooster(RieszEstimator):
         self.subsample = subsample
 
     def predict_path(
-        self, X, n_estimators_grid: Sequence[int]
+        self, Z, n_estimators_grid: Sequence[int]
     ) -> np.ndarray:
         """Predict α̂ at every tree count in `n_estimators_grid` from one fit.
 
@@ -94,7 +94,7 @@ class RieszBooster(RieszEstimator):
             raise RuntimeError(
                 f"{type(self).__name__} is not fitted yet. Call .fit() first."
             )
-        rows = _rows_from_X(X, self.estimand)
+        rows = _rows_from_Z(Z, self.estimand)
         feats = _features_from_rows(rows, self.estimand)
         return self.predictor_.predict_alpha_path(feats, n_estimators_grid)
 

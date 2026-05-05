@@ -3,7 +3,7 @@ extracted from a single boosting fit via xgboost's `iteration_range`.
 
 The optimization's correctness claim is bit-equality with single-point refits:
 fitting at `n_estimators=k` and predicting must give identical numbers to
-`fit(n_estimators=K).predict_path(X, [k])` for any k ≤ K. Same training data,
+`fit(n_estimators=K).predict_path(Z, [k])` for any k ≤ K. Same training data,
 same seed.
 """
 
