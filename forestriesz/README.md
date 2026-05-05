@@ -133,9 +133,10 @@ Re-exported from rieszreg — same API, same semantics:
 | `TSM(level, treatment, covariates)` | α(level, x) | `[1{T=level}]` |
 | `AdditiveShift(delta, ...)` | α(a + δ, x) − α(a, x) | none — use `AugForestRieszRegressor` |
 | `LocalShift(delta, threshold, ...)` | 1(a < threshold) · (α(a + δ, x) − α(a, x)) | none — use `AugForestRieszRegressor` |
-| `StochasticIntervention(samples_key, ...)` | (1/K) Σₖ α(a'ₖ, x) | none |
 
-For estimands without a built-in sieve, the moment varies in W naturally if your evaluation points (the (coef, point) pairs from `trace`) depend on the row data — `StochasticIntervention` is the canonical example. For estimands where it doesn't (`AdditiveShift`, `LocalShift`, custom user moments), use `AugForestRieszRegressor`.
+`StochasticIntervention` previously appeared here; it is currently being rewritten and will return.
+
+For estimands without a built-in sieve, the moment varies in W naturally if your evaluation points (the (coef, point) pairs from `trace`) depend on the row data. For estimands where it doesn't (`AdditiveShift`, `LocalShift`, custom user moments), use `AugForestRieszRegressor`.
 
 ## Architecture
 

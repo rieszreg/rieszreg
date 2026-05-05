@@ -17,7 +17,6 @@ from forestriesz import (
     AdditiveShift,
     ForestRieszRegressor,
     LocalShift,
-    StochasticIntervention,
     TSM,
     default_riesz_features,
 )
@@ -40,18 +39,6 @@ def df_continuous():
     x = rng.normal(size=n)
     a = rng.normal(0.5 * x, 1.0)  # continuous treatment
     return pd.DataFrame({"a": a, "x": x})
-
-
-@pytest.fixture
-def df_stochastic():
-    rng = np.random.default_rng(0)
-    n = 500
-    x = rng.normal(size=n)
-    pi = 1.0 / (1.0 + np.exp(-0.5 * x))
-    a = (rng.uniform(size=n) < pi).astype(float)
-    # Pre-sampled treatment-shift draws used by StochasticIntervention.
-    shift_samples = [list(rng.normal(size=3)) for _ in range(n)]
-    return pd.DataFrame({"a": a, "x": x, "shift_samples": shift_samples})
 
 
 def _make(estimand, force_constant=False):
@@ -105,15 +92,3 @@ def test_local_shift_constant_raises(df_continuous):
         est.fit(df_continuous)
 
 
-def test_stochastic_intervention_smoke(df_stochastic):
-    # Stochastic intervention has random per-row evaluation points so the
-    # moment naturally varies in W; constant basis should work (or raise if
-    # the draws happen to be degenerate).
-    est = _make(StochasticIntervention(samples_key="shift_samples"))
-    try:
-        est.fit(df_stochastic)
-        pred = est.predict(df_stochastic)
-        assert pred.shape == (len(df_stochastic),)
-        assert np.all(np.isfinite(pred))
-    except ValueError as e:
-        assert "row-constant" in str(e)
