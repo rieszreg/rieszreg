@@ -73,24 +73,6 @@ def test_round_trip_per_built_in_estimand(tmp_path):
         np.testing.assert_array_equal(b.predict(df), loaded.predict(df))
 
 
-def test_stochastic_round_trip_with_extra_keys(tmp_path):
-    rng = np.random.default_rng(0)
-    n = 200
-    a = rng.uniform(-1, 1, n)
-    x = rng.uniform(0, 1, n)
-    df = pd.DataFrame({"a": a, "x": x})
-    df["shift_samples"] = [rng.normal(a[i] + 0.5, 0.3, 5).tolist() for i in range(n)]
-
-    b = RieszBooster(
-        estimand=rieszboost.StochasticIntervention(),
-        n_estimators=20, learning_rate=0.05, max_depth=3,
-    ).fit(df)
-    pre = b.predict(df)
-    b.save(tmp_path / "stochastic")
-    loaded = RieszBooster.load(tmp_path / "stochastic")
-    np.testing.assert_array_equal(pre, loaded.predict(df))
-
-
 def test_round_trip_with_kl_loss(tmp_path):
     df = _df(seed=3)
     b = RieszBooster(
@@ -122,7 +104,7 @@ def test_round_trip_with_sklearn_backend(tmp_path):
 def test_custom_estimand_requires_explicit_estimand_on_load(tmp_path):
     df = _df(seed=5)
     def m_custom(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
         return inner
     custom = FiniteEvalEstimand(feature_keys=("a", "x"), m=m_custom, name="my_custom")
@@ -198,23 +180,6 @@ def test_joblib_round_trip_with_kl_loss(tmp_path):
     joblib.dump(b, p)
     loaded = joblib.load(p)
     assert loaded.loss_.max_eta == 40.0
-    np.testing.assert_array_equal(pre, loaded.predict(df))
-
-
-def test_joblib_round_trip_with_stochastic_intervention(tmp_path):
-    import joblib
-    rng = np.random.default_rng(0)
-    n = 200
-    df = pd.DataFrame({"a": rng.uniform(-1, 1, n), "x": rng.uniform(0, 1, n)})
-    df["shift_samples"] = [rng.normal(df["a"][i] + 0.5, 0.3, 5).tolist() for i in range(n)]
-    b = RieszBooster(
-        estimand=rieszboost.StochasticIntervention(),
-        n_estimators=10, learning_rate=0.1, max_depth=3,
-    ).fit(df)
-    pre = b.predict(df)
-    p = tmp_path / "stoch.pkl"
-    joblib.dump(b, p)
-    loaded = joblib.load(p)
     np.testing.assert_array_equal(pre, loaded.predict(df))
 
 

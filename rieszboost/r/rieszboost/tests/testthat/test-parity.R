@@ -69,26 +69,6 @@ test_that("diagnose returns a summary", {
 })
 
 
-test_that("StochasticIntervention via list-column works from R", {
-  set.seed(7)
-  n <- 400L
-  x <- runif(n, 0, 2)
-  a <- rnorm(n, x^2 - 1, sqrt(2))
-  shift_samples <- lapply(seq_len(n), function(i) rnorm(20, a[i] + 1, 0.5))
-  df <- data.frame(a = a, x = x)
-  df$shift_samples <- shift_samples
-
-  booster <- RieszBooster$new(
-    estimand = StochasticIntervention(samples_key = "shift_samples"),
-    n_estimators = 30L, learning_rate = 0.05, max_depth = 3L
-  )
-  booster$fit(df)
-  alpha_hat <- booster$predict(df)
-  expect_length(alpha_hat, n)
-  expect_true(all(is.finite(alpha_hat)))
-})
-
-
 test_that("save / load round-trips a RieszBooster from R", {
   s <- simulate(400L, seed = 8L)
   booster <- RieszBooster$new(estimand = ATE("a", "x"),

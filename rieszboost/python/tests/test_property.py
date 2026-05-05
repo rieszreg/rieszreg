@@ -24,7 +24,6 @@ from rieszboost import (
     LocalShift,
     RieszBooster,
     SquaredLoss,
-    StochasticIntervention,
     TSM,
 )
 from rieszboost.augmentation import build_augmented
@@ -45,18 +44,18 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
         trace(c1·m1 + c2·m2) == c1·trace(m1) + c2·trace(m2)
     term-by-term."""
     def m1(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
         return inner
 
     def m2(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"])  # ATE-like and TSM-like
         return inner
 
     def m_combined(alpha):
-        def inner(z):
-            return c1 * m1(alpha)(z) + c2 * m2(alpha)(z)
+        def inner(z, y=None):
+            return c1 * m1(alpha)(z, y) + c2 * m2(alpha)(z, y)
         return inner
 
     from rieszreg import FiniteEvalEstimand
@@ -116,11 +115,9 @@ def test_estimand_factory_spec_round_trip(delta: float, threshold: float, level:
         TSM(level=level),
         AdditiveShift(delta=delta),
         LocalShift(delta=delta, threshold=threshold),
-        StochasticIntervention(),
     ):
         roundtrip = estimand_from_spec(est.factory_spec)
         assert roundtrip.feature_keys == est.feature_keys
-        assert roundtrip.extra_keys == est.extra_keys
         assert roundtrip.factory_spec == est.factory_spec
 
 

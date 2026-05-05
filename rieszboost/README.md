@@ -104,47 +104,34 @@ Each fold's `RieszBooster` does its own internal validation split for early stop
 
 ## Custom estimands
 
-Write `m(alpha)` as an operator that returns a function of `z`. The library traces it to extract the linear-form structure. Wrap the result in an `Estimand` and you're done — `feature_keys` / `extra_keys` belong to the estimand:
+Write `m(alpha)` as an operator that returns a function of `(z, y)`. The library traces it to extract the linear-form structure. Wrap the result in a `FiniteEvalEstimand`:
 
 ```python
-from rieszboost import Estimand
+from rieszboost import FiniteEvalEstimand
 
 def m_my_thing(alpha):
-    def inner(z):
+    def inner(z, y=None):
         return alpha(a=2, x=z["x"]) - 0.5 * alpha(a=1, x=z["x"])
     return inner
 
-est = Estimand(feature_keys=("a", "x"), m=m_my_thing, name="MyThing")
+est = FiniteEvalEstimand(feature_keys=("a", "x"), m=m_my_thing, name="MyThing")
 
 booster = RieszBooster(estimand=est, n_estimators=200).fit(df)
 ```
 
-`alpha(...)` calls record evaluation points; `+`, `-`, and scalar `*` compose them into a `LinearForm`. Anything outside that (e.g. `alpha(...) ** 2`, `alpha(...) + 1.0`) raises — by construction the fast path supports exactly the class of finite linear combinations of point evaluations of α.
+`alpha(...)` calls record evaluation points; `+`, `-`, and scalar `*` compose them into a `LinearForm`. Anything outside that (e.g. `alpha(...) ** 2`, `alpha(...) + 1.0`) raises — by construction the fast path supports exactly the class of finite linear combinations of point evaluations of α. `y` is the per-row outcome (sklearn-style); use it when `m` is outcome-dependent, ignore it otherwise.
 
 ## Built-in estimands
 
-| Factory | m(α)(z) | Notes |
+| Factory | m(α)(z, y) | Notes |
 |---|---|---|
 | `ATE(treatment, covariates)` | α(1, x) − α(0, x) | Average treatment effect |
 | `ATT(treatment, covariates)` | a · (α(1, x) − α(0, x)) | ATT *partial-estimand* surface. Full ATT divides by P(A=1) and is **not** a Riesz functional — combine α̂_partial with a delta-method EIF (Hubbard 2011) downstream. |
 | `TSM(level, treatment, covariates)` | α(level, x) | Treatment-specific mean |
 | `AdditiveShift(delta, ...)` | α(a + δ, x) − α(a, x) | Continuous-treatment shift effect |
 | `LocalShift(delta, threshold, ...)` | 1(a < threshold) · (α(a + δ, x) − α(a, x)) | LASE *partial-estimand* surface; same caveat as ATT |
-| `StochasticIntervention(samples_key, ...)` | (1/K) Σₖ α(a'ₖ, x) | Stochastic interventions / IPSI via Monte Carlo over the intervention density |
 
-For stochastic interventions, attach a list-column of pre-sampled treatment values:
-
-```python
-df["shift_samples"] = [
-    rng.normal(a_i + delta, sigma, size=20).tolist() for a_i in df["a"]
-]
-booster = RieszBooster(
-    estimand=rieszboost.StochasticIntervention(samples_key="shift_samples"),
-    n_estimators=500, learning_rate=0.05,
-).fit(df)
-```
-
-`extra_keys` on the estimand declares the payload columns; `RieszBooster.fit(df)` pulls them through automatically.
+`StochasticIntervention` previously appeared here; it is currently being rewritten and will return.
 
 ## Save and load
 

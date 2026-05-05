@@ -7,7 +7,6 @@ from rieszreg.estimands.base import (  # noqa: F401
     Estimand,
     FiniteEvalEstimand,
     LocalShift,
-    StochasticIntervention,
     TSM,
     _FACTORY_REGISTRY,
     _rebuild_custom_estimand,
@@ -21,7 +20,6 @@ __all__ = [
     "Estimand",
     "FiniteEvalEstimand",
     "LocalShift",
-    "StochasticIntervention",
     "TSM",
     "estimand_from_spec",
 ]

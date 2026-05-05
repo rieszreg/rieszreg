@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from rieszboost import ATE, LocalShift, RieszBooster, StochasticIntervention
+from rieszboost import ATE, LocalShift, RieszBooster
 
 
 def _logit(z):
@@ -25,8 +25,8 @@ def _df(n=200, seed=0):
 
 
 def test_extra_columns_in_dataframe_are_ignored():
-    """Columns not in estimand.feature_keys / extra_keys should pass through
-    silently — not raise, not affect the fit."""
+    """Columns not in estimand.feature_keys should pass through silently —
+    not raise, not affect the fit."""
     df = _df(seed=1)
     df["irrelevant_col"] = np.arange(len(df))
     df["another"] = "string_data"  # would crash if naively passed to xgboost
@@ -107,23 +107,6 @@ def test_eval_set_overrides_internal_split():
     ).fit(df, eval_set=df_valid)
     # eval_set was used → best_iteration_ should be set (or model finished).
     assert booster.predict(df).shape == (len(df),)
-
-
-def test_stochastic_with_empty_samples_lists():
-    """If a row has zero MC samples, m returns 0 → no counterfactuals."""
-    n = 50
-    rng = np.random.default_rng(0)
-    df = pd.DataFrame({
-        "a": rng.uniform(-1, 1, n),
-        "x": rng.uniform(0, 1, n),
-    })
-    df["shift_samples"] = [[] for _ in range(n)]  # all empty
-    booster = RieszBooster(
-        estimand=StochasticIntervention(),
-        n_estimators=10, learning_rate=0.1, max_depth=3,
-    ).fit(df)
-    pred = booster.predict(df)
-    assert pred.shape == (n,) and np.isfinite(pred).all()
 
 
 def test_predict_on_unseen_extreme_x():

@@ -10,7 +10,7 @@ def _est(m):
 
 def test_ate_traces_to_two_terms():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) - alpha(a=0, x=z["x"])
         return inner
 
@@ -23,7 +23,7 @@ def test_ate_traces_to_two_terms():
 
 def test_scalar_multiplication_and_addition():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return 2.0 * alpha(a=1, x=z["x"]) + 0.5 * alpha(a=0, x=z["x"])
         return inner
 
@@ -34,7 +34,7 @@ def test_scalar_multiplication_and_addition():
 
 def test_duplicate_points_merge():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) + alpha(a=1, x=z["x"])
         return inner
 
@@ -45,7 +45,7 @@ def test_duplicate_points_merge():
 
 def test_zero_coef_dropped():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) - alpha(a=1, x=z["x"])
         return inner
 
@@ -54,7 +54,7 @@ def test_zero_coef_dropped():
 
 def test_nonlinear_op_raises():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) ** 2
         return inner
 
@@ -64,7 +64,7 @@ def test_nonlinear_op_raises():
 
 def test_constant_offset_raises():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) + 1.0
         return inner
 
@@ -74,7 +74,7 @@ def test_constant_offset_raises():
 
 def test_alpha_times_alpha_raises():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=1, x=z["x"]) * alpha(a=0, x=z["x"])
         return inner
 
@@ -84,7 +84,7 @@ def test_alpha_times_alpha_raises():
 
 def test_shift_estimand_traces():
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(a=z["a"], x=z["x"])
         return inner
 

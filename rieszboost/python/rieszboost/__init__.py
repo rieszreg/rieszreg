@@ -17,7 +17,6 @@ from .estimand import (
     AdditiveShift,
     Estimand,
     LocalShift,
-    StochasticIntervention,
     TSM,
 )
 from .losses import BernoulliLoss, BoundedSquaredLoss, KLLoss, LossSpec, SquaredLoss
@@ -39,7 +38,6 @@ __all__ = [
     "RieszBooster",
     "SklearnBackend",
     "SquaredLoss",
-    "StochasticIntervention",
     "TSM",
     "Tracer",
     "XGBoostBackend",

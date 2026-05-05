@@ -129,15 +129,6 @@ def test_unfitted_booster_raises():
         booster.predict(np.array([[1.0, 0.5]]))
 
 
-def test_extra_keys_estimand_rejects_ndarray():
-    """StochasticIntervention has extra_keys=("shift_samples",) — ndarray
-    can't carry that, so we raise with a clear message."""
-    X = np.array([[0.5, 0.3]])
-    booster = RieszBooster(estimand=rieszboost.StochasticIntervention(), n_estimators=5)
-    with pytest.raises(ValueError, match="DataFrame"):
-        booster.fit(X)
-
-
 def test_public_api_exports():
     assert hasattr(rieszboost, "RieszBooster")
     assert hasattr(rieszboost, "ATE")
@@ -145,7 +136,6 @@ def test_public_api_exports():
     assert hasattr(rieszboost, "TSM")
     assert hasattr(rieszboost, "AdditiveShift")
     assert hasattr(rieszboost, "LocalShift")
-    assert hasattr(rieszboost, "StochasticIntervention")
     assert hasattr(rieszboost, "Estimand")
     assert hasattr(rieszboost, "XGBoostBackend")
     assert hasattr(rieszboost, "SklearnBackend")
