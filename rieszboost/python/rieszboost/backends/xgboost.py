@@ -9,7 +9,7 @@ predictor applies `loss.link_to_alpha` to convert to α space.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import xgboost as xgb
@@ -47,6 +47,34 @@ class XGBoostPredictor:
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
+
+    def _booster_n_trees(self) -> int:
+        return int(self.booster.num_boosted_rounds())
+
+    def predict_eta_path(
+        self, features: np.ndarray, n_estimators_grid: Sequence[int]
+    ) -> np.ndarray:
+        grid = [int(k) for k in n_estimators_grid]
+        if not grid:
+            raise ValueError("n_estimators_grid must be non-empty.")
+        cap = self._booster_n_trees()
+        for k in grid:
+            if k <= 0 or k > cap:
+                raise ValueError(
+                    f"n_estimators_grid entries must satisfy 1 ≤ k ≤ {cap} "
+                    f"(booster has {cap} trees); got {grid}."
+                )
+        dmat = xgb.DMatrix(np.asarray(features, dtype=float))
+        out = np.empty((dmat.num_row(), len(grid)), dtype=float)
+        for j, k in enumerate(grid):
+            out[:, j] = self.booster.predict(dmat, iteration_range=(0, k))
+        return out
+
+    def predict_alpha_path(
+        self, features: np.ndarray, n_estimators_grid: Sequence[int]
+    ) -> np.ndarray:
+        eta = self.predict_eta_path(features, n_estimators_grid)
+        return np.asarray(self.loss.link_to_alpha(eta))
 
     def save(self, dir_path):
         """Save booster as JSON (xgboost native format) inside dir_path."""

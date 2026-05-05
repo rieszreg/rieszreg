@@ -140,6 +140,24 @@ RieszBooster <- R6::R6Class(
       if (!is.null(init)) args$init <- init
       py_object <- do.call(.module()$RieszBooster, args)
       super$initialize(py_object = py_object, estimand = estimand)
+    },
+
+    #' Predict α̂ at every tree count in `n_estimators_grid` from one fit.
+    #'
+    #' Returns an n_rows × length(n_estimators_grid) numeric matrix whose
+    #' column j is the α̂ obtained by truncating the booster to
+    #' `n_estimators_grid[j]` trees. Columns are labelled `"trees=<k>"`.
+    #'
+    #' Each grid entry must be in `[1, booster.num_boosted_rounds()]`.
+    #' @param X Feature data.frame.
+    #' @param n_estimators_grid Integer vector of tree counts.
+    predict_path = function(X, n_estimators_grid) {
+      grid <- as.integer(n_estimators_grid)
+      out <- self$py$predict_path(rieszreg::df_to_py(X),
+                                  reticulate::r_to_py(as.list(grid)))
+      m <- as.matrix(reticulate::py_to_r(out))
+      colnames(m) <- paste0("trees=", grid)
+      m
     }
   )
 )
