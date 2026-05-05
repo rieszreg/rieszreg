@@ -113,6 +113,44 @@ alpha_hat <- est$predict(df)
 
 Custom torch architectures are Python-only.
 
+## macOS: avoiding torch-R conflicts
+
+R's `torch` package and Python's `torch` (which `riesznet` imports via reticulate) both bundle their own copy of `libtorch_cpu.dylib` at different ABI versions. On macOS, dyld keeps only one copy of that library resident per process. Whichever package loads first wins; the second one resolves symbols against the wrong copy and the import fails:
+
+```
+ImportError: dlopen(.../torch/_C.cpython-313-darwin.so):
+  Symbol not found: __ZN2at17toDLPackVersionedERKNS_6TensorE
+  Referenced from: .../torch/lib/libtorch_python.dylib
+  Expected in:     .../R/arm64/4.4/library/torch/lib/libtorch_cpu.dylib
+```
+
+The reverse load order (Python's torch first, then R's `torch`) fails symmetrically. Linux is unaffected; both libraries can coexist in one process there.
+
+Two workarounds are known to work in R sessions that also use R's `torch` (directly, or through `tabnet`, `luz`, `brulee`, etc.).
+
+**Pattern A: isolate riesznet in a child R process.** Wrap each `riesznet` call in `callr::r()` so the spawned process loads only Python's torch:
+
+```r
+result <- callr::r(function() {
+  library(riesznet)
+  est <- RieszNet$new(estimand = ATE(treatment = "a", covariates = "x"))
+  est$fit(df)
+  est$predict(df)
+})
+```
+
+**Pattern B: flush the future plan between torch worlds.** When parallelism uses `future::plan(multisession, workers = N)`, each worker is a long-lived R process that pins whichever torch loaded first. Switching to a worker pool that needs the other torch requires killing the old workers first:
+
+```r
+future::plan(multisession, workers = 4)   # workers will load R-torch
+# ... R-torch work ...
+future::plan(sequential)                  # kill workers
+future::plan(multisession, workers = 4)   # fresh workers for riesznet
+# ... riesznet work ...
+```
+
+Without the flush, `future` reuses workers across plans of the same shape and the conflict persists.
+
 ## What works today (v0.0.1)
 
 - All five built-in estimands (`ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`) plus custom estimands. `StochasticIntervention` is currently stubbed in rieszreg and will be reintroduced.
