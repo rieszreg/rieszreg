@@ -12,10 +12,14 @@ directly and pass it to ``RieszEstimator(estimand, backend=...)``.
 from __future__ import annotations
 
 import functools
+from typing import Sequence
+
+import numpy as np
 
 from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
+from rieszreg.estimator import _features_from_rows, _rows_from_X
 
-from .backend import TorchBackend
+from .backend import TorchBackend, auto_snapshot_epochs
 from .modules import build_adam, build_mlp
 
 
@@ -58,6 +62,12 @@ class RieszNet(RieszEstimator):
     early_stopping_rounds : int or None
         Stop fitting after this many epochs without validation-loss
         improvement; restore best-validation weights at end of fit.
+    snapshot_epochs : sequence of int or None, default None
+        Epoch ticks at which to snapshot ``state_dict`` during training so
+        ``predict_path(X, epochs=...)`` can return α̂ at each tick. ``None``
+        builds an auto-grid of ~20 log-spaced ticks across ``[1, epochs]``
+        (see :func:`riesznet.backend.auto_snapshot_epochs`). Pass an empty
+        sequence to disable snapshotting entirely.
     random_state : int, default 0
     """
 
@@ -78,6 +88,7 @@ class RieszNet(RieszEstimator):
         init: float | str | None = None,
         validation_fraction: float = 0.0,
         early_stopping_rounds: int | None = None,
+        snapshot_epochs: Sequence[int] | None = None,
         random_state: int = 0,
     ):
         super().__init__(
@@ -99,11 +110,24 @@ class RieszNet(RieszEstimator):
         self.grad_clip_norm = grad_clip_norm
         self.early_stopping_rounds = early_stopping_rounds
         self.validation_fraction = validation_fraction
+        self.snapshot_epochs = snapshot_epochs
 
     # ---- defaults / backend construction ----
 
     def _resolved_loss(self) -> LossSpec:
         return self.loss if self.loss is not None else SquaredLoss()
+
+    def _resolved_snapshot_epochs(self) -> tuple[int, ...]:
+        if self.snapshot_epochs is None:
+            return auto_snapshot_epochs(int(self.epochs))
+        ticks = sorted({int(e) for e in self.snapshot_epochs})
+        for e in ticks:
+            if not (1 <= e <= int(self.epochs)):
+                raise ValueError(
+                    f"snapshot_epochs entry {e} must satisfy 1 ≤ e ≤ epochs"
+                    f"={int(self.epochs)}."
+                )
+        return tuple(ticks)
 
     def _resolved_backend(self) -> TorchBackend:
         module_factory = functools.partial(
@@ -128,7 +152,28 @@ class RieszNet(RieszEstimator):
             grad_clip_norm=self.grad_clip_norm,
             early_stopping_rounds=self.early_stopping_rounds,
             validation_fraction=self.validation_fraction,
+            snapshot_epochs=self._resolved_snapshot_epochs(),
         )
+
+    def predict_path(
+        self, X, epochs: Sequence[int] | None = None
+    ) -> np.ndarray:
+        """Predict α̂ at every snapshot epoch from one training run.
+
+        Returns an array of shape ``(n_rows, n_epochs)`` whose column ``j``
+        is the prediction obtained from the network's ``state_dict`` at
+        snapshot epoch ``epochs[j]`` (or every retained snapshot when
+        ``epochs`` is ``None``). Each column equals a fresh fit at
+        ``epochs=epochs[j]`` to within Adam's deterministic-trajectory
+        tolerance (bit-equal under fixed seed and identical data ordering).
+        """
+        if not hasattr(self, "predictor_"):
+            raise RuntimeError(
+                f"{type(self).__name__} is not fitted yet. Call .fit() first."
+            )
+        rows = _rows_from_X(X, self.estimand)
+        feats = _features_from_rows(rows, self.estimand)
+        return self.predictor_.predict_alpha_path(feats, epochs)
 
     # ---- save/load ----
 
@@ -147,6 +192,11 @@ class RieszNet(RieszEstimator):
             grad_clip_norm=self.grad_clip_norm,
             early_stopping_rounds=self.early_stopping_rounds,
             validation_fraction=float(self.validation_fraction),
+            snapshot_epochs=(
+                list(int(e) for e in self.snapshot_epochs)
+                if self.snapshot_epochs is not None
+                else None
+            ),
         )
         return base
 
@@ -171,5 +221,6 @@ class RieszNet(RieszEstimator):
             init=hyperparameters.get("init"),
             validation_fraction=hyperparameters.get("validation_fraction", 0.0),
             early_stopping_rounds=hyperparameters.get("early_stopping_rounds"),
+            snapshot_epochs=hyperparameters.get("snapshot_epochs"),
             random_state=hyperparameters.get("random_state", 0),
         )

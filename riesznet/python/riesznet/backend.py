@@ -180,12 +180,32 @@ def _row_batches(
 # ----------------------------------------------------------------------
 
 
+def auto_snapshot_epochs(max_epochs: int) -> tuple[int, ...]:
+    """Default tick grid for ``RieszNet.snapshot_epochs``.
+
+    Returns roughly 20 epoch ticks spanning ``[1, max_epochs]``: dense at
+    the start (1, 2, 5, 10) and evenly spaced thereafter at stride
+    ``max(1, max_epochs // 20)``. Always includes 1 and ``max_epochs``.
+    """
+    if max_epochs < 1:
+        return ()
+    rec = max(1, int(max_epochs) // 20)
+    seeded = {1, int(max_epochs)}
+    seeded.update({2, 5, 10})
+    seeded.update(range(rec, int(max_epochs) + 1, rec))
+    return tuple(sorted(e for e in seeded if 1 <= e <= int(max_epochs)))
+
+
 @dataclass
 class TorchPredictor:
     """Wraps the trained ``nn.Module`` for prediction.
 
     Implements the ``rieszreg.Predictor`` protocol (``predict_eta``,
     ``predict_alpha``, ``save`` + classmethod ``load``).
+
+    When fit with ``snapshot_epochs`` set, also stores a per-epoch
+    ``state_dict`` snapshot dictionary so ``predict_eta_path`` /
+    ``predict_alpha_path`` can return α̂ at every snapshot epoch in one call.
     """
 
     model: torch.nn.Module
@@ -196,6 +216,8 @@ class TorchPredictor:
     device: str
     factory_metadata: dict
     feature_keys: tuple[str, ...] = field(default_factory=tuple)
+    snapshot_state_dicts: dict[int, dict[str, torch.Tensor]] | None = None
+    snapshot_epochs: tuple[int, ...] | None = None
 
     kind: ClassVar[str] = "riesznet"
 
@@ -234,6 +256,69 @@ class TorchPredictor:
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
 
+    # ---- path predict ----
+
+    def _resolve_snapshot_epochs(
+        self, epochs: Iterable[int] | None
+    ) -> list[int]:
+        if self.snapshot_state_dicts is None or self.snapshot_epochs is None:
+            raise RuntimeError(
+                "predict_path requires snapshot_epochs (auto or explicit) "
+                "to have been set at fit time."
+            )
+        if epochs is None:
+            return list(self.snapshot_epochs)
+        chosen: list[int] = []
+        stored = set(self.snapshot_epochs)
+        for e in epochs:
+            ek = int(e)
+            if ek not in stored:
+                raise ValueError(
+                    f"epoch={ek!r} not in stored snapshot_epochs "
+                    f"{tuple(self.snapshot_epochs)}."
+                )
+            chosen.append(ek)
+        return chosen
+
+    def predict_eta_path(
+        self, features: np.ndarray, epochs: Iterable[int] | None = None
+    ) -> np.ndarray:
+        chosen = self._resolve_snapshot_epochs(epochs)
+        X = np.atleast_2d(np.asarray(features, dtype=float))
+        if X.shape[1] != self.input_dim:
+            raise ValueError(
+                f"TorchPredictor expects {self.input_dim} input features, "
+                f"got {X.shape[1]}."
+            )
+        device = self._torch_device()
+        dtype = self._torch_dtype()
+        X_t = torch.as_tensor(X, dtype=dtype, device=device)
+        self.model.to(device=device, dtype=dtype)
+
+        original_state = {
+            k: v.detach().clone() for k, v in self.model.state_dict().items()
+        }
+        was_training = self.model.training
+        self.model.eval()
+        out = np.empty((X.shape[0], len(chosen)), dtype=float)
+        try:
+            for j, ep in enumerate(chosen):
+                self.model.load_state_dict(self.snapshot_state_dicts[ep])
+                with torch.no_grad():
+                    eta_t = self.model(X_t).squeeze(-1) + self.base_score
+                out[:, j] = eta_t.detach().cpu().numpy().astype(float)
+        finally:
+            self.model.load_state_dict(original_state)
+            if was_training:
+                self.model.train()
+        return out
+
+    def predict_alpha_path(
+        self, features: np.ndarray, epochs: Iterable[int] | None = None
+    ) -> np.ndarray:
+        eta = self.predict_eta_path(features, epochs)
+        return np.asarray(self.loss.link_to_alpha(eta))
+
     # ---- serialization ----
 
     def save(self, dir_path) -> None:
@@ -252,9 +337,24 @@ class TorchPredictor:
             "device": self.device,
             "factory": self.factory_metadata,
             "feature_keys": list(self.feature_keys),
+            "snapshot_epochs": (
+                list(self.snapshot_epochs)
+                if self.snapshot_epochs is not None
+                else None
+            ),
         }
         with open(path / "predictor.json", "w") as f:
             json.dump(meta, f, indent=2)
+
+        if self.snapshot_state_dicts is not None and self.snapshot_epochs:
+            snap_dir = path / "snapshots"
+            snap_dir.mkdir(exist_ok=True)
+            for ep in self.snapshot_epochs:
+                cpu_sd = {
+                    k: v.detach().cpu()
+                    for k, v in self.snapshot_state_dicts[ep].items()
+                }
+                torch.save(cpu_sd, snap_dir / f"epoch_{ep}.pt")
 
     @classmethod
     def load(cls, dir_path, *, base_score=None, loss=None, best_iteration=None):
@@ -273,6 +373,16 @@ class TorchPredictor:
         state = torch.load(path / "state_dict.pt", map_location="cpu")
         model.load_state_dict(state)
 
+        snap_epochs = meta.get("snapshot_epochs")
+        snap_dir = path / "snapshots"
+        snap_state_dicts: dict[int, dict[str, torch.Tensor]] | None = None
+        if snap_epochs and snap_dir.is_dir():
+            snap_state_dicts = {}
+            for ep in snap_epochs:
+                snap_state_dicts[int(ep)] = torch.load(
+                    snap_dir / f"epoch_{int(ep)}.pt", map_location="cpu"
+                )
+
         return cls(
             model=model,
             loss=loss_obj,
@@ -282,6 +392,10 @@ class TorchPredictor:
             device=device,
             factory_metadata=meta["factory"],
             feature_keys=tuple(meta.get("feature_keys", ())),
+            snapshot_state_dicts=snap_state_dicts,
+            snapshot_epochs=(
+                tuple(int(e) for e in snap_epochs) if snap_epochs else None
+            ),
         )
 
 
@@ -350,6 +464,7 @@ class TorchBackend:
     grad_clip_norm: float | None = None
     early_stopping_rounds: int | None = None
     validation_fraction: float = 0.0
+    snapshot_epochs: tuple[int, ...] = ()
 
     def fit_rows(
         self,
@@ -417,6 +532,9 @@ class TorchBackend:
         no_improve = 0
         history: list[float] = []
 
+        snap_set = {int(e) for e in self.snapshot_epochs}
+        snapshots: dict[int, dict[str, torch.Tensor]] = {}
+
         if rows_valid is None and self.early_stopping_rounds:
             raise ValueError(
                 "early_stopping_rounds requires a validation set. Set "
@@ -465,6 +583,13 @@ class TorchBackend:
             if scheduler is not None:
                 scheduler.step()
 
+            done = epoch + 1
+            if done in snap_set:
+                snapshots[done] = {
+                    k: v.detach().cpu().clone()
+                    for k, v in model.state_dict().items()
+                }
+
             if valid_x is not None:
                 val = self._validation_loss(
                     model, base, loss,
@@ -490,6 +615,9 @@ class TorchBackend:
         # surfaces early, before the user tries to save.
         factory_meta = _factory_metadata(self.module_factory)
 
+        # Only retain snapshot epochs that were actually reached during
+        # training (early stopping may end the loop before later ticks).
+        retained_epochs = tuple(sorted(snapshots.keys()))
         predictor = TorchPredictor(
             model=model,
             loss=loss,
@@ -499,6 +627,8 @@ class TorchBackend:
             device=str(device),
             factory_metadata=factory_meta,
             feature_keys=tuple(estimand.feature_keys),
+            snapshot_state_dicts=snapshots if retained_epochs else None,
+            snapshot_epochs=retained_epochs if retained_epochs else None,
         )
 
         return FitResult(

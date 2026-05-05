@@ -79,6 +79,7 @@ RieszNet <- R6::R6Class(
                           init = NULL,
                           validation_fraction = 0.0,
                           early_stopping_rounds = NULL,
+                          snapshot_epochs = NULL,
                           random_state = 0L) {
       # Build the hidden_sizes Python tuple from the R integer vector.
       hs <- reticulate::tuple(lapply(as.integer(hidden_sizes), as.integer))
@@ -101,8 +102,43 @@ RieszNet <- R6::R6Class(
       if (!is.null(early_stopping_rounds)) {
         args$early_stopping_rounds <- as.integer(early_stopping_rounds)
       }
+      if (!is.null(snapshot_epochs)) {
+        args$snapshot_epochs <- reticulate::r_to_py(
+          as.list(as.integer(snapshot_epochs))
+        )
+      }
       py_object <- do.call(.module()$RieszNet, args)
       super$initialize(py_object = py_object, estimand = estimand)
+    },
+
+    #' Predict α̂ at every snapshot epoch from one training run.
+    #'
+    #' Returns an n_rows × n_epochs numeric matrix. Column ``j`` is the
+    #' prediction obtained from the ``state_dict`` at snapshot epoch
+    #' ``epochs[j]`` (or every retained snapshot when `epochs` is `NULL`).
+    #' Each column equals a fresh fit at ``epochs[j]`` to within Adam's
+    #' deterministic-trajectory tolerance.
+    #'
+    #' Requires `snapshot_epochs` (or the auto-grid default) to have been
+    #' enabled at construction.
+    #' @param X Feature data.frame.
+    #' @param epochs Integer vector of epoch ticks (subset of stored grid);
+    #'   defaults to the full stored grid.
+    predict_path = function(X, epochs = NULL) {
+      if (is.null(epochs)) {
+        py_ep <- NULL
+      } else {
+        py_ep <- reticulate::r_to_py(as.list(as.integer(epochs)))
+      }
+      out <- self$py$predict_path(rieszreg::df_to_py(X), py_ep)
+      m <- as.matrix(reticulate::py_to_r(out))
+      ep_used <- if (is.null(epochs)) {
+        as.integer(reticulate::py_to_r(self$py$predictor_$snapshot_epochs))
+      } else {
+        as.integer(epochs)
+      }
+      colnames(m) <- paste0("epoch=", ep_used)
+      m
     }
   )
 )

@@ -74,6 +74,22 @@ est.fit(df)
 
 `module_factory` must be a top-level (importable) callable so `state_dict` save/load can reconstruct the module by qualname. `functools.partial` over a top-level function is fine.
 
+## Predicting at every epoch from one fit
+
+`predict_path` returns α̂ at each snapshot epoch from a single training run. The backend captures `state_dict` at a list of epoch ticks during fit; `predict_path` replays each snapshot and stacks the results column-wise.
+
+```python
+net = RieszNet(estimand=ATE(), epochs=200, snapshot_epochs=[1, 5, 25, 100, 200]).fit(df)
+path = net.predict_path(df)            # shape (n_rows, 5)
+sub = net.predict_path(df, epochs=[25, 200])
+```
+
+`snapshot_epochs=None` (the default) builds an auto-grid of ~20 log-spaced ticks across `[1, epochs]`. Pass `snapshot_epochs=[]` to disable snapshotting if storage is tight.
+
+When early stopping fires, only ticks reached during training are retained. Each retained column is bit-equal to a fresh fit at that epoch under the same `random_state`, since Adam's trajectory is deterministic given fixed seed and data ordering.
+
+The R6 wrapper exposes the same method with column names `"epoch=1"`, `"epoch=25"`, etc.
+
 ## R wrapper
 
 Same API surface, MLP knobs only:
