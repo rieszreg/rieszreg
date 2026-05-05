@@ -158,6 +158,24 @@ alpha_oof = cross_val_predict(
 
 Each fold's regressor does its own internal validation split for λ selection.
 
+## Predicting at every λ from one fit
+
+`predict_path` returns α̂ at each λ in (a subset of) `lambda_grid` from a single fit. The dual coefficients are computed for every λ in the sweep already; `keep_path=True` (the default) retains them so prediction reuses one shared test-side kernel slab across λ.
+
+```python
+krr = KernelRieszRegressor(
+    estimand=ATE(),
+    lambda_grid=[1e-3, 1e-2, 1e-1, 1.0],
+    solver="direct",
+).fit(df)
+path = krr.predict_path(df)            # shape (n_rows, 4)
+sub = krr.predict_path(df, lambdas=[1e-2, 1.0])  # shape (n_rows, 2)
+```
+
+Column `j` is mathematically equal (to roundoff) to a fresh fit at the singleton `lambda_grid=[lambdas[j]]` — same Cholesky, same RHS, same dual. Pass `keep_path=False` to skip the retention if memory is tight at very large `n_train`.
+
+The R6 wrapper exposes the same method with column names `"lambda=1e-03"`, etc.
+
 ## Diagnostics
 
 ```python

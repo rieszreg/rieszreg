@@ -109,6 +109,7 @@ KernelRieszRegressor <- R6::R6Class(
                           n_landmarks = NULL, n_features = 1024L,
                           cg_tol = 1e-6, cg_max_iter = 200L,
                           init = NULL, validation_fraction = 0.2,
+                          keep_path = TRUE,
                           random_state = 0L) {
       args <- list(
         estimand = estimand,
@@ -117,6 +118,7 @@ KernelRieszRegressor <- R6::R6Class(
         cg_tol = cg_tol,
         cg_max_iter = as.integer(cg_max_iter),
         validation_fraction = validation_fraction,
+        keep_path = isTRUE(keep_path),
         random_state = as.integer(random_state)
       )
       if (!is.null(kernel)) args$kernel <- kernel
@@ -126,6 +128,34 @@ KernelRieszRegressor <- R6::R6Class(
       if (!is.null(init)) args$init <- init
       py_object <- do.call(.module()$KernelRieszRegressor, args)
       super$initialize(py_object = py_object, estimand = estimand)
+    },
+
+    #' Predict α̂ at every λ in the (optionally subset) lambda_grid.
+    #'
+    #' Returns an n_rows × n_lambdas numeric matrix. Column ``j`` is the
+    #' prediction at ``lambdas[j]`` (or ``self$py$lambda_grid[j]`` when
+    #' `lambdas` is `NULL`). Each column is bit-equal to a fresh fit at a
+    #' singleton `lambda_grid` containing that λ.
+    #'
+    #' Requires `keep_path = TRUE` (the default).
+    #' @param Z Feature data.frame.
+    #' @param lambdas Numeric vector of λ values (a subset of the stored
+    #'   `lambda_grid`); defaults to the full grid.
+    predict_path = function(Z, lambdas = NULL) {
+      if (is.null(lambdas)) {
+        py_lam <- NULL
+      } else {
+        py_lam <- reticulate::r_to_py(as.list(as.numeric(lambdas)))
+      }
+      out <- self$py$predict_path(rieszreg::df_to_py(Z), py_lam)
+      m <- as.matrix(reticulate::py_to_r(out))
+      lam_used <- if (is.null(lambdas)) {
+        as.numeric(reticulate::py_to_r(self$py$predictor_$lambda_grid))
+      } else {
+        as.numeric(lambdas)
+      }
+      colnames(m) <- paste0("lambda=", format(lam_used, scientific = TRUE))
+      m
     }
   )
 )

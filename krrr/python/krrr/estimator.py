@@ -14,7 +14,7 @@ from typing import Sequence
 import numpy as np
 
 from rieszreg.estimands.base import Estimand
-from rieszreg.estimator import RieszEstimator
+from rieszreg.estimator import RieszEstimator, _features_from_rows, _rows_from_X
 from rieszreg.losses import LossSpec, SquaredLoss
 
 from .backend import KernelRidgeBackend
@@ -53,6 +53,10 @@ class KernelRieszRegressor(RieszEstimator):
         α-space initialization. None defers to `loss.default_init_alpha()`.
     validation_fraction : float, default=0.2
         Hold out this fraction of the training data for λ selection.
+    keep_path : bool, default=True
+        Retain per-λ dual coefficients on the fitted estimator so
+        `predict_path(X, lambdas=...)` can return α̂ at each retained λ in
+        one call. Storage cost is `n_train × n_lambda × 8` bytes.
     random_state : int, default=0
     """
 
@@ -69,6 +73,7 @@ class KernelRieszRegressor(RieszEstimator):
         cg_max_iter: int = 200,
         init: float | str | None = None,
         validation_fraction: float = 0.2,
+        keep_path: bool = True,
         random_state: int = 0,
     ):
         super().__init__(
@@ -86,6 +91,7 @@ class KernelRieszRegressor(RieszEstimator):
         self.cg_tol = cg_tol
         self.cg_max_iter = cg_max_iter
         self.validation_fraction = validation_fraction
+        self.keep_path = keep_path
 
     # ---- defaults / backend construction ----
 
@@ -110,6 +116,7 @@ class KernelRieszRegressor(RieszEstimator):
             cg_tol=self.cg_tol,
             cg_max_iter=self.cg_max_iter,
             validation_fraction=self.validation_fraction,
+            keep_path=self.keep_path,
             random_state=self.random_state,
         )
 
@@ -122,11 +129,35 @@ class KernelRieszRegressor(RieszEstimator):
             self.lambda_ = self.predictor_.result.extra.get("lambda")
         return self
 
+    def predict_path(
+        self, Z, lambdas: Sequence[float] | None = None
+    ) -> np.ndarray:
+        """Predict α̂ at every λ in the (optionally subset) lambda_grid.
+
+        Returns an array of shape ``(n_rows, n_lambdas)`` whose column ``j``
+        is the prediction at ``lambdas[j]`` (or ``self.lambda_grid[j]`` if
+        ``lambdas`` is ``None``). Each column is bit-equal to a fresh fit at
+        a singleton lambda_grid containing that λ — same Cholesky / RHS / dual.
+
+        Requires ``keep_path=True`` (the default). Raises ``RuntimeError`` if
+        the estimator was fit with ``keep_path=False``.
+        """
+        if not hasattr(self, "predictor_"):
+            raise RuntimeError(
+                f"{type(self).__name__} is not fitted yet. Call .fit() first."
+            )
+        rows = _rows_from_X(Z, self.estimand)
+        feats = _features_from_rows(rows, self.estimand)
+        return self.predictor_.predict_alpha_path(feats, lambdas)
+
     # ---- save/load: defer to base class via the registry ----
 
     def _save_hyperparameters(self) -> dict:
         base = super()._save_hyperparameters()
-        base.update(validation_fraction=self.validation_fraction)
+        base.update(
+            validation_fraction=self.validation_fraction,
+            keep_path=self.keep_path,
+        )
         return base
 
     @classmethod
@@ -136,5 +167,6 @@ class KernelRieszRegressor(RieszEstimator):
             loss=loss,
             init=hyperparameters.get("init"),
             validation_fraction=hyperparameters.get("validation_fraction", 0.2),
+            keep_path=hyperparameters.get("keep_path", True),
             random_state=hyperparameters.get("random_state", 0),
         )

@@ -51,6 +51,7 @@ class KernelRidgeBackend:
     cg_max_iter: int = 200
     validation_fraction: float = 0.2
     random_state: int = 0
+    keep_path: bool = True
 
     def fit_augmented(
         self,
@@ -136,6 +137,8 @@ class KernelRidgeBackend:
             loss=loss,
             result=result,
             base_score=base_score,
+            solve_results=list(results) if self.keep_path else None,
+            lambda_grid=tuple(self.lambda_grid) if self.keep_path else None,
         )
         return FitResult(
             predictor=predictor,
