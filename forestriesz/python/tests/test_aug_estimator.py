@@ -88,7 +88,7 @@ def test_aug_custom_estimand_runs():
 
     # Custom moment: alpha(a + 1, x) - alpha(a - 1, x).
     def m(alpha):
-        def inner(z):
+        def inner(z, y=None):
             return alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(a=z["a"] - 1.0, x=z["x"])
         return inner
 

@@ -106,7 +106,7 @@ For all built-in estimands, `m(W; 1) = Σ coef` in the trace doesn't depend on W
 ## What works today (v0.0.1)
 
 - **`ForestRieszRegressor(BaseEstimator)`** — sklearn-compatible. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`. Same `fit / predict / score / diagnose` surface as `RieszBooster` and `KernelRieszRegressor`.
-- **All six built-in estimands** via the rieszreg re-exports: `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`, `StochasticIntervention`. Custom `Estimand`s also work; for difference-style functionals supply your own `riesz_feature_fns`.
+- **All five built-in estimands** via the rieszreg re-exports: `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`. Custom `FiniteEvalEstimand`s also work; for difference-style functionals supply your own `riesz_feature_fns`. `StochasticIntervention` is currently stubbed in rieszreg and will be reintroduced.
 - **Default sieve auto-resolution**: `riesz_feature_fns="auto"` (the default) picks `[1{T=0}, 1{T=1}]` for ATE/ATT, `[1{T=level}]` for TSM, falling back to constant for custom estimands.
 - **Honest-split confidence intervals** via `predict_interval(X, alpha)` for single-basis fits.
 - **Loss**: `SquaredLoss` only (closed-form per-leaf solve). KLLoss / BernoulliLoss / BoundedSquaredLoss raise `NotImplementedError`; planned for v2.

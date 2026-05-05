@@ -42,7 +42,6 @@ def test_namespace_exports_match_design():
         "LocalShift",
         "LossSpec",
         "SquaredLoss",
-        "StochasticIntervention",
         "TSM",
         "default_riesz_features",
         "default_split_feature_indices",

@@ -48,16 +48,20 @@ def _compute_per_row_moments(
     estimand: Estimand,
     phi_fns: Sequence[Callable],
     feature_keys: Sequence[str],
+    ys: list | None = None,
 ) -> np.ndarray:
-    """Compute A[i, j] = m(W_i; phi_j) = sum over (coef, point) in trace(W_i)
-    of coef * phi_j(point), for each original row i and basis j."""
+    """Compute A[i, j] = m(W_i; phi_j) = sum over (coef, point) in trace(W_i, y_i)
+    of coef * phi_j(point), for each original row i and basis j. ``ys`` is the
+    sklearn-style per-row outcome; pass ``None`` when the estimand's m doesn't
+    depend on Y."""
     n = len(rows)
     p = len(phi_fns)
     if n == 0:
         return np.zeros((0, p))
     A = np.zeros((n, p))
     for i, row in enumerate(rows):
-        for coef, point in trace(estimand, row):
+        y_i = ys[i] if ys is not None else None
+        for coef, point in trace(estimand, row, y_i):
             point_arr = np.array([[point[k] for k in feature_keys]], dtype=float)
             phi_at_point = np.array([float(fn(point_arr)[0]) for fn in phi_fns])
             A[i] += coef * phi_at_point
@@ -69,15 +73,18 @@ def _holdout_riesz_loss(
     estimand: Estimand,
     predictor: ForestPredictor,
     loss: LossSpec,
+    ys_valid: list | None = None,
 ) -> float:
     """Mean per-original-row Riesz loss on the validation rows.
 
     Uses build_augmented + loss_row to share the formula with the rest of the
-    framework, so val scores are comparable across backends.
+    framework, so val scores are comparable across backends. ``ys_valid``
+    threads the per-row outcome through to ``m(alpha)(z, y)`` for
+    Y-dependent estimands.
     """
     if not rows_valid:
         return float("nan")
-    aug = build_augmented(rows_valid, estimand)
+    aug = build_augmented(rows_valid, estimand, ys_valid)
     eta = predictor.predict_eta(aug.features)
     alpha = loss.link_to_alpha(eta)
     return float(
@@ -152,6 +159,8 @@ class ForestRieszBackend:
         base_score: float,
         random_state: int,
         hyperparams: dict[str, Any],
+        ys_train: list | None = None,
+        ys_valid: list | None = None,
     ) -> FitResult:
         if not isinstance(loss, SquaredLoss):
             raise NotImplementedError(
@@ -187,7 +196,7 @@ class ForestRieszBackend:
         phi_W = _eval_phi(features, phi_fns)             # (n, p)
 
         # 4. Per-row moment A[i, j] = m(W_i; φ_j).
-        A = _compute_per_row_moments(rows_train, estimand, phi_fns, feature_keys)
+        A = _compute_per_row_moments(rows_train, estimand, phi_fns, feature_keys, ys_train)
 
         # 5. Fold base_score into A so the predictor returns base_score + leaf θ·φ.
         if base_score != 0.0:
@@ -269,7 +278,7 @@ class ForestRieszBackend:
 
         val_score = None
         if rows_valid:
-            val_score = _holdout_riesz_loss(rows_valid, estimand, predictor, loss)
+            val_score = _holdout_riesz_loss(rows_valid, estimand, predictor, loss, ys_valid)
 
         return FitResult(
             predictor=predictor,

@@ -21,7 +21,6 @@ from rieszreg import (
     LocalShift,
     LossSpec,
     SquaredLoss,
-    StochasticIntervention,
     TSM,
 )
 
@@ -49,7 +48,6 @@ __all__ = [
     "LocalShift",
     "LossSpec",
     "SquaredLoss",
-    "StochasticIntervention",
     "TSM",
     "default_riesz_features",
     "default_split_feature_indices",
