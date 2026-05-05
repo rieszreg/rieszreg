@@ -24,7 +24,7 @@ Estimand factories live in `rieszreg`. When a *forest-side* feature is added (ne
 
 ## R wrapper scope
 
-The R6 wrapper exposes single-basis fits only (constant basis or single-basis sieve like TSM's `[1{T=level}]`). Multi-basis sieves (e.g. ATE's `[1{T=0}, 1{T=1}]`) are Python-callable lambdas and not yet marshalled through reticulate. R users who need ATE/ATT should call into Python via reticulate. This matches the krrr R-wrapper-scope decision.
+The R6 wrapper exposes single-basis fits only (constant basis or single-basis sieve like TSM's `[1{T=level}]`). Multi-basis sieves (e.g. ATE's `[1{T=0}, 1{T=1}]`) are Python-callable lambdas and not yet marshalled through reticulate. R users who need ATE/ATT should call into Python via reticulate.
 
 ## API design rule
 

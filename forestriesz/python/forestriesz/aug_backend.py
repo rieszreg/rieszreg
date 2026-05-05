@@ -124,7 +124,7 @@ class AugForestRieszBackend:
         is_original = aug_train.is_original                  # (M,)
         pdc = aug_train.potential_deriv_coef                 # (M,)
 
-        # 3. Fold base_score into the linear coefficient (same trick as krrr).
+        # 3. Fold base_score into the linear coefficient.
         if base_score != 0.0:
             pdc = pdc + is_original * base_score
 
