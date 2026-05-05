@@ -1,6 +1,6 @@
 # forestriesz
 
-Random-forest Riesz regression, in **Python** and **R**. Sister package to [krrr](https://github.com/rieszreg/krrr) and [rieszboost](https://github.com/rieszreg/rieszboost) in the [RieszReg family](https://github.com/rieszreg/rieszreg): same scope (Riesz representers for linear estimands; ψ = E[m(μ)(Z)]), same user-facing API, but the learner is a generalized random forest.
+Random-forest Riesz regression, in **Python** and **R**. A learner package in the [RieszReg family](https://github.com/rieszreg/rieszreg): estimates the Riesz representer α of a linear estimand ψ = E[m(μ)(Z)] using a generalized random forest.
 
 Two backends ship side-by-side, both built on EconML's `BaseGRF`:
 

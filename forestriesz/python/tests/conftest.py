@@ -1,7 +1,7 @@
 """Shared fixtures for forestriesz tests.
 
 Reuses the canonical DGPs from rieszreg.testing.dgps so backend correctness
-checks stay aligned with krrr/rieszboost.
+checks stay aligned with the rieszreg test contract.
 """
 
 from __future__ import annotations
