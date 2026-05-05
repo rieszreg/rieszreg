@@ -4,9 +4,9 @@ For each loss, we sample random ``(eta, coefs, pt_to_row)``, compute the
 per-row Riesz loss in torch, and compare the gradient that autograd produces
 to the analytic gradient computed via the loss spec's ``gradient(a, b, eta)``.
 
-If this passes, autograd is computing exactly the same gradient that the
-analytic backends (rieszboost, krrr) use — the contract is satisfied for
-every Bregman loss the meta-package supports.
+If this passes, autograd is computing exactly the same gradient that
+augmentation-style backends use — the contract is satisfied for every
+Bregman loss the meta-package supports.
 """
 
 from __future__ import annotations

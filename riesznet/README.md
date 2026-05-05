@@ -2,7 +2,7 @@
 
 Neural-network learner for [RieszReg](https://github.com/rieszreg/rieszreg). Trains the Riesz representer α of a linear estimand ψ = E[m(μ)(Z)] using PyTorch.
 
-Sister package to [`rieszboost`](https://github.com/rieszreg/rieszboost) (gradient boosting), [`krrr`](https://github.com/rieszreg/krrr) (kernel ridge), and [`forestriesz`](https://github.com/rieszreg/forestriesz) (random forests). All four packages share the same `rieszreg.RieszEstimator` orchestrator and the same `Estimand` / `LossSpec` family — pick the backend that fits your data and architecture preferences.
+A learner package in the [RieszReg family](https://github.com/rieszreg/rieszreg), sharing the `rieszreg.RieszEstimator` orchestrator and the `Estimand` / `LossSpec` family.
 
 Reference: [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (2021), *RieszNet and ForestRiesz*](https://arxiv.org/abs/2110.03031). Unlike the original RieszNet, this package fits the Riesz representer only (not a joint regression head).
 

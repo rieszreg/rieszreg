@@ -22,11 +22,11 @@ The user guide is the unified Quarto site at [`../docs/`](../docs/). The neural-
 
 ## R wrapper scope
 
-The R6 wrapper exposes the simple-MLP knobs (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `device`). Custom torch architectures (custom `nn.Module`, custom optimizer, custom scheduler) are Python-only — the factory callables don't survive the reticulate boundary cleanly. R users who need a custom architecture write the factory in Python and call into Python via reticulate. Mirrors forestriesz's rule about Python-only callable feature functions.
+The R6 wrapper exposes the simple-MLP knobs (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `device`). Custom torch architectures (custom `nn.Module`, custom optimizer, custom scheduler) are Python-only — the factory callables don't survive the reticulate boundary cleanly. R users who need a custom architecture write the factory in Python and call into Python via reticulate.
 
 ## API design rule
 
-Mirrors rieszboost / krrr / forestriesz: object-oriented factory `RieszNet(estimand=, hidden_sizes=, ...)`, BaseEstimator-compatible `fit / predict / score / diagnose`, composes with `sklearn.model_selection` (`GridSearchCV`, `cross_val_predict`, `Pipeline`). No `feature_keys` on `fit()` / `predict()`. Cross-fitting is `cross_val_predict`; tuning is `GridSearchCV`.
+Object-oriented factory `RieszNet(estimand=, hidden_sizes=, ...)`, `BaseEstimator`-compatible `fit / predict / score / diagnose`, composes with `sklearn.model_selection` (`GridSearchCV`, `cross_val_predict`, `Pipeline`). No `feature_keys` on `fit()` / `predict()`. Cross-fitting is `cross_val_predict`; tuning is `GridSearchCV`.
 
 ## Layout
 
