@@ -1,12 +1,11 @@
 """krrr: kernel ridge Riesz regression.
 
-Sister package to ``rieszboost`` — same scope (Riesz representers for linear
-functionals; auto-DML / Lee-Schuler / Singh objective), same user-facing API,
-but the backend is kernel ridge regression instead of gradient boosting.
+A learner package in the RieszReg family. Estimates the Riesz representer α
+of a linear estimand ψ = E[m(μ)(Z)] using kernel ridge regression.
 
 Reuses ``rieszreg``'s ``Estimand``, ``Tracer``, ``AugmentedDataset``,
 ``LossSpec``, ``Diagnostics``, and sklearn glue. The kernel solve plugs in
-through the existing ``Backend`` protocol.
+through the ``Backend`` Protocol from ``rieszreg``.
 
     from rieszreg import ATE
     from krrr import KernelRieszRegressor, Gaussian

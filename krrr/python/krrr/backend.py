@@ -1,6 +1,6 @@
-"""KernelRidgeBackend — implements `rieszboost.backends.base.Backend`.
+"""KernelRidgeBackend — implements `rieszreg.backends.base.Backend`.
 
-Consumes the `AugmentedDataset` produced by `rieszboost.build_augmented` and
+Consumes the `AugmentedDataset` produced by `rieszreg.build_augmented` and
 returns a `FitResult` whose `predictor` is a `KernelPredictor`. Iterates over
 `lambda_grid` and picks the best λ either by validation Riesz loss
 (`aug_valid` provided) or the smallest λ (no validation set).

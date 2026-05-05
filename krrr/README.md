@@ -1,6 +1,6 @@
 # krrr
 
-Kernel ridge Riesz regression, in **Python** and **R**. Sister package to [rieszboost](https://github.com/rieszreg/rieszboost) in the [RieszReg family](https://github.com/rieszreg/rieszreg): same scope (Riesz representers for linear estimands; `ψ = E[m(μ)(Z)]`), same user-facing API, but the learner is kernel ridge regression instead of gradient boosting.
+Kernel ridge Riesz regression, in **Python** and **R**. A learner package in the [RieszReg family](https://github.com/rieszreg/rieszreg): estimates the Riesz representer α of a linear estimand ψ = E[m(μ)(Z)] using kernel ridge regression.
 
 Implements [Singh, *Kernel Ridge Riesz Representers* (arXiv:2102.11076)](https://arxiv.org/abs/2102.11076) for the full set of estimands the rieszreg framework supports — not just TSM1 — by piping rieszreg's augmentation engine into a kernel solve. Includes scalable solvers (Nyström-preconditioned conjugate gradient; random Fourier features; optional Falkon for GPU / very large n).
 
@@ -236,7 +236,7 @@ Includes a numerical-parity test against the dml-tmle krrr.R reference at 1e-8.
 ## Related work
 
 - [Singh, Kernel Ridge Riesz Representers (2102.11076)](https://arxiv.org/abs/2102.11076) — closed-form RKHS estimator for TSM1.
-- [Lee & Schuler, RieszBoost (2501.04871)](https://arxiv.org/abs/2501.04871) — gradient-boosted Riesz regression; the sister package.
+- [Lee & Schuler, RieszBoost (2501.04871)](https://arxiv.org/abs/2501.04871) — gradient-boosted Riesz regression.
 - [Chernozhukov et al., Auto-DML via Riesz Regression (2104.14737)](https://arxiv.org/abs/2104.14737) — origin of the squared Riesz loss.
 - [Rudi-Carratino-Rosasco, FALKON (1705.10958)](https://arxiv.org/abs/1705.10958) — Nyström + preconditioned CG solver, optional backend.
 - [Rahimi-Recht, Random Features (NIPS 2007)](https://proceedings.neurips.cc/paper/2007/hash/013a006f03dbc5392effeb8f18fda755-Abstract.html) — RFF solver basis.

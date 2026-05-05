@@ -14,7 +14,7 @@ This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Los
 - Kernel algebra (`Gaussian`, `Matern`, `Linear`, `Polynomial`, `Tensor`, `Sum`, `Product`, `Scaled`) and four solvers (`direct`, `nystrom_cg`, `rff`, optional `falkon`).
 - R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
 
-Earlier versions imported from `rieszboost`; that dependency is gone — krrr now depends only on `rieszreg`.
+This package depends only on `rieszreg`.
 
 ## Living-doc rule (README + meta-project docs)
 
@@ -26,7 +26,7 @@ The pre-commit hook at `.githooks/pre-commit` enforces this. Activate per clone 
 
 ## Per-estimand example rule
 
-Estimand factories live in `rieszreg` (no longer in rieszboost). When a *kernel-side* feature is added (new kernel, new solver), add a corresponding example in `examples/` that exercises it on a realistic DGP.
+Estimand factories live in `rieszreg`. When a *kernel-side* feature is added (new kernel, new solver), add a corresponding example in `examples/` that exercises it on a realistic DGP.
 
 ## R wrapper scope
 
@@ -37,7 +37,7 @@ The R6 wrapper exposes built-in estimands only. Custom `m()` is Python-only — 
 The public API should feel like **ngboost / sklearn**:
 
 - Object-oriented factory `KernelRieszRegressor(estimand=, kernel=, lambda_grid=, solver=, ...)`. `BaseEstimator`-compatible `fit / predict / score / diagnose`. Anything that can't compose with `sklearn.model_selection` (`GridSearchCV`, `cross_val_predict`, `Pipeline`) is a regression and should be fixed.
-- **No `feature_keys` (or other input-schema args) on `fit()` / `predict()`.** The estimand owns its input schema. This rule is inherited from `rieszboost`.
+- **No `feature_keys` (or other input-schema args) on `fit()` / `predict()`.** The estimand owns its input schema.
 - Cross-fitting is `sklearn.model_selection.cross_val_predict`. No bespoke `crossfit()`.
 - Hyperparameter tuning is `sklearn.model_selection.GridSearchCV`. No `tune_riesz()`.
 
@@ -45,7 +45,7 @@ R-side mirrors this: R6 classes (`KernelRieszRegressor$new(estimand=, kernel=, .
 
 ## Layout
 
-- `python/krrr/` — `KernelRidgeBackend`, kernels, solvers, and the `KernelRieszRegressor` convenience class. `pyproject.toml` declares `rieszreg>=0.0.1` as the dependency (rieszboost is no longer a dep).
+- `python/krrr/` — `KernelRidgeBackend`, kernels, solvers, and the `KernelRieszRegressor` convenience class. `pyproject.toml` declares `rieszreg>=0.0.1` as the dependency.
 - `r/krrr/` — R6 wrapper via reticulate. `KernelRieszRegressor` subclasses `rieszreg::RieszEstimatorR6` (~50 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE.
 - `examples/` — runnable demonstrations of each feature.
 - `.githooks/pre-commit` — copy of the meta-project canonical hook (`../.githooks/pre-commit`). Activate per clone.
@@ -106,7 +106,7 @@ For TSM1 with a Gaussian kernel and `a_k ≡ 1`, this recovers the closed form i
 
 ### What's lazy-imported
 
-`falkon`, `pykeops`, and `pandas` are optional. The core path uses only numpy, scipy, scikit-learn, and rieszboost.
+`falkon`, `pykeops`, and `pandas` are optional. The core path uses only numpy, scipy, scikit-learn, and rieszreg.
 
 ## What works today (v0.0.1)
 
@@ -118,7 +118,7 @@ For TSM1 with a Gaussian kernel and `a_k ≡ 1`, this recovers the closed form i
 - **λ selection** via validation Riesz loss (default: 20% holdout). `lambda_grid` is a sequence; the chosen value surfaces as `regressor.lambda_`.
 - **Loss**: `SquaredLoss` only (closed-form linear-system solve). KLLoss / BernoulliLoss / BoundedSquaredLoss require Newton iteration on the kernel system; planned for v0.2.
 - **Save / load**: directory format with JSON metadata + npz tensors. Round-trip works for built-in estimands automatically; custom estimands require `estimand=` on load.
-- **Diagnostics**: `KernelDiagnostics` extends `rieszboost.Diagnostics` with chosen λ, support size, effective d.o.f., condition number, and ill-conditioning warnings.
+- **Diagnostics**: `KernelDiagnostics` extends `rieszreg.Diagnostics` with chosen λ, support size, effective d.o.f., condition number, and ill-conditioning warnings.
 - **R wrapper**: R6 mirror via reticulate. Built-in estimands only.
 - **31 Python tests** covering: backend protocol satisfaction, end-to-end ATE recovery, all six built-in estimands + custom, save/load round-trip, solver equivalence (direct vs nystrom_cg vs rff), kernel correctness (PSD, algebra, spec round-trip), sklearn integration (clone, GridSearchCV, cross_val_predict), and TSM1 numerical parity with the dml-tmle krrr.R reference.
 
@@ -127,7 +127,7 @@ For TSM1 with a Gaussian kernel and `a_k ≡ 1`, this recovers the closed form i
 - **λ scaling.** For consistency theory the regularizer should scale O(1/n). The default grid `np.logspace(-4, 0, 21)` covers a wide range; cross-fitting users should re-tune per fold (sklearn's `cross_val_predict` does this if KRRR is wrapped in `GridSearchCV`).
 - **Median-heuristic bandwidth on the augmented dataset.** The median is computed on the *augmented* points (originals + counterfactuals from `m`). This adapts to the joint scale of `(treatment, covariates)` automatically; for shift-style estimands it includes the shifted treatment values, which is usually what you want.
 - **`solver="falkon"` drops the K_oc b_c coupling on the o-block.** The standalone Falkon API only solves vanilla KRR, not the modified-RHS system the augmentation produces. For estimands where n_c is small or λ is moderate, the bias is small; for tight overlap or extreme λ it is not. Use `solver="nystrom_cg"` if exactness matters more than scale.
-- **`KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` raise.** These need an iterative kernel Newton scheme that v0.1 doesn't implement. Use `rieszboost` (boosting backend) for non-quadratic Bregman losses, or wait for v0.2.
+- **`KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` raise.** These need an iterative kernel Newton scheme that v0.1 doesn't implement. Planned for v0.2.
 
 ## What's next
 

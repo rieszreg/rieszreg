@@ -1,8 +1,8 @@
-"""KRR-specific diagnostics on top of `rieszboost.diagnose`.
+"""KRR-specific diagnostics extending `rieszreg.diagnose`.
 
-`diagnose_kernel(regressor, Z)` returns the same `Diagnostics` fields as the
-rieszboost version, plus kernel-specific extras: chosen λ, condition number
-of the o-block kernel matrix, and an effective-degrees-of-freedom estimate.
+`diagnose_kernel(regressor, Z)` returns the base `Diagnostics` fields from
+rieszreg plus kernel-specific extras: chosen λ, condition number of the
+o-block kernel matrix, and an effective-degrees-of-freedom estimate.
 """
 
 from __future__ import annotations

@@ -1,8 +1,7 @@
-"""Predictor that satisfies `rieszboost.backends.base.Predictor`.
+"""Predictor that satisfies `rieszreg.backends.base.Predictor`.
 
 Wraps a `SolveResult` (from one of the solvers) plus the kernel and loss spec
-into something that exposes `predict_eta(X)` / `predict_alpha(X)` for
-`RieszBooster.predict` to call.
+into something that exposes `predict_eta(X)` / `predict_alpha(X)`.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from .solvers import SolveResult
 
 @dataclass
 class KernelPredictor:
-    """Wraps a `SolveResult` for prediction. Implements the rieszboost
+    """Wraps a `SolveResult` for prediction. Implements the rieszreg
     `Predictor` protocol (`predict_eta`, `predict_alpha`).
 
     When fit with `keep_path=True`, also stores the full per-λ list of
