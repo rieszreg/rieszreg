@@ -17,6 +17,7 @@ import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.model_selection import train_test_split
 
+from ._omp import warn_if_multi_backend_omp
 from .augmentation import aug_loss_alpha, build_augmented
 from .backends import Backend, load_predictor
 from .estimands.base import Estimand, FiniteEvalEstimand, estimand_from_spec
@@ -190,6 +191,7 @@ class RieszEstimator(BaseEstimator):
         λ-selection (when the backend uses one); pair it with `eval_y` to
         feed an outcome vector for the same rows.
         """
+        warn_if_multi_backend_omp()
         loss = self._resolved_loss()
         backend = self._resolved_backend()
 

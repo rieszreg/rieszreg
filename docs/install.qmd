@@ -33,6 +33,17 @@ brew install libomp
 
 Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed. `krrr` has no system prerequisites; an optional GPU backend uses [`falkon`](https://falkonml.github.io/falkon/) (`pip install -e 'krrr/python[falkon]'`). `forestriesz` depends on `econml`, which ships prebuilt wheels for macOS arm64+x86_64 and ubuntu — no compiler required. `riesznet` depends on `torch>=2.0`; CPU wheels are fetched automatically, GPU wheels need a `--index-url` per the PyTorch install matrix.
 
+### Combining `rieszboost` and `riesznet` in one process
+
+The macOS pip wheels for `xgboost` and `torch` each bundle their own `libomp.dylib`. When both are loaded into one Python process, the two OpenMP runtimes can deadlock during a fit ([troubleshooting](troubleshooting.qmd)). Two install paths avoid this:
+
+- **conda-forge** — installs `xgboost` and `pytorch` against a single shared `llvm-openmp`, so the conflict cannot occur:
+  ```sh
+  conda install -c conda-forge xgboost pytorch
+  pip install -e rieszreg/python rieszboost/python riesznet/python
+  ```
+- **pip + thread-limit env vars** — keep the pip install above and set `OMP_NUM_THREADS=1` (and `MKL_NUM_THREADS=1`) in the shell or at the top of every script that uses both backends. See the [troubleshooting page](troubleshooting.qmd) for the full discussion and options including `threadpoolctl.threadpool_limits` for finer-grained control.
+
 ### Verify
 
 The chunks below import each package and exercise its public entry point. Failure to import or instantiate raises immediately.

@@ -11,6 +11,16 @@ orchestrator.
     est.fit(Z)
 """
 
+# Mirror sklearn's `sklearn/__init__.py`: when xgboost (rieszboost) and torch
+# (riesznet) are loaded into the same process, macOS dyld can map two distinct
+# libomp copies and abort. `setdefault` so any value the user already exported
+# wins. See https://github.com/joblib/threadpoolctl/blob/master/multiple_openmp.md
+# for background; the runtime threadpool-deadlock warning lives in `_omp.py`.
+import os as _os
+_os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "True")
+_os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+del _os
+
 from .augmentation import (
     AugmentedDataset,
     aug_grad_eta,

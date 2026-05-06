@@ -1,0 +1,96 @@
+---
+title: "Troubleshooting"
+---
+
+## OpenMP deadlock when both rieszboost and riesznet are loaded
+
+### Symptom
+
+A fit hangs indefinitely. Sampling the Python process with `py-spy dump` (or attaching with `lldb`) shows the main thread stuck in OpenMP barrier code:
+
+```
+__kmp_join_barrier
+  kmp_flag_64<false, true>::wait
+    __kmp_suspend_64
+      _pthread_cond_wait
+        __psynch_cvwait
+```
+
+The same hang appears under R when `riesznet` runs through reticulate, and from RStudio / Jupyter / `quarto render` sessions that fit both backends in one process. The hang is non-deterministic: the same script may finish on one run and hang on the next.
+
+### Cause
+
+xgboost's macOS pip wheel (which `rieszboost` uses) and PyTorch's macOS pip wheel (which `riesznet` uses) each ship their own copy of `libomp.dylib`. When both packages are loaded into the same Python process, dyld maps two distinct OpenMP runtimes into the address space. Their threadpool barriers can race, leading to the deadlock above.
+
+This is an upstream xgboost + PyTorch + macOS-wheel issue, not specific to `rieszreg`. See [pytorch/pytorch#44282](https://github.com/pytorch/pytorch/issues/44282), [pytorch/pytorch#98836](https://github.com/pytorch/pytorch/issues/98836), and [dmlc/xgboost#11500](https://github.com/dmlc/xgboost/issues/11500). The same underlying conflict can throttle threads silently on Linux pip installs without producing a deadlock.
+
+The deadlock is not guaranteed: many users who load both packages never see it. The trigger is OMP-parallel work in both runtimes during the same fit.
+
+### What `rieszreg` does automatically
+
+On import, `rieszreg/__init__.py` mirrors `sklearn/__init__.py`:
+
+```python
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "True")
+os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+```
+
+This stops the second runtime from aborting on `OMP: Error #15` and avoids a `fork()` crash from the Intel OpenMP 2019.5 bug. `setdefault` means a value the user already exported wins.
+
+These two flags do **not** prevent the threadpool deadlock above. That requires limiting OMP threads.
+
+`rieszboost` and `riesznet` defer their `import xgboost` and `import torch` until the first attribute access, so `import rieszboost; import riesznet` (without instantiating estimators from both) does not load both `libomp` copies.
+
+When `RieszEstimator.fit()` runs and detects both `torch` and `xgboost` already loaded, it emits a one-time `RuntimeWarning` describing the situation.
+
+### Fixing the deadlock
+
+The env vars that prevent the deadlock are read by the OpenMP runtime when `libomp` is first loaded. Setting them after `import torch` or `import xgboost` is too late. So all three workarounds below assume a fresh Python process.
+
+**Option 1 — set `OMP_NUM_THREADS=1` in the shell:**
+
+```sh
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+python my_script.py
+```
+
+**Option 2 — set in Python before the imports:**
+
+```python
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
+# only after the env is set:
+import rieszboost, riesznet
+```
+
+This is the form used at the top of `index.qmd` and `tuning-and-cross-fitting.qmd` in this user guide.
+
+**Option 3 — limit threads at fit time with `threadpoolctl`:**
+
+`threadpoolctl` is a sklearn dependency and is already installed. It manages thread counts on already-loaded OMP runtimes:
+
+```python
+from threadpoolctl import threadpool_limits
+
+with threadpool_limits(limits=1):
+    booster.fit(df)
+    net.fit(df)
+```
+
+This is the right tool when only one fit (or one pipeline stage) needs to run single-threaded.
+
+**Option 4 — install via conda-forge:**
+
+conda-forge enforces a single shared `llvm-openmp` runtime across all packages in the environment via `_openmp_mutex`. The conflict cannot occur:
+
+```sh
+conda install -c conda-forge xgboost pytorch
+pip install -e rieszreg/python rieszboost/python riesznet/python
+```
+
+### Performance cost
+
+`OMP_NUM_THREADS=1` disables OpenMP intra-op parallelism for both xgboost and torch. On the dataset sizes typical for Riesz regression (`n` in the thousands to low hundreds of thousands), the cost is small — xgboost's tree construction is the dominant work and parallelizes across rows in chunks where SIMD already covers most of the speedup. Larger workloads should prefer `threadpoolctl.threadpool_limits` so that other parts of the pipeline retain parallelism.

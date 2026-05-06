@@ -46,6 +46,7 @@ website:
           - estimation/index.qmd
           - estimation/custom.qmd
           - estimation/external.qmd
+      - troubleshooting.qmd
       - developing.qmd
       - related.qmd
       - references.qmd
