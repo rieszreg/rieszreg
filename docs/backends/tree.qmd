@@ -436,7 +436,61 @@ $$
 
 ### Greedy versus global ERM
 
-Theorem 1 applies to the *global* minimiser of $\hat L_n$ over $\mathcal{F}_{K_n, M}$. The riesztree splitter is greedy: it accepts a sequence of best-gain splits and need not return the global optimum. The same gap holds for ordinary regression CART, where consistency of the greedy minimiser is established only under additional structural conditions (Nobel 1996; Scornet, Biau and Vert 2015 for additive regression). The Riesz-representer setting inherits the same gap.
+Theorem 1 applies to the *global* minimiser of $\hat L_n$ over $\mathcal{F}_{K_n, M}$. The riesztree splitter is greedy: it accepts a sequence of best-gain splits and need not return the global optimum. Greedy CART consistency for ordinary regression is established only under additional structural conditions on the partitions the rule produces (Nobel 1996; Scornet, Biau and Vert 2015 for additive regression). Corollary 1 imports those conditions into the Riesz setting.
+
+Let $\hat\Pi_n \in \mathcal{T}_{K_n}$ denote any data-dependent partition (in particular, the partition produced by greedy riesztree under any growth or pruning policy) and let
+$$
+\hat\alpha_n(z) \;=\; \mathrm{clip}_{[-M, M]}\!\left( \frac{\sum_{i=1}^n m(\mathbf{1}_{\hat\Pi_n(z)})(Z_i)}{\#\{i : Z_i \in \hat\Pi_n(z)\}} \right)
+$$
+be the riesztree estimator (with the convention that empty cells take value $0$, which is then clipped harmlessly). Equivalently in the doc's notation, the leaf value is $\mathrm{clip}_{[-M, M]}(-\hat C_\ell / \hat D_\ell)$.
+
+**Corollary 1 (consistency under shrinking-cell conditions).** *Suppose (A1), (A2), and (A4) of Theorem 1 hold, together with*
+
+- *(B1) Shrinking cells. $\mathrm{diam}\big(\hat\Pi_n(Z_*)\big) \xrightarrow{P} 0$, where $Z_* \sim P$ is independent of the training sample.*
+- *(B2) Uniformly continuous representer. $\alpha_0$ is uniformly continuous on $\mathcal{Z}$.*
+
+*Then $\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \xrightarrow{P} 0$.*
+
+::: {.callout-tip collapse="true" title="Proof of Corollary 1"}
+
+Let $\bar\alpha_n(z) := \mu_{\hat\Pi_n(z)}$ where $\mu_A := \mathbb{E}[\alpha_0(Z) \mid Z \in A,\, \hat\Pi_n]$ when $P(A) > 0$ and $\mu_A := 0$ otherwise. By (A1), $|\mu_A| \le M$, so $\bar\alpha_n \in \mathcal{F}_{\hat\Pi_n, M} \subseteq \mathcal{F}_{K_n, M}$.
+
+**Step 1 (oracle decomposition restricted to $\hat\Pi_n$).** The riesztree leaf-value formula $\hat\alpha_\ell^* = -\hat C_\ell / \hat D_\ell$ is the unrestricted minimiser of $\hat L_n$ over piecewise-constant functions on $\hat\Pi_n$ (per-leaf decoupling, derived earlier in this page). Clipping to $[-M, M]$ is the projection onto $\mathcal{F}_{\hat\Pi_n, M}$, and since the squared Bregman-Riesz loss is convex in each leaf value, the clipped optimum minimises $\hat L_n$ over $\mathcal{F}_{\hat\Pi_n, M}$. In particular $\hat L_n(\hat\alpha_n) \le \hat L_n(\bar\alpha_n)$, so as in Step 2 of the proof of Theorem 1,
+$$
+L(\hat\alpha_n) - L(\bar\alpha_n) \;\le\; 2 \sup_{\alpha \in \mathcal{F}_{K_n, M}} \big|\hat L_n(\alpha) - L(\alpha)\big|.
+$$
+The supremum is over the *full* class $\mathcal{F}_{K_n, M}$ (which contains $\hat\Pi_n$'s class as a subset, regardless of how $\hat\Pi_n$ was chosen). Step 3 of the proof of Theorem 1 shows this supremum vanishes in probability under (A4):
+$$
+L(\hat\alpha_n) - L(\bar\alpha_n) \;\xrightarrow{P}\; 0.
+$$
+
+**Step 2 (bias from cell shrinkage).** Let $\omega(\delta) := \sup\{|\alpha_0(z) - \alpha_0(z')| : z, z' \in \mathcal{Z},\, \|z - z'\| \le \delta\}$ be the modulus of continuity of $\alpha_0$, with $\omega(\delta) \to 0$ as $\delta \to 0$ by (B2). For any $z$ with $P(\hat\Pi_n(z)) > 0$,
+$$
+|\bar\alpha_n(z) - \alpha_0(z)| \;=\; \big|\mathbb{E}[\alpha_0(Z) - \alpha_0(z) \mid Z \in \hat\Pi_n(z)]\big| \;\le\; \omega\!\big(\mathrm{diam}(\hat\Pi_n(z))\big).
+$$
+For any $\delta > 0$ and any $z \in \mathcal{Z}$,
+$$
+|\bar\alpha_n(z) - \alpha_0(z)| \;\le\; \omega(\delta) + 2M\, \mathbf{1}\{\mathrm{diam}(\hat\Pi_n(z)) > \delta\},
+$$
+using (A1) for the bound $2M$ on the second term and the convention $|\bar\alpha_n - \alpha_0| \le 2M$ when $P(\hat\Pi_n(z)) = 0$ (a $P$-null set). Squaring and integrating against $P$:
+$$
+\|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\le\; 2\omega(\delta)^2 + 8 M^2\, P\!\big(\mathrm{diam}(\hat\Pi_n(Z_*)) > \delta\big).
+$$
+By (B1), $P(\mathrm{diam}(\hat\Pi_n(Z_*)) > \delta) \to 0$ for any fixed $\delta > 0$. Letting $\delta \to 0$ along a sequence $\delta_n \downarrow 0$ slowly enough that the second term vanishes,
+$$
+\|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\xrightarrow{P}\; 0.
+$$
+
+**Step 3 (combine).** By Step 1 of the proof of Theorem 1, $L(\bar\alpha_n) - L(\alpha_0) = \|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2$. Adding the bounds from Steps 1 and 2 above,
+$$
+\|\hat\alpha_n - \alpha_0\|_{L^2(P)}^2 \;=\; L(\hat\alpha_n) - L(\alpha_0) \;\le\; \big[L(\hat\alpha_n) - L(\bar\alpha_n)\big] + \|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\xrightarrow{P}\; 0. \qquad \blacksquare
+$$
+
+:::
+
+**On (B1).** Whether greedy CART produces shrinking cells is a separate question that depends on the splitting rule and the DGP. Sufficient conditions in the regression-tree literature (Wager and Walther 2016; Klusowski 2021; Scornet, Biau and Vert 2015 for additive regression) carry over to the augmented Bregman setting under analogous structural conditions on the signal carried by $\alpha_0$. (B1) holds automatically for "honest" splitters that allocate fresh data to leaf-value estimation, and for purely random forests.
+
+**Why (B2) of Nobel (1996) is not needed here.** Nobel's framework requires growing cell counts ($\hat n_{\hat\Pi_n(Z_*)} \xrightarrow{P} \infty$) to control per-leaf variance of the histogram regression estimator. Here the leaf values are clipped to $[-M, M]$ (since $\alpha_0 \in [-M, M]$), and the uniform empirical-process bound from Step 3 of the proof of Theorem 1 controls the variance for the *whole* class $\mathcal{F}_{K_n, M}$ at once. Clipping plus uniform LLN replaces growing-leaf-counts.
 
 ### In practice
 
