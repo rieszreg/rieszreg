@@ -34,9 +34,15 @@ from .tree import Node
 def _holdout_riesz_loss(
     tree: Node, aug_valid: AugmentedDataset, loss: LossSpec
 ) -> float:
-    from .tree import predict_array
+    """Final-fit held-out Riesz loss reported via ``FitResult.best_score``.
 
-    alpha_hat = predict_array(tree, aug_valid.features)
+    Uses the Cython flat-array predict path (Phase 9) — much faster
+    than the Python Node tree-walk this used to call
+    (``riesztree.tree.predict_array``).
+    """
+    from .fast import flat_tree_from_node, predict_alpha as _flat_predict
+    flat = flat_tree_from_node(tree)
+    alpha_hat = _flat_predict(flat, aug_valid.features)
     return float(
         np.sum(aug_loss_alpha(
             loss, aug_valid.is_original, aug_valid.potential_deriv_coef, alpha_hat

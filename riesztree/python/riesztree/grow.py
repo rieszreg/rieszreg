@@ -303,10 +303,19 @@ def _holdout_loss(
     aug_valid_C: np.ndarray | None,
     loss,
 ) -> float:
+    """Held-out augmented Bregman loss for early-stopping monitoring.
+
+    Builds a flat-array companion of ``root`` and walks it via the
+    Cython ``predict_alpha`` kernel — much faster than the Python
+    Node tree-walk that this used to call (``riesztree.tree.predict_array``).
+    Phase 9: this path is invoked once per accepted split when early
+    stopping is enabled; the speedup compounds over a full fit.
+    """
     if aug_valid_features is None or len(aug_valid_features) == 0:
         return float("nan")
-    from .tree import predict_array
-    alpha_hat = predict_array(root, aug_valid_features)
+    from .fast import flat_tree_from_node, predict_alpha as _flat_predict
+    flat = flat_tree_from_node(root)
+    alpha_hat = _flat_predict(flat, aug_valid_features)
     # Augmented α-space loss, summed and normalised by n_orig in valid set.
     n_orig_valid = float((aug_valid_D > 0).sum())
     if n_orig_valid <= 0:
