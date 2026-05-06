@@ -4,7 +4,7 @@ Implements the Breiman et al. (1984) weakest-link pruning generalised to
 the augmented Bregman loss. The criterion ``R_α(T) = R(T) + α |leaves(T)|``
 is minimised; we collapse the subtree rooted at the node with the smallest
 ``g(t) = (R(t) - R(T_t)) / (|leaves(T_t)| - 1)`` until the pruned-tree
-penalty satisfies ``g_min ≥ pruning_alpha``.
+penalty satisfies ``g_min ≥ ccp_alpha``.
 
 For each candidate-collapse subtree this requires per-subtree
 ``R(T_t)`` (sum of leaf-loss-at-optimum across the subtree's leaves) and
@@ -13,6 +13,8 @@ For each candidate-collapse subtree this requires per-subtree
 """
 
 from __future__ import annotations
+
+import warnings
 
 from .splitter import make_leaf_solvers
 from .tree import Node
@@ -71,18 +73,39 @@ def _weakest_link_alpha(root: Node, leaf_loss) -> tuple[float, Node | None]:
     return g_min, best
 
 
-def cost_complexity_prune(root: Node, loss, *, pruning_alpha: float) -> Node:
+def cost_complexity_prune(
+    root: Node,
+    loss,
+    *,
+    ccp_alpha: float | None = None,
+    pruning_alpha: float | None = None,
+) -> Node:
     """Prune the tree in place by repeatedly collapsing the weakest link.
 
-    Stops when ``g_min ≥ pruning_alpha`` or only the root remains.
-    Returns the pruned root (same object as input, mutated).
+    Stops when ``g_min ≥ ccp_alpha`` or only the root remains. Returns
+    the pruned root (same object as input, mutated).
+
+    The keyword is ``ccp_alpha`` to match
+    :class:`sklearn.tree.DecisionTreeRegressor`. ``pruning_alpha`` is
+    accepted as a deprecated alias and emits ``FutureWarning``.
     """
-    if pruning_alpha <= 0.0:
+    if pruning_alpha is not None:
+        warnings.warn(
+            "`pruning_alpha` is deprecated; use `ccp_alpha` instead "
+            "(matches sklearn.tree.DecisionTreeRegressor).",
+            FutureWarning,
+            stacklevel=2,
+        )
+        if ccp_alpha is None:
+            ccp_alpha = pruning_alpha
+    if ccp_alpha is None:
+        ccp_alpha = 0.0
+    if ccp_alpha <= 0.0:
         return root
     leaf_loss, _ = make_leaf_solvers(loss)
     while not root.is_leaf:
         g_min, weakest = _weakest_link_alpha(root, leaf_loss)
-        if weakest is None or g_min >= pruning_alpha:
+        if weakest is None or g_min >= ccp_alpha:
             break
         _collapse_to_leaf(weakest, leaf_loss)
     return root

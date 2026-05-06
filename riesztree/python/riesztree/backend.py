@@ -49,6 +49,9 @@ def _holdout_riesz_loss(
 class RieszTreeBackend:
     """Single-tree backend for the augmentation-style entry point.
 
+    Hyperparameters mirror :class:`sklearn.tree.DecisionTreeRegressor`
+    where the augmented Bregman-Riesz setting allows.
+
     Parameters
     ----------
     max_depth
@@ -59,13 +62,23 @@ class RieszTreeBackend:
     min_samples_leaf
         Minimum count of original rows in each child of a candidate split.
         Default 10.
-    max_leaves
+    min_weight_fraction_leaf
+        sklearn-parity: leaves must contain at least
+        ``ceil(min_weight_fraction_leaf * n_original_total)`` original rows
+        (combined with ``min_samples_leaf`` via ``max(...)``). Default 0.0.
+    max_leaf_nodes
         Cap for leafwise growth. Ignored when ``growth_policy="depthwise"``.
-        Default 31 (∼ XGBoost convention).
+        Default 31.
+    max_features
+        Per-split feature-subsampling rule, as in
+        :class:`sklearn.tree.DecisionTreeRegressor`. ``None``, ``"sqrt"``,
+        ``"log2"``, an int, or a float in ``(0, 1]``. Default ``None``.
     growth_policy
         ``"depthwise"`` (recursive depth-first) or ``"leafwise"`` (best-first).
         Default ``"depthwise"``.
-    pruning_alpha
+    min_impurity_decrease
+        Reject splits with gain ≤ this threshold. Default 0.0 (sklearn).
+    ccp_alpha
         Cost-complexity penalty. ``0`` (default) disables pruning.
     early_stopping_rounds
         Stop growing when held-out augmented loss has not improved for that
@@ -78,15 +91,19 @@ class RieszTreeBackend:
         whose values should be treated as integer category labels rather
         than ordered numerics. Default ``()``.
     random_state
-        Reserved for tie-breaking; the splitter is otherwise deterministic.
+        Seeds the per-split feature subsample under ``max_features``.
+        Default 0.
     """
 
     max_depth: int = 8
     min_samples_split: int = 20
     min_samples_leaf: int = 10
-    max_leaves: int = 31
+    min_weight_fraction_leaf: float = 0.0
+    max_leaf_nodes: int = 31
+    max_features: object = None     # int | float | str | None
     growth_policy: str = "depthwise"
-    pruning_alpha: float = 0.0
+    min_impurity_decrease: float = 0.0
+    ccp_alpha: float = 0.0
     early_stopping_rounds: int | None = None
     validation_fraction: float = 0.0
     categorical_features: tuple[int, ...] = field(default_factory=tuple)
@@ -136,6 +153,10 @@ class RieszTreeBackend:
                 categorical_features=cat_feats,
                 aug_valid=valid_tuple,
                 early_stopping_rounds=self.early_stopping_rounds,
+                max_features=self.max_features,
+                min_impurity_decrease=self.min_impurity_decrease,
+                min_weight_fraction_leaf=self.min_weight_fraction_leaf,
+                random_state=self.random_state,
             )
         else:
             tree = grow_leafwise(
@@ -143,17 +164,21 @@ class RieszTreeBackend:
                 D=aug_train.is_original,
                 C=aug_train.potential_deriv_coef,
                 loss=loss,
-                max_leaves=self.max_leaves,
+                max_leaf_nodes=self.max_leaf_nodes,
                 max_depth=self.max_depth,
                 min_samples_split=self.min_samples_split,
                 min_orig_leaf=self.min_samples_leaf,
                 categorical_features=cat_feats,
                 aug_valid=valid_tuple,
                 early_stopping_rounds=self.early_stopping_rounds,
+                max_features=self.max_features,
+                min_impurity_decrease=self.min_impurity_decrease,
+                min_weight_fraction_leaf=self.min_weight_fraction_leaf,
+                random_state=self.random_state,
             )
 
-        if self.pruning_alpha > 0:
-            tree = cost_complexity_prune(tree, loss, pruning_alpha=self.pruning_alpha)
+        if self.ccp_alpha > 0:
+            tree = cost_complexity_prune(tree, loss, ccp_alpha=self.ccp_alpha)
 
         # The orchestrator uses ``base_score`` to seed boosting / additive
         # learners; for a tree the leaves already store the loss-aware α*.

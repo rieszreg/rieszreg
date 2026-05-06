@@ -31,7 +31,7 @@ def test_early_stopping_works_with_leafwise(linear_gaussian_ate, covariate_keys)
     est = RieszTreeRegressor(
         estimand=ATE(treatment="a", covariates=covariate_keys),
         growth_policy="leafwise",
-        max_leaves=200,
+        max_leaf_nodes=200,
         early_stopping_rounds=3,
         validation_fraction=0.2,
     ).fit(df)

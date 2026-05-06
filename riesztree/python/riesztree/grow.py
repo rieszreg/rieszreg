@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import heapq
 import itertools
+import math
 from typing import Sequence
 
 import numpy as np
@@ -24,6 +25,62 @@ from .splitter import (
     make_leaf_solvers,
 )
 from .tree import Node
+
+
+# ---------------------------------------------------------------------------
+# Hyperparameter resolution helpers (sklearn parity).
+
+def _resolve_max_features(max_features, n_features: int) -> int:
+    """Resolve ``max_features`` to an int in ``[1, n_features]``.
+
+    Mirrors :class:`sklearn.tree.DecisionTreeRegressor`. Accepts:
+
+    - ``None`` (or ``"all"``): all features.
+    - ``int``: exact count, clipped to ``[1, n_features]``.
+    - ``float`` in ``(0, 1]``: fraction of features (rounded up, ≥ 1).
+    - ``"sqrt"``: ``max(1, ⌊√n_features⌋)``.
+    - ``"log2"``: ``max(1, ⌊log2(n_features)⌋)``.
+    """
+    if max_features is None or max_features == "all":
+        return n_features
+    if isinstance(max_features, str):
+        if max_features == "sqrt":
+            return max(1, int(math.isqrt(n_features)))
+        if max_features == "log2":
+            return max(1, int(math.log2(max(n_features, 1))))
+        raise ValueError(
+            f"max_features={max_features!r}; expected None, 'all', 'sqrt', "
+            "'log2', an int, or a float in (0, 1]."
+        )
+    if isinstance(max_features, float):
+        if not (0.0 < max_features <= 1.0):
+            raise ValueError(
+                f"max_features={max_features!r}; float must be in (0, 1]."
+            )
+        return max(1, int(math.ceil(max_features * n_features)))
+    if isinstance(max_features, (int, np.integer)):
+        if max_features < 1:
+            raise ValueError(f"max_features={max_features!r}; int must be ≥ 1.")
+        return min(int(max_features), n_features)
+    raise TypeError(
+        f"max_features={max_features!r} ({type(max_features).__name__}); "
+        "expected None, str, int, or float."
+    )
+
+
+def _effective_min_orig_leaf(
+    min_samples_leaf: int,
+    min_weight_fraction_leaf: float,
+    n_orig_total: int,
+) -> int:
+    """sklearn parity: leaves must satisfy both `min_samples_leaf` and
+    `ceil(min_weight_fraction_leaf * n_orig_total)`. With unit weights
+    (the only case riesztree currently supports) the weighted sample count
+    equals the original-row count, so this reduces to a max() over the two."""
+    if min_weight_fraction_leaf <= 0.0:
+        return int(min_samples_leaf)
+    floor_weighted = int(math.ceil(min_weight_fraction_leaf * max(n_orig_total, 0)))
+    return int(max(min_samples_leaf, floor_weighted))
 
 
 def _make_leaf(
@@ -60,12 +117,22 @@ def best_split_at(
     alpha_at_opt,
     min_orig_leaf: int,
     categorical_features: Sequence[int],
+    feature_indices: Sequence[int] | None = None,
 ):
-    """Best (gain, feature_index, split_payload) across all features."""
+    """Best (gain, feature_index, split_payload) across all considered features.
+
+    If ``feature_indices`` is given, only those columns are evaluated
+    (sklearn-style ``max_features`` subsampling, drawn by the caller).
+    """
     cat_set = set(categorical_features) if categorical_features else set()
     best = None
     best_feat = None
-    for j in range(features.shape[1]):
+    cols = (
+        range(features.shape[1])
+        if feature_indices is None
+        else [int(j) for j in feature_indices]
+    )
+    for j in cols:
         if j in cat_set:
             cand = best_split_categorical(
                 features[:, j], D, C, idx, leaf_loss, alpha_at_opt,
@@ -164,6 +231,10 @@ def grow_depthwise(
     categorical_features: Sequence[int] = (),
     aug_valid: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
     early_stopping_rounds: int | None = None,
+    max_features=None,
+    min_impurity_decrease: float = 0.0,
+    min_weight_fraction_leaf: float = 0.0,
+    random_state: int = 0,
 ) -> Node:
     """Greedy recursive depth-first growth.
 
@@ -174,12 +245,33 @@ def grow_depthwise(
     leafwise growth would produce, but it interacts oddly with
     depth-first ordering. Use ``growth_policy="leafwise"`` for textbook
     early stopping behaviour.
+
+    sklearn-parity hyperparameters
+    ------------------------------
+    ``max_features``
+        Sub-sample candidate features at each split (drawn from
+        ``random_state``). See :func:`_resolve_max_features`.
+    ``min_impurity_decrease``
+        Reject splits with gain ≤ this threshold. Replaces the v0.0.1
+        hard-coded ``1e-12``; the default is now ``0.0`` (sklearn).
+    ``min_weight_fraction_leaf``
+        With unit weights, leaves must contain at least
+        ``ceil(min_weight_fraction_leaf * n_original_total)`` original
+        rows. Combined with ``min_orig_leaf`` via ``max(...)``.
     """
     leaf_loss, alpha_at_opt = make_leaf_solvers(loss)
 
     valid_features = D_v = C_v = None
     if aug_valid is not None:
         valid_features, D_v, C_v = aug_valid
+
+    n_features = features.shape[1]
+    n_features_to_consider = _resolve_max_features(max_features, n_features)
+    rng = np.random.default_rng(random_state)
+    n_orig_total = int((D > 0).sum())
+    eff_min_orig_leaf = _effective_min_orig_leaf(
+        min_orig_leaf, min_weight_fraction_leaf, n_orig_total
+    )
 
     root = _make_leaf(
         D, C, np.arange(features.shape[0]), leaf_loss, alpha_at_opt, depth=0
@@ -199,16 +291,23 @@ def grow_depthwise(
             return
         if node.n_orig < min_samples_split:
             return
+        if n_features_to_consider < n_features:
+            feat_idx = rng.choice(
+                n_features, size=n_features_to_consider, replace=False
+            )
+        else:
+            feat_idx = None
         best = best_split_at(
             features, D, C, idx,
             leaf_loss=leaf_loss, alpha_at_opt=alpha_at_opt,
-            min_orig_leaf=min_orig_leaf,
+            min_orig_leaf=eff_min_orig_leaf,
             categorical_features=categorical_features,
+            feature_indices=feat_idx,
         )
         if best is None:
             return
         best_feat, best_split = best
-        if best_split[0] <= 1e-12:
+        if best_split[0] <= min_impurity_decrease:
             return
         is_cat = best_feat in (set(categorical_features) if categorical_features else set())
         left_idx, right_idx = _split_node_into_children(
@@ -245,29 +344,42 @@ def grow_leafwise(
     C: np.ndarray,
     loss,
     *,
-    max_leaves: int,
+    max_leaf_nodes: int,
     max_depth: int,
     min_samples_split: int,
     min_orig_leaf: int,
     categorical_features: Sequence[int] = (),
     aug_valid: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
     early_stopping_rounds: int | None = None,
+    max_features=None,
+    min_impurity_decrease: float = 0.0,
+    min_weight_fraction_leaf: float = 0.0,
+    random_state: int = 0,
 ) -> Node:
     """Best-first growth: at each step split the leaf whose best candidate
     split has the highest gain, anywhere in the tree.
 
-    Termination: ``max_leaves`` reached, no positive-gain split remains, or
-    early stopping fires.
+    Termination: ``max_leaf_nodes`` reached, no above-threshold split remains,
+    or early stopping fires.
+
+    sklearn-parity hyperparameters: see :func:`grow_depthwise`.
     """
     leaf_loss, alpha_at_opt = make_leaf_solvers(loss)
     valid_features = D_v = C_v = None
     if aug_valid is not None:
         valid_features, D_v, C_v = aug_valid
 
+    n_features = features.shape[1]
+    n_features_to_consider = _resolve_max_features(max_features, n_features)
+    rng = np.random.default_rng(random_state)
+    n_orig_total = int((D > 0).sum())
+    eff_min_orig_leaf = _effective_min_orig_leaf(
+        min_orig_leaf, min_weight_fraction_leaf, n_orig_total
+    )
+
     root = _make_leaf(
         D, C, np.arange(features.shape[0]), leaf_loss, alpha_at_opt, depth=0
     )
-    n_features = features.shape[1]
 
     # Heap entries: (-gain, tiebreaker, node_id, leaf_node, idx, best_feat, best_split, is_cat).
     counter = itertools.count()
@@ -276,16 +388,23 @@ def grow_leafwise(
     def _push_best_split_for_leaf(leaf: Node, idx: np.ndarray) -> None:
         if leaf.depth >= max_depth or leaf.n_orig < min_samples_split:
             return
+        if n_features_to_consider < n_features:
+            feat_idx = rng.choice(
+                n_features, size=n_features_to_consider, replace=False
+            )
+        else:
+            feat_idx = None
         best = best_split_at(
             features, D, C, idx,
             leaf_loss=leaf_loss, alpha_at_opt=alpha_at_opt,
-            min_orig_leaf=min_orig_leaf,
+            min_orig_leaf=eff_min_orig_leaf,
             categorical_features=categorical_features,
+            feature_indices=feat_idx,
         )
         if best is None:
             return
         best_feat, best_split = best
-        if best_split[0] <= 1e-12:
+        if best_split[0] <= min_impurity_decrease:
             return
         is_cat = best_feat in (set(categorical_features) if categorical_features else set())
         heapq.heappush(
@@ -299,7 +418,7 @@ def grow_leafwise(
     es_best = _holdout_loss(root, valid_features, D_v, C_v, loss)
     rounds_since_improve = 0
 
-    while heap and leaves_count < max_leaves:
+    while heap and leaves_count < max_leaf_nodes:
         neg_gain, _tb, node_id, leaf, idx, best_feat, best_split, is_cat = heapq.heappop(heap)
         if id(leaf) != node_id or not leaf.is_leaf:
             continue  # stale

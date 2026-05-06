@@ -19,13 +19,13 @@ def test_depthwise_respects_max_depth(linear_gaussian_ate, covariate_keys):
     assert n_leaves(est.predictor_.tree) <= 8
 
 
-def test_leafwise_respects_max_leaves(linear_gaussian_ate, covariate_keys):
+def test_leafwise_respects_max_leaf_nodes(linear_gaussian_ate, covariate_keys):
     make, _ = linear_gaussian_ate
     df = make(1500, seed=0)
     est = RieszTreeRegressor(
         estimand=ATE(treatment="a", covariates=covariate_keys),
         growth_policy="leafwise",
-        max_leaves=12,
+        max_leaf_nodes=12,
         max_depth=20,  # don't let depth bind
     )
     est.fit(df)
@@ -58,7 +58,7 @@ def test_leafwise_yields_lower_train_loss_per_leaf(linear_gaussian_ate, covariat
     est_lw = RieszTreeRegressor(
         estimand=ATE(treatment="a", covariates=covariate_keys),
         growth_policy="leafwise",
-        max_leaves=16,
+        max_leaf_nodes=16,
         max_depth=20,
     )
     est_dw.fit(df)

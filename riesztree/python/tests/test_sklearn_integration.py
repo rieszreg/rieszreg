@@ -26,12 +26,20 @@ def test_get_set_params(covariate_keys):
     p = est.get_params()
     expected = {
         "estimand", "loss", "max_depth", "min_samples_split", "min_samples_leaf",
-        "max_leaves", "growth_policy", "pruning_alpha", "early_stopping_rounds",
-        "validation_fraction", "categorical_features", "init", "random_state",
+        "min_weight_fraction_leaf", "max_leaf_nodes", "max_features",
+        "growth_policy", "min_impurity_decrease", "ccp_alpha",
+        "early_stopping_rounds", "validation_fraction", "categorical_features",
+        "init", "random_state",
+        # Deprecated aliases stay in get_params() so sklearn clone() round-trips.
+        "max_leaves", "pruning_alpha",
     }
     assert expected.issubset(set(p.keys()))
-    est.set_params(max_depth=7, growth_policy="leafwise", max_leaves=20)
-    assert est.max_depth == 7 and est.growth_policy == "leafwise" and est.max_leaves == 20
+    est.set_params(max_depth=7, growth_policy="leafwise", max_leaf_nodes=20)
+    assert (
+        est.max_depth == 7
+        and est.growth_policy == "leafwise"
+        and est.max_leaf_nodes == 20
+    )
 
 
 def test_grid_search_cv(linear_gaussian_ate, covariate_keys):

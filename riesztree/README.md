@@ -72,14 +72,19 @@ alpha_hat = est.predict(df)
 | `max_depth` | 8 | Cap on tree depth. |
 | `min_samples_split` | 20 | Minimum count of original (D > 0) augmented rows in a node before considering a split. |
 | `min_samples_leaf` | 10 | Minimum count of original rows in each child. |
-| `max_leaves` | 31 | Cap for leafwise growth. Ignored when `growth_policy="depthwise"`. |
+| `min_weight_fraction_leaf` | 0.0 | Sklearn parity. With unit weights, leaves must hold ≥ `ceil(min_weight_fraction_leaf · n_original)` original rows (combined with `min_samples_leaf` via `max(...)`). |
+| `max_leaf_nodes` | 31 | Cap for leafwise growth. Ignored when `growth_policy="depthwise"`. |
+| `max_features` | None | Per-split feature subsample. `None`, `"sqrt"`, `"log2"`, an int, or a float in `(0, 1]`. Sklearn convention. |
 | `growth_policy` | `"depthwise"` | Or `"leafwise"`. |
-| `pruning_alpha` | 0.0 | Cost-complexity penalty. |
+| `min_impurity_decrease` | 0.0 | Reject splits with gain ≤ this threshold. |
+| `ccp_alpha` | 0.0 | Cost-complexity pruning penalty. Sklearn name. |
 | `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many splits. |
 | `validation_fraction` | 0.1 | Held-out fraction for early stopping. Ignored when not needed. |
 | `categorical_features` | None | Sequence of column indices treated as integer category labels. |
 | `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
-| `random_state` | 0 | Reserved for tie-breaking. |
+| `random_state` | 0 | Seeds the per-split feature subsample under `max_features`. |
+
+The v0.0.1 names `max_leaves` and `pruning_alpha` are accepted as deprecated aliases for `max_leaf_nodes` and `ccp_alpha`; passing them emits a `FutureWarning` and behaves identically.
 
 ## Known sharp edges
 
