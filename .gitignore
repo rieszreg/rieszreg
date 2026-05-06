@@ -3,6 +3,12 @@ rieszboost/
 krrr/
 forestriesz/
 riesznet/
+riesztree/
+
+# riesztree design / proof-of-concept artifacts (the canonical version lives
+# in the docs at docs/backends/tree.qmd and the package at rieszreg/riesztree).
+RIESZTREE_DESIGN.html
+RIESZTREE_DESIGN_files/
 
 # Local virtualenvs
 .venv/

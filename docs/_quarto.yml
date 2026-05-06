@@ -39,6 +39,7 @@ website:
           - backends/boosting.qmd
           - backends/kernel.qmd
           - backends/forest.qmd
+          - backends/tree.qmd
           - backends/neural.qmd
       - section: "Estimation"
         contents:

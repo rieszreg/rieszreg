@@ -1,0 +1,455 @@
+---
+title: "Tree backend (riesztree)"
+number-sections: true
+---
+
+{{< include ../_setup.qmd >}}
+
+`riesztree` fits a single decision tree to estimate the Riesz representer $\alpha_0$ of a linear functional, by greedy splits on the augmented Bregman-Riesz loss. Each leaf stores a closed-form value $\alpha_\ell^* = -C_\ell / D_\ell$, projected to the loss's $\alpha$-domain. Loss-aware splits work for every built-in Bregman loss; the per-leaf $\alpha^*$ formula is universal.
+
+The method is new — there is no published reference at this writing. The package is conceptually the simplest of the four learners, and a useful starting point for understanding what every other learner is doing.
+
+::: {.callout-note}
+For headline accuracy, reach for [`forestriesz`](forest.qmd) (random forest) or [`rieszboost`](boosting.qmd) (gradient boosting). A single tree's value is **interpretability**: a depth-3 or depth-4 tree is a readable rule, and each leaf's $\alpha_\ell^*$ is a subgroup-specific IPW-like weight you can stare at directly.
+:::
+
+## How it works
+
+### The augmented loss
+
+For a finite-evaluation estimand $m$, the empirical Bregman-Riesz loss reduces over the augmented dataset to
+
+$$
+\hat L(\alpha) \;=\; \frac{1}{n}\sum_{r=1}^{M} \Big[\, D_r\, \tilde h(\alpha(z_r)) \;+\; C_r\, h'(\alpha(z_r)) \,\Big],
+$$
+
+with one row per evaluation point $z_r$, weight $D_r \in \{0, 1\}$ ($1$ for original observations, $0$ for counterfactual evaluation points), and linear coefficient $C_r$ accumulating the trace coefficients of $m$ at $z_r$. See [Losses](../losses.qmd) for the derivation.
+
+For ATE on $Z_i = (a_i, x_i)$ the trace expands to two evaluation points $(1, x_i)$ and $(0, x_i)$ with coefficients $+1$ and $-1$:
+
+| augmented row | $z_r$ | $D_r$ | $C_r$ |
+|---|---|---|---|
+| original-merged | $(a_i, x_i)$ | $1$ | $-1$ if $a_i = 1$, else $+1$ |
+| counterfactual at the other arm | $(1 - a_i, x_i)$ | $0$ | $+1$ if $a_i = 1$, else $-1$ |
+
+### Per-leaf decoupling
+
+Consider a tree with leaves $\ell = 1, \ldots, K$ assigning a constant $\alpha_\ell$ in leaf $\ell$. Let $D_\ell = \sum_{r \in \ell} D_r$ and $C_\ell = \sum_{r \in \ell} C_r$. The empirical loss becomes
+
+$$
+\hat L(\alpha_1, \ldots, \alpha_K) = \frac{1}{n}\sum_\ell \big[\, D_\ell\, \tilde h(\alpha_\ell) + C_\ell\, h'(\alpha_\ell) \,\big].
+$$
+
+The summand for leaf $\ell$ depends only on $\alpha_\ell, D_\ell, C_\ell$ — no cross-leaf coupling. Setting the derivative to zero and using the identity $\tilde h'(t) = t \cdot h''(t)$ (immediate from $\tilde h = t\, h' - h$):
+
+$$
+h''(\alpha_\ell) \cdot (D_\ell\, \alpha_\ell + C_\ell) = 0.
+$$
+
+Since $h$ is strictly convex, $h''(\alpha_\ell) > 0$, so
+
+$$
+\alpha_\ell^* \;=\; -\,\frac{C_\ell}{D_\ell}
+$$
+
+(when $-C_\ell / D_\ell$ lies in the loss's $\alpha$-domain; otherwise project to the boundary). This formula is universal across `SquaredLoss`, `KLLoss`, `BernoulliLoss`, and `BoundedSquaredLoss` — only the link's $\alpha$-domain changes.
+
+### Splitting criterion
+
+For a candidate split of parent leaf $p$ into children $\ell, r$, the **gain** is the reduction in empirical loss at the per-leaf optima:
+
+$$
+\Delta(\text{split}) \;=\; \hat L_p(\alpha_p^*) - \hat L_\ell(\alpha_\ell^*) - \hat L_r(\alpha_r^*).
+$$
+
+The gain expression depends on the loss. For squared loss, the per-leaf objective at the optimum is
+
+$$
+\hat L_\ell(\alpha_\ell^*)
+  \;=\; D_\ell\, (\alpha_\ell^*)^2 + 2 C_\ell\, \alpha_\ell^*
+  \;=\; D_\ell \!\left(\!-\frac{C_\ell}{D_\ell}\!\right)^{\!2} + 2 C_\ell\!\left(\!-\frac{C_\ell}{D_\ell}\!\right)
+  \;=\; -\frac{C_\ell^2}{D_\ell},
+$$
+
+so
+
+$$
+\Delta_{\text{sq}} \;=\; \frac{C_\ell^2}{D_\ell} + \frac{C_r^2}{D_r} - \frac{C_p^2}{D_p}.
+$$
+
+Since the augmented rows include $D_r = 0$ counterfactual points contributing only to $C_\ell$ — these add a *linear* shift in $\alpha$ to the within-leaf objective rather than a quadratic — the gain cannot be encoded as a vanilla weighted regression target. A custom Cython criterion plugged into sklearn's tree builder would work; the package hand-rolls the splitter in pure NumPy, which is fast enough at the $n$ a single tree is sensible for.
+
+For other losses the gain has its own analytic form. KL ($h(t) = t \log t - t$), for instance, gives $\hat L_\ell(\alpha_\ell^*) = -C_\ell + C_\ell \log(-C_\ell / D_\ell)$ when $C_\ell < 0$, and the gain is
+
+$$
+\Delta_{\text{KL}} \;=\; -C_\ell \log\!\frac{-C_\ell}{D_\ell} - C_r \log\!\frac{-C_r}{D_r} + C_p \log\!\frac{-C_p}{D_p}.
+$$
+
+The orderings of candidate splits under $\Delta_{\text{sq}}$ and $\Delta_{\text{KL}}$ can differ — the *splits* depend on the loss, even though the *leaf values given a partition* don't.
+
+## Quickstart {#sec-quickstart}
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+import numpy as np, pandas as pd
+from riesztree import RieszTreeRegressor, ATE
+
+rng = np.random.default_rng(0)
+n = 1500
+x = rng.uniform(0, 1, n)
+pi = 1 / (1 + np.exp(-(-0.02*x - x**2 + 4*np.log(x + 0.3) + 1.5)))
+a = rng.binomial(1, pi).astype(float)
+df = pd.DataFrame({"a": a, "x": x})
+
+est = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    max_depth=4,
+    random_state=0,
+)
+est.fit(df)
+
+alpha_hat  = est.predict(df)
+true_alpha = a / pi - (1 - a) / (1 - pi)
+print(f"corr(α̂, α₀) = {np.corrcoef(alpha_hat, true_alpha)[0, 1]:.3f}")
+print(f"RMSE         = {np.sqrt(np.mean((alpha_hat - true_alpha)**2)):.3f}")
+```
+
+## R
+
+```{r}
+#| eval: false
+pkgload::load_all("../riesztree/r/riesztree")
+use_python_riesztree(file.path(getwd(), "../.venv/bin/python"))
+
+set.seed(0)
+n  <- 1500
+x  <- runif(n)
+pi <- 1 / (1 + exp(-(-0.02 * x - x^2 + 4 * log(x + 0.3) + 1.5)))
+a  <- rbinom(n, 1, pi)
+df <- data.frame(a = as.numeric(a), x = x)
+
+rt <- RieszTreeRegressor$new(
+  estimand = ATE(treatment = "a", covariates = "x"),
+  max_depth = 4L, random_state = 0L
+)
+rt$fit(df)
+alpha_hat <- as.numeric(rt$predict(df))
+```
+
+:::
+
+## Growth strategies {#sec-growth}
+
+Two growth policies are supported:
+
+- **Depthwise** (`growth_policy="depthwise"`, default). Standard recursive depth-first growth. Stops at `max_depth` or when `min_samples_split` blocks the node.
+- **Leafwise** (`growth_policy="leafwise"`). Best-first growth: at each step split the leaf whose best candidate has the highest gain anywhere in the tree. Termination on `max_leaves` (the natural cap for this policy) or when no positive-gain split remains.
+
+```{python}
+from riesztree import RieszTreeRegressor, ATE, n_leaves
+
+est_dw = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    growth_policy="depthwise", max_depth=4,
+).fit(df)
+
+est_lw = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    growth_policy="leafwise", max_leaves=16, max_depth=20,
+).fit(df)
+
+print(f"depthwise leaves: {n_leaves(est_dw.predictor_.tree)}")
+print(f"leafwise  leaves: {n_leaves(est_lw.predictor_.tree)}")
+```
+
+## Pruning {#sec-pruning}
+
+Two regularisation paths are available:
+
+- **Cost-complexity pruning** via `pruning_alpha > 0`. Standard Breiman et al. weakest-link algorithm: walk the tree bottom-up, computing per-subtree $R_\alpha(T) = R(T) + \alpha\, |\text{leaves}(T)|$, and collapse the weakest link until $g_{\min} \geq \alpha$. $R(T)$ is the augmented Bregman training loss summed over leaves.
+- **Early stopping** via `early_stopping_rounds` + `validation_fraction`. Stops growing when the held-out augmented loss has not improved for that many consecutive accepted splits, mirroring `rieszboost` / `riesznet`.
+
+Both are off by default. Combine freely with either growth policy.
+
+```{python}
+est_pruned = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    max_depth=10, pruning_alpha=0.5,
+).fit(df)
+
+est_es = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    max_depth=10, early_stopping_rounds=3, validation_fraction=0.2,
+).fit(df)
+
+print(f"unpruned: {n_leaves(RieszTreeRegressor(estimand=ATE(treatment='a', covariates=('x',)), max_depth=10).fit(df).predictor_.tree)} leaves")
+print(f"pruned  : {n_leaves(est_pruned.predictor_.tree)} leaves")
+print(f"early-stop: {n_leaves(est_es.predictor_.tree)} leaves")
+```
+
+## Categorical predictors {#sec-categorical}
+
+Declare integer-coded categorical columns via `categorical_features=(col_idx, ...)`. The splitter uses the standard CART trick: order levels by within-level $\alpha_{\text{level}}^* = -C_{\text{level}} / D_{\text{level}}$, then sweep contiguous splits in that order. The ordering theorem carries over because the augmented Bregman per-leaf objective is convex.
+
+```{python}
+rng = np.random.default_rng(0)
+n_cat = 2000
+pi_per_level = rng.uniform(0.1, 0.9, size=8)
+cat = rng.integers(0, 8, size=n_cat).astype(float)
+pi_cat = pi_per_level[cat.astype(int)]
+a_cat = (rng.uniform(0, 1, size=n_cat) < pi_cat).astype(float)
+df_cat = pd.DataFrame({"a": a_cat, "cat": cat, "x": rng.normal(size=n_cat)})
+
+est_cat = RieszTreeRegressor(
+    estimand=ATE(treatment="a", covariates=("cat", "x")),
+    max_depth=4,
+    categorical_features=(1,),    # column 1 in feature_keys = ("a","cat","x")
+).fit(df_cat)
+
+alpha_cat = est_cat.predict(df_cat)
+print(f"alpha range: [{alpha_cat.min():.3f}, {alpha_cat.max():.3f}]")
+```
+
+## Save / load {#sec-save-load}
+
+```{python}
+import tempfile, os
+with tempfile.TemporaryDirectory() as tmp:
+    save_dir = os.path.join(tmp, "fitted")
+    est.save(save_dir)
+
+    loaded = RieszTreeRegressor.load(save_dir)
+    pred_loaded = loaded.predict(df)
+    print(f"max abs diff after round-trip: {np.max(np.abs(pred_loaded - alpha_hat)):.2e}")
+```
+
+For built-in estimands the metadata fully reconstructs the estimand on load. For custom estimands pass `estimand=` to `RieszTreeRegressor.load(path, estimand=...)`.
+
+## Sklearn integration {#sec-sklearn}
+
+`RieszTreeRegressor` is a `BaseEstimator`, so it composes with `clone`, `GridSearchCV`, `cross_val_predict`, `Pipeline`. See [Tuning and Cross-Fitting](../tuning-and-cross-fitting.qmd).
+
+```{python}
+from sklearn.model_selection import GridSearchCV
+gs = GridSearchCV(
+    RieszTreeRegressor(estimand=ATE(treatment="a", covariates=("x",))),
+    {"max_depth": [2, 4, 6, 8]},
+    cv=3, n_jobs=1,
+)
+gs.fit(df)
+print(f"best max_depth = {gs.best_params_['max_depth']}")
+```
+
+## Hyperparameters
+
+| Knob | Default | Notes |
+|---|---|---|
+| `max_depth` | 8 | Cap on tree depth. |
+| `min_samples_split` | 20 | Minimum count of original ($D > 0$) augmented rows in a node before considering a split. |
+| `min_samples_leaf` | 10 | Minimum count of original rows in each child of a candidate split. |
+| `max_leaves` | 31 | Cap for leafwise growth. Ignored when `growth_policy="depthwise"`. |
+| `growth_policy` | `"depthwise"` | Or `"leafwise"`. |
+| `pruning_alpha` | 0.0 | Cost-complexity penalty. |
+| `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many accepted splits. |
+| `validation_fraction` | 0.1 | Held-out fraction for early stopping. Ignored when not needed. |
+| `categorical_features` | None | Sequence of column indices treated as integer category labels. |
+| `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
+| `random_state` | 0 | Reserved for tie-breaking. |
+
+## Loss-aware splits {#sec-loss-aware}
+
+The splitter uses the analytic per-leaf-loss-at-optimum for each Bregman loss:
+
+| Loss | $\alpha_\ell^*$ in-domain when | $\hat L_\ell(\alpha_\ell^*)$ |
+|---|---|---|
+| `SquaredLoss` | always | $-C_\ell^2 / D_\ell$ |
+| `KLLoss` | $C_\ell < 0$ (boundary at $C_\ell = 0$) | $-C_\ell + C_\ell \log(-C_\ell / D_\ell)$ |
+| `BernoulliLoss` | $-D_\ell < C_\ell < 0$ | $D_\ell \log D_\ell - (D_\ell + C_\ell) \log(D_\ell + C_\ell) + C_\ell \log(-C_\ell)$ |
+| `BoundedSquaredLoss(lo, hi)` | always (project $\alpha_\ell^*$ to $[lo, hi]$) | $D_\ell (\alpha_\ell^*)^2 + 2 C_\ell \alpha_\ell^*$ |
+
+Out-of-domain children are disqualified (`+∞` leaf loss). Pair `KLLoss` / `BernoulliLoss` with density-ratio-style estimands (`TSM`); difference-of-evaluations estimands (`ATE`, `ATT`) frequently produce out-of-domain leaves under those losses.
+
+```{python}
+from riesztree import RieszTreeRegressor, TSM
+from rieszreg import KLLoss
+
+est_kl = RieszTreeRegressor(
+    estimand=TSM(level=1.0, treatment="a", covariates=("x",)),
+    loss=KLLoss(),
+    max_depth=4, random_state=0,
+).fit(df)
+alpha_kl = est_kl.predict(df)
+print(f"all alpha_hat ≥ 0: {bool((alpha_kl >= 0).all())}")
+print(f"alpha range      : [{alpha_kl.min():.3f}, {alpha_kl.max():.3f}]")
+```
+
+## What you reach for instead
+
+`riesztree` is intentionally a single tree. For higher-accuracy variants:
+
+- **Single-tree augmentation in a forest**: see [`forestriesz/AugForestRieszRegressor`](forest.qmd#augmentation-style-augforestrieszregressor) — the same augmentation-style splitter, ensembled.
+- **Linear-in-$X$ leaves (model trees)**: not implemented in v1. Within-leaf the augmented Bregman loss is still a small convex problem in the leaf's $X$-coefficients, so the decoupling property survives. Planned.
+- **Treatment-dimension sieve** (à la `forestriesz`'s `riesz_feature_fns="auto"`, which uses $[\mathbf 1\{T = 0\}, \mathbf 1\{T = 1\}]$ as basis): not implemented in v1. The tree code generalises naturally.
+
+## Custom estimands
+
+Because `riesztree` implements the augmentation-style `Backend.fit_augmented`, any user-supplied `FiniteEvalEstimand` works without configuration: $D_r$ and $C_r$ vary across augmented rows even with no sieve. (Contrast `forestriesz`'s moment-style backend, which raises a row-constant degeneracy error on `AdditiveShift` / `LocalShift` / custom estimands.) Pass your custom estimand and fit normally:
+
+```{python}
+#| eval: false
+from rieszreg import FiniteEvalEstimand, LinearForm
+
+def m_custom(alpha):
+    def inner(z, y=None):
+        return LinearForm.point(1.0, {"a": z["a"] + 1.0, "x": z["x"]}) \
+             - LinearForm.point(1.0, {"a": z["a"], "x": z["x"]})
+    return inner
+
+custom = FiniteEvalEstimand(feature_keys=("a", "x"), m=m_custom)
+est = RieszTreeRegressor(estimand=custom, max_depth=4).fit(df)
+```
+
+## Consistency
+
+The greedy CART consistency theory (Breiman et al. 1984; Buhlmann & Yu 2003) covers regression trees fit by minimising additive-over-leaves squared loss. The augmented Bregman loss shares the additive-over-leaves structure that those arguments need, and the per-leaf objective is convex with a closed-form minimiser. Heuristically this should mean the same consistency results carry over for $\alpha^*$ under analogous regularity conditions (smoothness of the population loss, growing leaf counts at the right rate, bounded splitting noise).
+
+A formal proof for the augmented Bregman case isn't in the literature at this writing — flagged as an open question. In practice, the consistency behaviour we see on the canonical DGPs in `rieszreg.testing.dgps` matches the regression-tree picture: RMSE shrinks as $n$ grows, with the noise floor around what a comparable-depth CART achieves on the analogous regression problem. Single-tree variance is the dominant term; ensemble (`forestriesz`) or boost (`rieszboost`) for tighter rates.
+
+## Simulations: how does this stack up against IPW? {#sec-sims}
+
+A common alternative for ATE-style estimands is two-step IPW: fit $\hat\pi(x)$ (a propensity model), then plug into
+
+$$
+\hat\alpha(a, x) \;=\; \frac{2a - 1}{a\,\hat\pi(x) + (1 - a)\,(1 - \hat\pi(x))}.
+$$
+
+Two natural choices for $\hat\pi$:
+
+- **Logistic regression** (well-specified on the linear-Gaussian DGP below).
+- **Regression tree** of $A$ on $X$ (mis-specified, depth tuned via held-out NLL).
+
+Compare both against `riesztree` (depth tuned via held-out Riesz loss). Same training set; oracle RMSE measured on a fresh test set of size $5n$. Faceted across training sizes $n \in \{100, 200, 500, 2000, 8000\}$.
+
+```{python}
+#| label: ipw-comparison
+#| fig-cap: "Oracle RMSE vs depth, faceted by n_train. Lower is better. Logistic-regression IPW is well-specified on this DGP and gives the best achievable two-step baseline; riesztree directly optimises the Bregman-Riesz loss and beats both IPW variants once n exceeds a few hundred."
+#| fig-width: 9
+#| fig-height: 6
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+from riesztree import RieszTreeRegressor, ATE
+
+
+def sample(n, seed):
+    rng = np.random.default_rng(seed)
+    x = rng.normal(0.0, 1.0, size=(n, 5))
+    logit = 0.7 * x[:, 0] - 0.3 * x[:, 1]
+    pi = 1.0 / (1.0 + np.exp(-logit))
+    a = (rng.uniform(0, 1, n) < pi).astype(float)
+    df = pd.DataFrame(x, columns=[f"x{i}" for i in range(5)])
+    df.insert(0, "a", a)
+    df["_pi"] = pi
+    return df
+
+
+def truth_from(df):
+    pi = df["_pi"].values
+    a = df["a"].values
+    prob_a = a * pi + (1.0 - a) * (1.0 - pi)
+    return (2.0 * a - 1.0) / prob_a
+
+
+def rmse(a, b):
+    return float(np.sqrt(np.mean((a - b) ** 2)))
+
+
+def ipw_with_estimator(clf, train, test):
+    feats = [f"x{i}" for i in range(5)]
+    clf.fit(train[feats].values, train["a"].values.astype(int))
+    pi_hat = np.clip(clf.predict_proba(test[feats].values)[:, 1], 1e-3, 1 - 1e-3)
+    a = test["a"].values
+    prob_a = a * pi_hat + (1.0 - a) * (1.0 - pi_hat)
+    return (2.0 * a - 1.0) / prob_a
+
+
+depths = [2, 3, 4, 6, 8, 12]
+n_grid = [100, 200, 500, 2000, 8000]
+covariates = ("x0", "x1", "x2", "x3", "x4")
+
+records = []
+for n in n_grid:
+    train = sample(n, seed=0)
+    test = sample(5 * n, seed=1)
+    truth = truth_from(test)
+
+    # Logistic-regression IPW: a single horizontal reference (no depth knob).
+    log_ipw_alpha = ipw_with_estimator(LogisticRegression(max_iter=2000), train, test)
+    log_ipw_rmse = rmse(log_ipw_alpha, truth)
+
+    for d in depths:
+        # riesztree at this depth.
+        est = RieszTreeRegressor(
+            estimand=ATE(treatment="a", covariates=covariates),
+            max_depth=d, random_state=0,
+        ).fit(train)
+        records.append({
+            "n_train": n, "method": "riesztree", "depth": d,
+            "rmse": rmse(est.predict(test), truth),
+        })
+        # IPW-tree at this depth.
+        records.append({
+            "n_train": n, "method": "IPW (regression tree)", "depth": d,
+            "rmse": rmse(
+                ipw_with_estimator(
+                    DecisionTreeClassifier(max_depth=d, min_samples_leaf=10, random_state=0),
+                    train, test,
+                ),
+                truth,
+            ),
+        })
+    records.append({
+        "n_train": n, "method": "IPW (logistic regression)", "depth": None,
+        "rmse": log_ipw_rmse,
+    })
+
+res = pd.DataFrame(records)
+
+fig, axes = plt.subplots(1, len(n_grid), figsize=(3.0 * len(n_grid), 4), sharey=False)
+colors = {"riesztree": "#005f73", "IPW (regression tree)": "#bb3e03"}
+for ax, n in zip(axes, n_grid):
+    sub = res[res["n_train"] == n]
+    for method, color in colors.items():
+        m = sub[sub["method"] == method].sort_values("depth")
+        ax.plot(m["depth"], m["rmse"], "-o", color=color, label=method, linewidth=2)
+    log_rmse = sub[sub["method"] == "IPW (logistic regression)"]["rmse"].iloc[0]
+    ax.axhline(log_rmse, color="black", linestyle="--", label="IPW (logistic, well-spec.)")
+    ax.set_title(f"n_train = {n}")
+    ax.set_xlabel("max_depth")
+    ax.set_ylabel("oracle RMSE" if n == n_grid[0] else "")
+    ax.set_yscale("log")
+    ax.grid(alpha=0.3)
+axes[-1].legend(loc="best", fontsize=8)
+fig.tight_layout()
+plt.show()
+```
+
+Three things to read off the chart:
+
+1. At very small $n$ (100, 200), all three methods are competitive — there isn't enough signal to separate them.
+2. From $n \approx 500$ onward, `riesztree` consistently beats IPW-with-CART, and the gap grows with $n$.
+3. The horizontal logistic-regression line is the floor for IPW with a *correctly-specified* propensity model. `riesztree` reaches and crosses that floor at moderate $n$, despite not knowing the propensity is logistic. Direct loss optimisation on $\alpha$ avoids paying the model-mis-specification tax that the tree-IPW route incurs.
+
+The held-out depth that minimises RMSE for `riesztree` typically sits in the 4–8 range; deeper trees overfit. Tune via [GridSearchCV](#sec-sklearn) in practice.
+
+## Sharp edges
+
+- **High variance.** A single tree's RMSE is materially higher than a tuned forest or booster on the same DGP. Use this learner for interpretability or when the dependency footprint matters; otherwise pick `forestriesz` or `rieszboost`.
+- **No confidence intervals in v1.** Honest splits are not implemented.
+- **Constant per-leaf $\alpha$ only.** Linear-in-$X$ and treatment-sieve leaves are documented as future work.
+- **Loss-domain disqualifications.** KL / Bernoulli with `ATE`-style estimands will see many split candidates ruled out; the resulting tree may be shallower than `max_depth`. This is the splitter respecting the link's $\alpha$-domain, not a bug.
