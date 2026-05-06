@@ -1,5 +1,11 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = [
+    "setuptools>=61",
+    # Cython is needed at build time to compile the .pyx extensions.
+    "cython>=3.0",
+    # numpy headers are needed for cimport numpy in the extensions.
+    "numpy>=1.24",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,3 +27,7 @@ test = ["pytest>=7", "pandas>=2.0"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["riesztree*"]
+
+# Cython extensions are configured imperatively in setup.py; pyproject's
+# table-style ext-modules support is still tooling-dependent. The setup.py
+# stub below calls setuptools.setup() with cythonize()-d Extension objects.

@@ -5,13 +5,20 @@ uses the identity link so ``predict_eta`` and ``predict_alpha`` agree; for
 KL / Bernoulli the leaf stores α directly (post-projected to the link
 domain), and ``predict_eta`` returns ``loss.alpha_to_eta(α)``.
 
+The predictor stores both the ``Node`` tree (the source of truth used by
+diagnostics, pruning, and serialization) and a lazily-built flat-array
+companion that backs the Cython ``predict_alpha`` loop. The flat tree
+is rebuilt the first time ``predict_alpha`` runs after construction or
+load; mutating the ``Node`` tree (e.g. cost-complexity pruning) clears
+the cache via :meth:`invalidate_flat_tree`.
+
 Registers itself with rieszreg's loader registry on import.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Sequence
 
@@ -20,7 +27,8 @@ import numpy as np
 from rieszreg import LossSpec, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 
-from .tree import Node, from_dict, predict_array, to_dict
+from .fast import FlatTree, flat_tree_from_node, predict_alpha as _flat_predict_alpha
+from .tree import Node, from_dict, to_dict
 
 
 @dataclass
@@ -30,12 +38,27 @@ class RieszTreePredictor:
     base_score: float
     feature_keys: tuple[str, ...]
     categorical_features: tuple[int, ...] = ()
+    _flat_tree: FlatTree | None = field(default=None, init=False, repr=False, compare=False)
 
     kind: ClassVar[str] = "riesztree"
 
+    def _ensure_flat_tree(self) -> FlatTree:
+        """Build (and cache) the flat-array companion of ``self.tree``."""
+        if self._flat_tree is None:
+            self._flat_tree = flat_tree_from_node(self.tree)
+        return self._flat_tree
+
+    def invalidate_flat_tree(self) -> None:
+        """Drop the cached flat tree; the next ``predict_alpha`` rebuilds it.
+
+        Call after any in-place mutation of ``self.tree`` (e.g. pruning).
+        """
+        self._flat_tree = None
+
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         """Per-leaf α* sits in α-space already; return as-is."""
-        return predict_array(self.tree, features)
+        flat = self._ensure_flat_tree()
+        return _flat_predict_alpha(flat, np.asarray(features))
 
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
         alpha = self.predict_alpha(features)

@@ -12,3 +12,9 @@ dist/
 # Benchmark outputs are reproducible and would churn the repo on every run.
 # The locked baseline lives in BENCH_BASELINE.md; raw CSVs stay local.
 python/benchmarks/results/
+
+# Cython build artifacts: the .c is regenerated from .pyx on every build,
+# the .so is platform-specific and rebuilt by `pip install -e .`.
+python/riesztree/fast/_tree_c.c
+python/riesztree/fast/*.so
+python/riesztree/fast/*.html

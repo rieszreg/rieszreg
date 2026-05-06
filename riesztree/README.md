@@ -22,6 +22,12 @@ Forests (`forestriesz`) and gradient boosting (`rieszboost`) are the right learn
 pip install -e python/   # from this directory
 ```
 
+`riesztree` ships a small Cython extension (`riesztree.fast._tree_c`) that
+backs the prediction tight loop. `pip install -e python/` builds it
+automatically — you need a C compiler on the build machine
+(gcc / clang / MSVC). Editing a `.pyx` file requires re-running
+`pip install -e python/` to recompile.
+
 R:
 
 ```r
@@ -63,7 +69,8 @@ alpha_hat = est.predict(df)
 - **Save / load**: directory format with JSON predictor + JSON metadata. Built-in estimands round-trip automatically.
 - **Diagnostics**: `TreeDiagnostics` extends `rieszreg.Diagnostics` with `n_leaves`, `max_depth_actual`, `mean_leaf_size`, `feature_importances` (per-feature normalised split-gain).
 - **R wrapper**: R6 mirror via reticulate.
-- **38 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity.
+- **Cython prediction**: `predict` walks a flat-array tree (built once per fit) at C speed. The `Node` tree continues to back diagnostics, pruning, and serialization.
+- **79 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity.
 
 ## Hyperparameters
 
