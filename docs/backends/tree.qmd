@@ -314,9 +314,133 @@ est = RieszTreeRegressor(estimand=custom, max_depth=4).fit(df)
 
 ## Consistency
 
-The greedy CART consistency theory (Breiman et al. 1984; Buhlmann & Yu 2003) covers regression trees fit by minimising additive-over-leaves squared loss. The augmented Bregman loss shares the additive-over-leaves structure that those arguments need, and the per-leaf objective is convex with a closed-form minimiser. Heuristically this should mean the same consistency results carry over for $\alpha^*$ under analogous regularity conditions (smoothness of the population loss, growing leaf counts at the right rate, bounded splitting noise).
+For the squared Bregman-Riesz loss the population objective satisfies
+$$
+L(\alpha) \;-\; L(\alpha_0) \;=\; \|\alpha - \alpha_0\|_{L^2(P)}^2,
+$$
+so minimising $L$ is $L^2$-regression onto the (unobserved) Riesz representer $\alpha_0$. Theorem 1 below makes this rigorous for the empirical risk minimiser over piecewise-constant functions on tree partitions.
 
-A formal proof for the augmented Bregman case isn't in the literature at this writing — flagged as an open question. In practice, the consistency behaviour we see on the canonical DGPs in `rieszreg.testing.dgps` matches the regression-tree picture: RMSE shrinks as $n$ grows, with the noise floor around what a comparable-depth CART achieves on the analogous regression problem. Single-tree variance is the dominant term; ensemble (`forestriesz`) or boost (`rieszboost`) for tighter rates.
+### Setting
+
+Let $Z_1, \ldots, Z_n \overset{\text{iid}}{\sim} P$ on a measurable space $\mathcal{Z} \subseteq \mathbb{R}^{d+1}$ (treatment plus $d$ covariates). Let $m$ be a finite-evaluation linear functional with trace
+$$
+m(g)(z) \;=\; \sum_{r=1}^{R(z)} c_r(z)\, g(z_r(z))
+$$
+and Riesz representer $\alpha_0 \in L^2(P)$ defined by $\mathbb{E}[m(g)(Z)] = \mathbb{E}[\alpha_0(Z)\, g(Z)]$ for all $g \in L^2(P)$. The squared Bregman-Riesz loss and its empirical analog are
+$$
+L(\alpha) \;=\; \mathbb{E}\!\left[\alpha(Z)^2 - 2\, m(\alpha)(Z)\right],
+\qquad
+\hat L_n(\alpha) \;=\; \frac{1}{n}\sum_{i=1}^n \left[\alpha(Z_i)^2 - 2\, m(\alpha)(Z_i)\right].
+$$
+
+Let $\mathcal{T}_K$ be the class of binary tree partitions of $\mathcal{Z}$ into at most $K$ leaves with axis-aligned splits, and let
+$$
+\mathcal{F}_{K,M} \;=\; \big\{\alpha : \mathcal{Z} \to [-M, M] \;\big|\; \alpha \text{ is constant on each leaf of some } \Pi \in \mathcal{T}_K\big\}.
+$$
+Define the global empirical risk minimiser at complexity $K_n$, with leaf values clipped to $[-M, M]$:
+$$
+\hat\alpha_n \;\in\; \arg\min_{\alpha \in \mathcal{F}_{K_n, M}} \hat L_n(\alpha).
+$$
+
+### Assumptions
+
+- **(A1) Bounded representer.** $\|\alpha_0\|_\infty \le M < \infty$.
+- **(A2) Bounded trace.** There exist constants $B, R < \infty$ such that $R(z) \le R$ and $\sum_{r=1}^{R(z)} |c_r(z)| \le B$ for $P$-a.e.\ $z$.
+- **(A3) Approximation.** $\inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)} \to 0$ as $n \to \infty$.
+- **(A4) Capacity.** $K_n \to \infty$ and $K_n \log n / n \to 0$ as $n \to \infty$, with $d$ fixed.
+
+### Theorem
+
+**Theorem 1.** *Under (A1)–(A4),*
+$$
+\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \;\xrightarrow{P}\; 0.
+$$
+
+::: {.callout-tip collapse="true" title="Proof of Theorem 1"}
+
+Write $\Delta_n(\alpha) := \hat L_n(\alpha) - L(\alpha)$.
+
+**Step 1 (loss identity).** For any $\alpha \in L^2(P)$,
+$$
+L(\alpha) - L(\alpha_0)
+\;=\; \mathbb{E}[\alpha^2] - \mathbb{E}[\alpha_0^2] - 2\, \mathbb{E}[m(\alpha) - m(\alpha_0)]
+\;=\; \mathbb{E}[\alpha^2] - \mathbb{E}[\alpha_0^2] - 2\, \mathbb{E}[\alpha_0(\alpha - \alpha_0)]
+\;=\; \|\alpha - \alpha_0\|_{L^2(P)}^2,
+$$
+using the Riesz identity $\mathbb{E}[m(g)(Z)] = \mathbb{E}[\alpha_0(Z) g(Z)]$ in the second equality, applied to $g = \alpha - \alpha_0 \in L^2(P)$ (which is in $L^2$ by (A1) and the assumption $\alpha \in \mathcal{F}_{K_n, M}$ so $\|\alpha\|_\infty \le M$).
+
+**Step 2 (oracle decomposition).** Let $\alpha_n^\star \in \arg\min_{\alpha \in \mathcal{F}_{K_n, M}} L(\alpha)$. By optimality of $\hat\alpha_n$ for $\hat L_n$, $\hat L_n(\hat\alpha_n) - \hat L_n(\alpha_n^\star) \le 0$, so
+$$
+\begin{aligned}
+L(\hat\alpha_n) - L(\alpha_0)
+&= \big[L(\hat\alpha_n) - \hat L_n(\hat\alpha_n)\big] + \big[\hat L_n(\hat\alpha_n) - \hat L_n(\alpha_n^\star)\big] \\
+&\quad + \big[\hat L_n(\alpha_n^\star) - L(\alpha_n^\star)\big] + \big[L(\alpha_n^\star) - L(\alpha_0)\big] \\
+&\le -\Delta_n(\hat\alpha_n) + 0 + \Delta_n(\alpha_n^\star) + \inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)}^2 \\
+&\le 2 \sup_{\alpha \in \mathcal{F}_{K_n, M}} |\Delta_n(\alpha)| + \inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)}^2.
+\end{aligned}
+$$
+The substitution in the third line uses Step 1 to write $L(\alpha_n^\star) - L(\alpha_0) = \inf_{\alpha} \|\alpha - \alpha_0\|_{L^2(P)}^2$ (since $\alpha_n^\star$ minimises $L$ over $\mathcal{F}_{K_n, M}$). The infimum vanishes by (A3); it remains to control the supremum.
+
+**Step 3 (uniform LLN).** Decompose
+$$
+\Delta_n(\alpha) \;=\; \underbrace{\big(\hat E_n \alpha^2 - \mathbb{E}[\alpha^2]\big)}_{=:\, U_n(\alpha)} \;-\; 2\, \underbrace{\big(\hat E_n F_\alpha - \mathbb{E}[F_\alpha]\big)}_{=:\, V_n(\alpha)}, \qquad F_\alpha(z) \,:=\, \sum_{r=1}^{R(z)} c_r(z)\, \alpha(z_r(z)),
+$$
+where $\hat E_n f := \frac{1}{n}\sum_i f(Z_i)$. By (A1)-(A2), every $\alpha \in \mathcal{F}_{K_n, M}$ satisfies $\|\alpha\|_\infty \le M$, $\|\alpha^2\|_\infty \le M^2$, and $\|F_\alpha\|_\infty \le BM$.
+
+We bound the empirical $L^1$-covering number of $\mathcal{F}_{K_n, M}$, $\mathcal{Q}_n := \{\alpha^2 : \alpha \in \mathcal{F}_{K_n, M}\}$, and $\mathcal{M}_n := \{F_\alpha : \alpha \in \mathcal{F}_{K_n, M}\}$. For a class $\mathcal{F}$ and a measure $\mu$ on $\mathcal{Z}$, write $N_1(\epsilon, \mathcal{F}, \mu)$ for the smallest $N$ such that $\mathcal{F}$ admits an $\epsilon$-cover in $L^1(\mu)$.
+
+Each $\alpha \in \mathcal{F}_{K_n, M}$ is determined by a partition $\Pi \in \mathcal{T}_{K_n}$ and a value vector $(\alpha_\ell)_{\ell=1}^{K_n} \in [-M, M]^{K_n}$. Two functions with the same partition and value vectors $(\alpha_\ell), (\alpha'_\ell)$ satisfy
+$$
+\|\alpha - \alpha'\|_{L^1(P_n)} \;\le\; \max_\ell |\alpha_\ell - \alpha'_\ell|.
+$$
+The number of distinct partitions in $\mathcal{T}_{K_n}$ that yield distinct restrictions to the data points $Z_1, \ldots, Z_n$ together with all augmented evaluation points $\{z_r(Z_i) : i \le n,\, r \le R\}$ (a set of size at most $nR$) is at most $(d \cdot nR)^{K_n - 1} \le (dnR)^{K_n}$: each of the $\le K_n - 1$ splits picks one of $d$ axes and one of at most $nR$ achievable thresholds along that axis. Combined with an $\epsilon$-cover of $[-M, M]^{K_n}$ in $L^\infty$ of size $\lceil 2M/\epsilon \rceil^{K_n}$,
+$$
+N_1\!\big(\epsilon,\, \mathcal{F}_{K_n, M},\, P_n\big) \;\le\; (dnR)^{K_n}\, (2M/\epsilon)^{K_n}.
+$$
+Composition: since $|a^2 - b^2| \le 2M\, |a - b|$ on $[-M, M]$ and $|F_\alpha(z) - F_{\alpha'}(z)| \le T(z)\, \max_\ell |\alpha_\ell - \alpha'_\ell| \le B\, \max_\ell |\alpha_\ell - \alpha'_\ell|$ by (A2),
+$$
+N_1\!\big(\epsilon,\, \mathcal{Q}_n,\, P_n\big) \;\le\; (dnR)^{K_n}\, (4M^2/\epsilon)^{K_n},
+\qquad
+N_1\!\big(\epsilon,\, \mathcal{M}_n,\, P_n\big) \;\le\; (dnR)^{K_n}\, (2BM/\epsilon)^{K_n}.
+$$
+
+Pollard's uniform Vapnik-Chervonenkis inequality (Pollard 1984, Theorem II.24; equivalently Devroye, Györfi and Lugosi 1996, Theorem 12.6) states that for any class $\mathcal{F}$ of $[-B', B']$-valued measurable functions and any $\epsilon > 0$,
+$$
+P\!\left(\sup_{f \in \mathcal{F}} \big|\hat E_n f - \mathbb{E}[f]\big| > \epsilon\right) \;\le\; 8\, \mathbb{E}\!\big[N_1(\epsilon/8, \mathcal{F}, P_n)\big]\, \exp\!\big(-n \epsilon^2 / (128\, B'^2)\big).
+$$
+Apply this to $\mathcal{Q}_n$ with $B' = M^2$ and to $\mathcal{M}_n$ with $B' = BM$:
+$$
+\begin{aligned}
+P\!\left(\sup_{\alpha} |U_n(\alpha)| > \epsilon\right) \;&\le\; 8\, (dnR)^{K_n}\, (32 M^2/\epsilon)^{K_n}\, \exp\!\big(-n \epsilon^2 / (128\, M^4)\big), \\
+P\!\left(\sup_{\alpha} |V_n(\alpha)| > \epsilon\right) \;&\le\; 8\, (dnR)^{K_n}\, (16 BM/\epsilon)^{K_n}\, \exp\!\big(-n \epsilon^2 / (128\, B^2 M^2)\big).
+\end{aligned}
+$$
+Taking logarithms, the exponents are
+$$
+K_n \log(dnR) + K_n \log(C/\epsilon) - n \epsilon^2 / C',
+$$
+which tend to $-\infty$ for any fixed $\epsilon > 0$ provided $K_n \log n / n \to 0$, i.e., (A4). Hence
+$$
+\sup_{\alpha \in \mathcal{F}_{K_n, M}} |\Delta_n(\alpha)| \;\le\; \sup_\alpha |U_n(\alpha)| + 2 \sup_\alpha |V_n(\alpha)| \;\xrightarrow{P}\; 0.
+$$
+
+**Step 4 (conclusion).** Combining Steps 2 and 3, $L(\hat\alpha_n) - L(\alpha_0) \xrightarrow{P} 0$. By Step 1, $L(\hat\alpha_n) - L(\alpha_0) = \|\hat\alpha_n - \alpha_0\|_{L^2(P)}^2$, so $\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \xrightarrow{P} 0$. $\blacksquare$
+
+:::
+
+### Remarks on the assumptions
+
+- **(A1) and (A3)** are the standard assumptions in non-parametric regression-tree consistency proofs, transported to the Riesz target $\alpha_0$ in place of the regression function. (A3) is an assumption on the class of partitions and on the smoothness of $\alpha_0$. It holds, for example, when $\mathcal{Z}$ is bounded, $\alpha_0$ is continuous, $P$ has no atoms, and $\mathcal{T}_{K_n}$ contains all axis-aligned tree partitions with $\le K_n$ leaves; the rate at which the infimum vanishes is governed by the smoothness of $\alpha_0$ and the dimension $d$ via standard approximation theory.
+- **(A4)** is the standard tree-complexity assumption: trees may grow with $n$, but slowly enough that the log-covering complexity $K_n \log n$ of the partition class stays $o(n)$.
+- **(A2)** is the only Riesz-specific assumption. The trace coefficient sum $T(z) := \sum_r |c_r(z)|$ controls the magnitude of the augmented loss residuals, and is the analog of "bounded response" in regression CART. For ATE the trace sum equals $2$ identically. For ATT, ATC, and weighted estimands, $T$ inherits inverse-propensity factors, and (A2) reduces to the standard positivity (overlap) assumption $\pi(x) \in [\eta, 1 - \eta]$ for some $\eta > 0$.
+
+### Greedy versus global ERM
+
+Theorem 1 applies to the *global* minimiser of $\hat L_n$ over $\mathcal{F}_{K_n, M}$. The riesztree splitter is greedy: it accepts a sequence of best-gain splits and need not return the global optimum. The same gap holds for ordinary regression CART, where consistency of the greedy minimiser is established only under additional structural conditions (Nobel 1996; Scornet, Biau and Vert 2015 for additive regression). The Riesz-representer setting inherits the same gap.
+
+### In practice
+
+RMSE on the canonical DGPs in `rieszreg.testing.dgps` shrinks as $n$ grows, with the noise floor close to what a comparable-depth CART achieves on the analogous $L^2$ regression problem. Single-tree variance dominates; use `forestriesz` or `rieszboost` for tighter rates.
 
 ## Simulations: how does this stack up against IPW? {#sec-sims}
 
