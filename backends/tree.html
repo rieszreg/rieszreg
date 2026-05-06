@@ -546,7 +546,15 @@ window.Quarto = {
   <li><a href="#sec-loss-aware" id="toc-sec-loss-aware" class="nav-link" data-scroll-target="#sec-loss-aware"><span class="header-section-number">9</span> Loss-aware splits</a></li>
   <li><a href="#what-you-reach-for-instead" id="toc-what-you-reach-for-instead" class="nav-link" data-scroll-target="#what-you-reach-for-instead"><span class="header-section-number">10</span> What you reach for instead</a></li>
   <li><a href="#custom-estimands" id="toc-custom-estimands" class="nav-link" data-scroll-target="#custom-estimands"><span class="header-section-number">11</span> Custom estimands</a></li>
-  <li><a href="#consistency" id="toc-consistency" class="nav-link" data-scroll-target="#consistency"><span class="header-section-number">12</span> Consistency</a></li>
+  <li><a href="#consistency" id="toc-consistency" class="nav-link" data-scroll-target="#consistency"><span class="header-section-number">12</span> Consistency</a>
+  <ul class="collapse">
+  <li><a href="#setting" id="toc-setting" class="nav-link" data-scroll-target="#setting"><span class="header-section-number">12.1</span> Setting</a></li>
+  <li><a href="#assumptions" id="toc-assumptions" class="nav-link" data-scroll-target="#assumptions"><span class="header-section-number">12.2</span> Assumptions</a></li>
+  <li><a href="#theorem" id="toc-theorem" class="nav-link" data-scroll-target="#theorem"><span class="header-section-number">12.3</span> Theorem</a></li>
+  <li><a href="#remarks-on-the-assumptions" id="toc-remarks-on-the-assumptions" class="nav-link" data-scroll-target="#remarks-on-the-assumptions"><span class="header-section-number">12.4</span> Remarks on the assumptions</a></li>
+  <li><a href="#greedy-versus-global-erm" id="toc-greedy-versus-global-erm" class="nav-link" data-scroll-target="#greedy-versus-global-erm"><span class="header-section-number">12.5</span> Greedy versus global ERM</a></li>
+  <li><a href="#in-practice" id="toc-in-practice" class="nav-link" data-scroll-target="#in-practice"><span class="header-section-number">12.6</span> In practice</a></li>
+  </ul></li>
   <li><a href="#sec-sims" id="toc-sec-sims" class="nav-link" data-scroll-target="#sec-sims"><span class="header-section-number">13</span> Simulations: how does this stack up against IPW?</a></li>
   <li><a href="#sharp-edges" id="toc-sharp-edges" class="nav-link" data-scroll-target="#sharp-edges"><span class="header-section-number">14</span> Sharp edges</a></li>
   </ul>
@@ -1112,13 +1120,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x139780ea0&gt;,
+                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f84072453a0&gt;,
                                                name='ATE',
                                                factory_spec={'args': {'covariates': ['x'],
                                                                       'treatment': 'a'},
                                                              'factory': 'ATE'}),
                    max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x139780ea0&gt;,
+                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f84072453a0&gt;,
                                                name='ATE',
                                                factory_spec={'args': {'covariates': ['x'],
                                                                       'treatment': 'a'},
@@ -1695,7 +1703,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>GridSearchCV(cv=3,
              estimator=RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a',
                                                                                     'x'),
-                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x13976d760&gt;,
+                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x7f8407267420&gt;,
                                                                       name='ATE',
                                                                       factory_spec={'args': {'covariates': ['x'],
                                                                                              'treatment': 'a'},
@@ -1703,19 +1711,19 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
              n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox"><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>GridSearchCV</div></div><div><a class="sk-estimator-doc-link fitted" rel="noreferrer" target="_blank" href="https://scikit-learn.org/1.6/modules/generated/sklearn.model_selection.GridSearchCV.html">?<span>Documentation for GridSearchCV</span></a><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>GridSearchCV(cv=3,
              estimator=RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a',
                                                                                     'x'),
-                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x13976d760&gt;,
+                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x7f8407267420&gt;,
                                                                       name='ATE',
                                                                       factory_spec={'args': {'covariates': ['x'],
                                                                                              'treatment': 'a'},
                                                                                     'factory': 'ATE'})),
              n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x13976f920&gt;,
+                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f84071e3f60&gt;,
                                                name='ATE',
                                                factory_spec={'args': {'covariates': ['x'],
                                                                       'treatment': 'a'},
                                                              'factory': 'ATE'}),
                    max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x13976f920&gt;,
+                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f84071e3f60&gt;,
                                                name='ATE',
                                                factory_spec={'args': {'covariates': ['x'],
                                                                       'treatment': 'a'},
@@ -1889,8 +1897,156 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </section>
 <section id="consistency" class="level2" data-number="12">
 <h2 data-number="12" class="anchored" data-anchor-id="consistency"><span class="header-section-number">12</span> Consistency</h2>
-<p>The greedy CART consistency theory (Breiman et al.&nbsp;1984; Buhlmann &amp; Yu 2003) covers regression trees fit by minimising additive-over-leaves squared loss. The augmented Bregman loss shares the additive-over-leaves structure that those arguments need, and the per-leaf objective is convex with a closed-form minimiser. Heuristically this should mean the same consistency results carry over for <span class="math inline">\(\alpha^*\)</span> under analogous regularity conditions (smoothness of the population loss, growing leaf counts at the right rate, bounded splitting noise).</p>
-<p>A formal proof for the augmented Bregman case isn’t in the literature at this writing — flagged as an open question. In practice, the consistency behaviour we see on the canonical DGPs in <code>rieszreg.testing.dgps</code> matches the regression-tree picture: RMSE shrinks as <span class="math inline">\(n\)</span> grows, with the noise floor around what a comparable-depth CART achieves on the analogous regression problem. Single-tree variance is the dominant term; ensemble (<code>forestriesz</code>) or boost (<code>rieszboost</code>) for tighter rates.</p>
+<p>For the squared Bregman-Riesz loss the population objective satisfies <span class="math display">\[
+L(\alpha) \;-\; L(\alpha_0) \;=\; \|\alpha - \alpha_0\|_{L^2(P)}^2,
+\]</span> so minimising <span class="math inline">\(L\)</span> is <span class="math inline">\(L^2\)</span>-regression onto the (unobserved) Riesz representer <span class="math inline">\(\alpha_0\)</span>. Theorem 1 below makes this rigorous for the empirical risk minimiser over piecewise-constant functions on tree partitions.</p>
+<section id="setting" class="level3" data-number="12.1">
+<h3 data-number="12.1" class="anchored" data-anchor-id="setting"><span class="header-section-number">12.1</span> Setting</h3>
+<p>Let <span class="math inline">\(Z_1, \ldots, Z_n \overset{\text{iid}}{\sim} P\)</span> on a measurable space <span class="math inline">\(\mathcal{Z} \subseteq \mathbb{R}^{d+1}\)</span> (treatment plus <span class="math inline">\(d\)</span> covariates). Let <span class="math inline">\(m\)</span> be a finite-evaluation linear functional with trace <span class="math display">\[
+m(g)(z) \;=\; \sum_{r=1}^{R(z)} c_r(z)\, g(z_r(z))
+\]</span> and Riesz representer <span class="math inline">\(\alpha_0 \in L^2(P)\)</span> defined by <span class="math inline">\(\mathbb{E}[m(g)(Z)] = \mathbb{E}[\alpha_0(Z)\, g(Z)]\)</span> for all <span class="math inline">\(g \in L^2(P)\)</span>. The squared Bregman-Riesz loss and its empirical analog are <span class="math display">\[
+L(\alpha) \;=\; \mathbb{E}\!\left[\alpha(Z)^2 - 2\, m(\alpha)(Z)\right],
+\qquad
+\hat L_n(\alpha) \;=\; \frac{1}{n}\sum_{i=1}^n \left[\alpha(Z_i)^2 - 2\, m(\alpha)(Z_i)\right].
+\]</span></p>
+<p>Let <span class="math inline">\(\mathcal{T}_K\)</span> be the class of binary tree partitions of <span class="math inline">\(\mathcal{Z}\)</span> into at most <span class="math inline">\(K\)</span> leaves with axis-aligned splits, and let <span class="math display">\[
+\mathcal{F}_{K,M} \;=\; \big\{\alpha : \mathcal{Z} \to [-M, M] \;\big|\; \alpha \text{ is constant on each leaf of some } \Pi \in \mathcal{T}_K\big\}.
+\]</span> Define the global empirical risk minimiser at complexity <span class="math inline">\(K_n\)</span>, with leaf values clipped to <span class="math inline">\([-M, M]\)</span>: <span class="math display">\[
+\hat\alpha_n \;\in\; \arg\min_{\alpha \in \mathcal{F}_{K_n, M}} \hat L_n(\alpha).
+\]</span></p>
+</section>
+<section id="assumptions" class="level3" data-number="12.2">
+<h3 data-number="12.2" class="anchored" data-anchor-id="assumptions"><span class="header-section-number">12.2</span> Assumptions</h3>
+<ul>
+<li><strong>(A1) Bounded representer.</strong> <span class="math inline">\(\|\alpha_0\|_\infty \le M &lt; \infty\)</span>.</li>
+<li><strong>(A2) Bounded trace.</strong> There exist constants <span class="math inline">\(B, R &lt; \infty\)</span> such that <span class="math inline">\(R(z) \le R\)</span> and <span class="math inline">\(\sum_{r=1}^{R(z)} |c_r(z)| \le B\)</span> for <span class="math inline">\(P\)</span>-a.e.&nbsp;<span class="math inline">\(z\)</span>.</li>
+<li><strong>(A3) Approximation.</strong> <span class="math inline">\(\inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)} \to 0\)</span> as <span class="math inline">\(n \to \infty\)</span>.</li>
+<li><strong>(A4) Capacity.</strong> <span class="math inline">\(K_n \to \infty\)</span> and <span class="math inline">\(K_n \log n / n \to 0\)</span> as <span class="math inline">\(n \to \infty\)</span>, with <span class="math inline">\(d\)</span> fixed.</li>
+</ul>
+</section>
+<section id="theorem" class="level3" data-number="12.3">
+<h3 data-number="12.3" class="anchored" data-anchor-id="theorem"><span class="header-section-number">12.3</span> Theorem</h3>
+<p><strong>Theorem 1.</strong> <em>Under (A1)–(A4),</em> <span class="math display">\[
+\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \;\xrightarrow{P}\; 0.
+\]</span></p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Proof of Theorem 1">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Proof of Theorem 1
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Write <span class="math inline">\(\Delta_n(\alpha) := \hat L_n(\alpha) - L(\alpha)\)</span>.</p>
+<p><strong>Step 1 (loss identity).</strong> For any <span class="math inline">\(\alpha \in L^2(P)\)</span>, <span class="math display">\[
+L(\alpha) - L(\alpha_0)
+\;=\; \mathbb{E}[\alpha^2] - \mathbb{E}[\alpha_0^2] - 2\, \mathbb{E}[m(\alpha) - m(\alpha_0)]
+\;=\; \mathbb{E}[\alpha^2] - \mathbb{E}[\alpha_0^2] - 2\, \mathbb{E}[\alpha_0(\alpha - \alpha_0)]
+\;=\; \|\alpha - \alpha_0\|_{L^2(P)}^2,
+\]</span> using the Riesz identity <span class="math inline">\(\mathbb{E}[m(g)(Z)] = \mathbb{E}[\alpha_0(Z) g(Z)]\)</span> in the second equality, applied to <span class="math inline">\(g = \alpha - \alpha_0 \in L^2(P)\)</span> (which is in <span class="math inline">\(L^2\)</span> by (A1) and the assumption <span class="math inline">\(\alpha \in \mathcal{F}_{K_n, M}\)</span> so <span class="math inline">\(\|\alpha\|_\infty \le M\)</span>).</p>
+<p><strong>Step 2 (oracle decomposition).</strong> Let <span class="math inline">\(\alpha_n^\star \in \arg\min_{\alpha \in \mathcal{F}_{K_n, M}} L(\alpha)\)</span>. By optimality of <span class="math inline">\(\hat\alpha_n\)</span> for <span class="math inline">\(\hat L_n\)</span>, <span class="math inline">\(\hat L_n(\hat\alpha_n) - \hat L_n(\alpha_n^\star) \le 0\)</span>, so <span class="math display">\[
+\begin{aligned}
+L(\hat\alpha_n) - L(\alpha_0)
+&amp;= \big[L(\hat\alpha_n) - \hat L_n(\hat\alpha_n)\big] + \big[\hat L_n(\hat\alpha_n) - \hat L_n(\alpha_n^\star)\big] \\
+&amp;\quad + \big[\hat L_n(\alpha_n^\star) - L(\alpha_n^\star)\big] + \big[L(\alpha_n^\star) - L(\alpha_0)\big] \\
+&amp;\le -\Delta_n(\hat\alpha_n) + 0 + \Delta_n(\alpha_n^\star) + \inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)}^2 \\
+&amp;\le 2 \sup_{\alpha \in \mathcal{F}_{K_n, M}} |\Delta_n(\alpha)| + \inf_{\alpha \in \mathcal{F}_{K_n, M}} \|\alpha - \alpha_0\|_{L^2(P)}^2.
+\end{aligned}
+\]</span> The substitution in the third line uses Step 1 to write <span class="math inline">\(L(\alpha_n^\star) - L(\alpha_0) = \inf_{\alpha} \|\alpha - \alpha_0\|_{L^2(P)}^2\)</span> (since <span class="math inline">\(\alpha_n^\star\)</span> minimises <span class="math inline">\(L\)</span> over <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span>). The infimum vanishes by (A3); it remains to control the supremum.</p>
+<p><strong>Step 3 (uniform LLN).</strong> Decompose <span class="math display">\[
+\Delta_n(\alpha) \;=\; \underbrace{\big(\hat E_n \alpha^2 - \mathbb{E}[\alpha^2]\big)}_{=:\, U_n(\alpha)} \;-\; 2\, \underbrace{\big(\hat E_n F_\alpha - \mathbb{E}[F_\alpha]\big)}_{=:\, V_n(\alpha)}, \qquad F_\alpha(z) \,:=\, \sum_{r=1}^{R(z)} c_r(z)\, \alpha(z_r(z)),
+\]</span> where <span class="math inline">\(\hat E_n f := \frac{1}{n}\sum_i f(Z_i)\)</span>. By (A1)-(A2), every <span class="math inline">\(\alpha \in \mathcal{F}_{K_n, M}\)</span> satisfies <span class="math inline">\(\|\alpha\|_\infty \le M\)</span>, <span class="math inline">\(\|\alpha^2\|_\infty \le M^2\)</span>, and <span class="math inline">\(\|F_\alpha\|_\infty \le BM\)</span>.</p>
+<p>We bound the empirical <span class="math inline">\(L^1\)</span>-covering number of <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span>, <span class="math inline">\(\mathcal{Q}_n := \{\alpha^2 : \alpha \in \mathcal{F}_{K_n, M}\}\)</span>, and <span class="math inline">\(\mathcal{M}_n := \{F_\alpha : \alpha \in \mathcal{F}_{K_n, M}\}\)</span>. For a class <span class="math inline">\(\mathcal{F}\)</span> and a measure <span class="math inline">\(\mu\)</span> on <span class="math inline">\(\mathcal{Z}\)</span>, write <span class="math inline">\(N_1(\epsilon, \mathcal{F}, \mu)\)</span> for the smallest <span class="math inline">\(N\)</span> such that <span class="math inline">\(\mathcal{F}\)</span> admits an <span class="math inline">\(\epsilon\)</span>-cover in <span class="math inline">\(L^1(\mu)\)</span>.</p>
+<p>Each <span class="math inline">\(\alpha \in \mathcal{F}_{K_n, M}\)</span> is determined by a partition <span class="math inline">\(\Pi \in \mathcal{T}_{K_n}\)</span> and a value vector <span class="math inline">\((\alpha_\ell)_{\ell=1}^{K_n} \in [-M, M]^{K_n}\)</span>. Two functions with the same partition and value vectors <span class="math inline">\((\alpha_\ell), (\alpha'_\ell)\)</span> satisfy <span class="math display">\[
+\|\alpha - \alpha'\|_{L^1(P_n)} \;\le\; \max_\ell |\alpha_\ell - \alpha'_\ell|.
+\]</span> The number of distinct partitions in <span class="math inline">\(\mathcal{T}_{K_n}\)</span> that yield distinct restrictions to the data points <span class="math inline">\(Z_1, \ldots, Z_n\)</span> together with all augmented evaluation points <span class="math inline">\(\{z_r(Z_i) : i \le n,\, r \le R\}\)</span> (a set of size at most <span class="math inline">\(nR\)</span>) is at most <span class="math inline">\((d \cdot nR)^{K_n - 1} \le (dnR)^{K_n}\)</span>: each of the <span class="math inline">\(\le K_n - 1\)</span> splits picks one of <span class="math inline">\(d\)</span> axes and one of at most <span class="math inline">\(nR\)</span> achievable thresholds along that axis. Combined with an <span class="math inline">\(\epsilon\)</span>-cover of <span class="math inline">\([-M, M]^{K_n}\)</span> in <span class="math inline">\(L^\infty\)</span> of size <span class="math inline">\(\lceil 2M/\epsilon \rceil^{K_n}\)</span>, <span class="math display">\[
+N_1\!\big(\epsilon,\, \mathcal{F}_{K_n, M},\, P_n\big) \;\le\; (dnR)^{K_n}\, (2M/\epsilon)^{K_n}.
+\]</span> Composition: since <span class="math inline">\(|a^2 - b^2| \le 2M\, |a - b|\)</span> on <span class="math inline">\([-M, M]\)</span> and <span class="math inline">\(|F_\alpha(z) - F_{\alpha'}(z)| \le T(z)\, \max_\ell |\alpha_\ell - \alpha'_\ell| \le B\, \max_\ell |\alpha_\ell - \alpha'_\ell|\)</span> by (A2), <span class="math display">\[
+N_1\!\big(\epsilon,\, \mathcal{Q}_n,\, P_n\big) \;\le\; (dnR)^{K_n}\, (4M^2/\epsilon)^{K_n},
+\qquad
+N_1\!\big(\epsilon,\, \mathcal{M}_n,\, P_n\big) \;\le\; (dnR)^{K_n}\, (2BM/\epsilon)^{K_n}.
+\]</span></p>
+<p>Pollard’s uniform Vapnik-Chervonenkis inequality (Pollard 1984, Theorem II.24; equivalently Devroye, Györfi and Lugosi 1996, Theorem 12.6) states that for any class <span class="math inline">\(\mathcal{F}\)</span> of <span class="math inline">\([-B', B']\)</span>-valued measurable functions and any <span class="math inline">\(\epsilon &gt; 0\)</span>, <span class="math display">\[
+P\!\left(\sup_{f \in \mathcal{F}} \big|\hat E_n f - \mathbb{E}[f]\big| &gt; \epsilon\right) \;\le\; 8\, \mathbb{E}\!\big[N_1(\epsilon/8, \mathcal{F}, P_n)\big]\, \exp\!\big(-n \epsilon^2 / (128\, B'^2)\big).
+\]</span> Apply this to <span class="math inline">\(\mathcal{Q}_n\)</span> with <span class="math inline">\(B' = M^2\)</span> and to <span class="math inline">\(\mathcal{M}_n\)</span> with <span class="math inline">\(B' = BM\)</span>: <span class="math display">\[
+\begin{aligned}
+P\!\left(\sup_{\alpha} |U_n(\alpha)| &gt; \epsilon\right) \;&amp;\le\; 8\, (dnR)^{K_n}\, (32 M^2/\epsilon)^{K_n}\, \exp\!\big(-n \epsilon^2 / (128\, M^4)\big), \\
+P\!\left(\sup_{\alpha} |V_n(\alpha)| &gt; \epsilon\right) \;&amp;\le\; 8\, (dnR)^{K_n}\, (16 BM/\epsilon)^{K_n}\, \exp\!\big(-n \epsilon^2 / (128\, B^2 M^2)\big).
+\end{aligned}
+\]</span> Taking logarithms, the exponents are <span class="math display">\[
+K_n \log(dnR) + K_n \log(C/\epsilon) - n \epsilon^2 / C',
+\]</span> which tend to <span class="math inline">\(-\infty\)</span> for any fixed <span class="math inline">\(\epsilon &gt; 0\)</span> provided <span class="math inline">\(K_n \log n / n \to 0\)</span>, i.e., (A4). Hence <span class="math display">\[
+\sup_{\alpha \in \mathcal{F}_{K_n, M}} |\Delta_n(\alpha)| \;\le\; \sup_\alpha |U_n(\alpha)| + 2 \sup_\alpha |V_n(\alpha)| \;\xrightarrow{P}\; 0.
+\]</span></p>
+<p><strong>Step 4 (conclusion).</strong> Combining Steps 2 and 3, <span class="math inline">\(L(\hat\alpha_n) - L(\alpha_0) \xrightarrow{P} 0\)</span>. By Step 1, <span class="math inline">\(L(\hat\alpha_n) - L(\alpha_0) = \|\hat\alpha_n - \alpha_0\|_{L^2(P)}^2\)</span>, so <span class="math inline">\(\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \xrightarrow{P} 0\)</span>. <span class="math inline">\(\blacksquare\)</span></p>
+</div>
+</div>
+</div>
+</section>
+<section id="remarks-on-the-assumptions" class="level3" data-number="12.4">
+<h3 data-number="12.4" class="anchored" data-anchor-id="remarks-on-the-assumptions"><span class="header-section-number">12.4</span> Remarks on the assumptions</h3>
+<ul>
+<li><strong>(A1) and (A3)</strong> are the standard assumptions in non-parametric regression-tree consistency proofs, transported to the Riesz target <span class="math inline">\(\alpha_0\)</span> in place of the regression function. (A3) is an assumption on the class of partitions and on the smoothness of <span class="math inline">\(\alpha_0\)</span>. It holds, for example, when <span class="math inline">\(\mathcal{Z}\)</span> is bounded, <span class="math inline">\(\alpha_0\)</span> is continuous, <span class="math inline">\(P\)</span> has no atoms, and <span class="math inline">\(\mathcal{T}_{K_n}\)</span> contains all axis-aligned tree partitions with <span class="math inline">\(\le K_n\)</span> leaves; the rate at which the infimum vanishes is governed by the smoothness of <span class="math inline">\(\alpha_0\)</span> and the dimension <span class="math inline">\(d\)</span> via standard approximation theory.</li>
+<li><strong>(A4)</strong> is the standard tree-complexity assumption: trees may grow with <span class="math inline">\(n\)</span>, but slowly enough that the log-covering complexity <span class="math inline">\(K_n \log n\)</span> of the partition class stays <span class="math inline">\(o(n)\)</span>.</li>
+<li><strong>(A2)</strong> is the only Riesz-specific assumption. The trace coefficient sum <span class="math inline">\(T(z) := \sum_r |c_r(z)|\)</span> controls the magnitude of the augmented loss residuals, and is the analog of “bounded response” in regression CART. For ATE the trace sum equals <span class="math inline">\(2\)</span> identically. For ATT, ATC, and weighted estimands, <span class="math inline">\(T\)</span> inherits inverse-propensity factors, and (A2) reduces to the standard positivity (overlap) assumption <span class="math inline">\(\pi(x) \in [\eta, 1 - \eta]\)</span> for some <span class="math inline">\(\eta &gt; 0\)</span>.</li>
+</ul>
+</section>
+<section id="greedy-versus-global-erm" class="level3" data-number="12.5">
+<h3 data-number="12.5" class="anchored" data-anchor-id="greedy-versus-global-erm"><span class="header-section-number">12.5</span> Greedy versus global ERM</h3>
+<p>Theorem 1 applies to the <em>global</em> minimiser of <span class="math inline">\(\hat L_n\)</span> over <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span>. The riesztree splitter is greedy: it accepts a sequence of best-gain splits and need not return the global optimum. Greedy CART consistency for ordinary regression is established only under additional structural conditions on the partitions the rule produces (Nobel 1996; Scornet, Biau and Vert 2015 for additive regression). Corollary 1 imports those conditions into the Riesz setting.</p>
+<p>Let <span class="math inline">\(\hat\Pi_n \in \mathcal{T}_{K_n}\)</span> denote any data-dependent partition (in particular, the partition produced by greedy riesztree under any growth or pruning policy) and let <span class="math display">\[
+\hat\alpha_n(z) \;=\; \mathrm{clip}_{[-M, M]}\!\left( \frac{\sum_{i=1}^n m(\mathbf{1}_{\hat\Pi_n(z)})(Z_i)}{\#\{i : Z_i \in \hat\Pi_n(z)\}} \right)
+\]</span> be the riesztree estimator (with the convention that empty cells take value <span class="math inline">\(0\)</span>, which is then clipped harmlessly). Equivalently in the doc’s notation, the leaf value is <span class="math inline">\(\mathrm{clip}_{[-M, M]}(-\hat C_\ell / \hat D_\ell)\)</span>.</p>
+<p><strong>Corollary 1 (consistency under shrinking-cell conditions).</strong> <em>Suppose (A1), (A2), and (A4) of Theorem 1 hold, together with</em></p>
+<ul>
+<li><em>(B1) Shrinking cells. <span class="math inline">\(\mathrm{diam}\big(\hat\Pi_n(Z_*)\big) \xrightarrow{P} 0\)</span>, where <span class="math inline">\(Z_* \sim P\)</span> is independent of the training sample.</em></li>
+<li><em>(B2) Uniformly continuous representer. <span class="math inline">\(\alpha_0\)</span> is uniformly continuous on <span class="math inline">\(\mathcal{Z}\)</span>.</em></li>
+</ul>
+<p><em>Then <span class="math inline">\(\|\hat\alpha_n - \alpha_0\|_{L^2(P)} \xrightarrow{P} 0\)</span>.</em></p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Proof of Corollary 1">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Proof of Corollary 1
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Let <span class="math inline">\(\bar\alpha_n(z) := \mu_{\hat\Pi_n(z)}\)</span> where <span class="math inline">\(\mu_A := \mathbb{E}[\alpha_0(Z) \mid Z \in A,\, \hat\Pi_n]\)</span> when <span class="math inline">\(P(A) &gt; 0\)</span> and <span class="math inline">\(\mu_A := 0\)</span> otherwise. By (A1), <span class="math inline">\(|\mu_A| \le M\)</span>, so <span class="math inline">\(\bar\alpha_n \in \mathcal{F}_{\hat\Pi_n, M} \subseteq \mathcal{F}_{K_n, M}\)</span>.</p>
+<p><strong>Step 1 (oracle decomposition restricted to <span class="math inline">\(\hat\Pi_n\)</span>).</strong> The riesztree leaf-value formula <span class="math inline">\(\hat\alpha_\ell^* = -\hat C_\ell / \hat D_\ell\)</span> is the unrestricted minimiser of <span class="math inline">\(\hat L_n\)</span> over piecewise-constant functions on <span class="math inline">\(\hat\Pi_n\)</span> (per-leaf decoupling, derived earlier in this page). Clipping to <span class="math inline">\([-M, M]\)</span> is the projection onto <span class="math inline">\(\mathcal{F}_{\hat\Pi_n, M}\)</span>, and since the squared Bregman-Riesz loss is convex in each leaf value, the clipped optimum minimises <span class="math inline">\(\hat L_n\)</span> over <span class="math inline">\(\mathcal{F}_{\hat\Pi_n, M}\)</span>. In particular <span class="math inline">\(\hat L_n(\hat\alpha_n) \le \hat L_n(\bar\alpha_n)\)</span>, so as in Step 2 of the proof of Theorem 1, <span class="math display">\[
+L(\hat\alpha_n) - L(\bar\alpha_n) \;\le\; 2 \sup_{\alpha \in \mathcal{F}_{K_n, M}} \big|\hat L_n(\alpha) - L(\alpha)\big|.
+\]</span> The supremum is over the <em>full</em> class <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span> (which contains <span class="math inline">\(\hat\Pi_n\)</span>’s class as a subset, regardless of how <span class="math inline">\(\hat\Pi_n\)</span> was chosen). Step 3 of the proof of Theorem 1 shows this supremum vanishes in probability under (A4): <span class="math display">\[
+L(\hat\alpha_n) - L(\bar\alpha_n) \;\xrightarrow{P}\; 0.
+\]</span></p>
+<p><strong>Step 2 (bias from cell shrinkage).</strong> Let <span class="math inline">\(\omega(\delta) := \sup\{|\alpha_0(z) - \alpha_0(z')| : z, z' \in \mathcal{Z},\, \|z - z'\| \le \delta\}\)</span> be the modulus of continuity of <span class="math inline">\(\alpha_0\)</span>, with <span class="math inline">\(\omega(\delta) \to 0\)</span> as <span class="math inline">\(\delta \to 0\)</span> by (B2). For any <span class="math inline">\(z\)</span> with <span class="math inline">\(P(\hat\Pi_n(z)) &gt; 0\)</span>, <span class="math display">\[
+|\bar\alpha_n(z) - \alpha_0(z)| \;=\; \big|\mathbb{E}[\alpha_0(Z) - \alpha_0(z) \mid Z \in \hat\Pi_n(z)]\big| \;\le\; \omega\!\big(\mathrm{diam}(\hat\Pi_n(z))\big).
+\]</span> For any <span class="math inline">\(\delta &gt; 0\)</span> and any <span class="math inline">\(z \in \mathcal{Z}\)</span>, <span class="math display">\[
+|\bar\alpha_n(z) - \alpha_0(z)| \;\le\; \omega(\delta) + 2M\, \mathbf{1}\{\mathrm{diam}(\hat\Pi_n(z)) &gt; \delta\},
+\]</span> using (A1) for the bound <span class="math inline">\(2M\)</span> on the second term and the convention <span class="math inline">\(|\bar\alpha_n - \alpha_0| \le 2M\)</span> when <span class="math inline">\(P(\hat\Pi_n(z)) = 0\)</span> (a <span class="math inline">\(P\)</span>-null set). Squaring and integrating against <span class="math inline">\(P\)</span>: <span class="math display">\[
+\|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\le\; 2\omega(\delta)^2 + 8 M^2\, P\!\big(\mathrm{diam}(\hat\Pi_n(Z_*)) &gt; \delta\big).
+\]</span> By (B1), <span class="math inline">\(P(\mathrm{diam}(\hat\Pi_n(Z_*)) &gt; \delta) \to 0\)</span> for any fixed <span class="math inline">\(\delta &gt; 0\)</span>. Letting <span class="math inline">\(\delta \to 0\)</span> along a sequence <span class="math inline">\(\delta_n \downarrow 0\)</span> slowly enough that the second term vanishes, <span class="math display">\[
+\|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\xrightarrow{P}\; 0.
+\]</span></p>
+<p><strong>Step 3 (combine).</strong> By Step 1 of the proof of Theorem 1, <span class="math inline">\(L(\bar\alpha_n) - L(\alpha_0) = \|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2\)</span>. Adding the bounds from Steps 1 and 2 above, <span class="math display">\[
+\|\hat\alpha_n - \alpha_0\|_{L^2(P)}^2 \;=\; L(\hat\alpha_n) - L(\alpha_0) \;\le\; \big[L(\hat\alpha_n) - L(\bar\alpha_n)\big] + \|\bar\alpha_n - \alpha_0\|_{L^2(P)}^2 \;\xrightarrow{P}\; 0. \qquad \blacksquare
+\]</span></p>
+</div>
+</div>
+</div>
+<p><strong>On (B1).</strong> Whether greedy CART produces shrinking cells is a separate question that depends on the splitting rule and the DGP. Sufficient conditions in the regression-tree literature (Wager and Walther 2016; Klusowski 2021; Scornet, Biau and Vert 2015 for additive regression) carry over to the augmented Bregman setting under analogous structural conditions on the signal carried by <span class="math inline">\(\alpha_0\)</span>. (B1) holds automatically for “honest” splitters that allocate fresh data to leaf-value estimation, and for purely random forests.</p>
+<p><strong>Why (B2) of Nobel (1996) is not needed here.</strong> Nobel’s framework requires growing cell counts (<span class="math inline">\(\hat n_{\hat\Pi_n(Z_*)} \xrightarrow{P} \infty\)</span>) to control per-leaf variance of the histogram regression estimator. Here the leaf values are clipped to <span class="math inline">\([-M, M]\)</span> (since <span class="math inline">\(\alpha_0 \in [-M, M]\)</span>), and the uniform empirical-process bound from Step 3 of the proof of Theorem 1 controls the variance for the <em>whole</em> class <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span> at once. Clipping plus uniform LLN replaces growing-leaf-counts.</p>
+</section>
+<section id="in-practice" class="level3" data-number="12.6">
+<h3 data-number="12.6" class="anchored" data-anchor-id="in-practice"><span class="header-section-number">12.6</span> In practice</h3>
+<p>RMSE on the canonical DGPs in <code>rieszreg.testing.dgps</code> shrinks as <span class="math inline">\(n\)</span> grows, with the noise floor close to what a comparable-depth CART achieves on the analogous <span class="math inline">\(L^2\)</span> regression problem. Single-tree variance dominates; use <code>forestriesz</code> or <code>rieszboost</code> for tighter rates.</p>
+</section>
 </section>
 <section id="sec-sims" class="level2" data-number="13">
 <h2 data-number="13" class="anchored" data-anchor-id="sec-sims"><span class="header-section-number">13</span> Simulations: how does this stack up against IPW?</h2>
