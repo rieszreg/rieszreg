@@ -32,7 +32,12 @@ def _is_dataframe(Z) -> bool:
 def _rows_from_Z(Z, estimand: Estimand) -> list[dict]:
     """Convert ndarray or DataFrame Z into a list of row-dicts keyed by
     `estimand.feature_keys`. Ndarray input is interpreted column-by-column in
-    `feature_keys` order; DataFrame columns are matched by name."""
+    `feature_keys` order; DataFrame columns are matched by name.
+
+    Hot path during fit (the augmentation engine consumes row-dicts).
+    Predict-only paths should use :func:`_features_from_Z` instead, which
+    skips the row-dict pivot entirely.
+    """
     if _is_dataframe(Z):
         cols_needed = list(estimand.feature_keys)
         missing = [c for c in cols_needed if c not in Z.columns]
@@ -41,14 +46,15 @@ def _rows_from_Z(Z, estimand: Estimand) -> list[dict]:
                 f"DataFrame is missing columns required by estimand "
                 f"{estimand.name!r}: {missing}"
             )
-        rows = []
-        for i in range(len(Z)):
-            row = {}
-            for k in cols_needed:
-                v = Z[k].iloc[i]
-                row[k] = v
-            rows.append(row)
-        return rows
+        # Vectorise the per-column extraction: one .to_numpy() per column
+        # rather than O(n*p) .iloc lookups. The downstream consumers see
+        # the same list-of-dicts shape.
+        col_arrs = {k: Z[k].to_numpy() for k in cols_needed}
+        n = len(Z)
+        return [
+            {k: col_arrs[k][i] for k in cols_needed}
+            for i in range(n)
+        ]
 
     arr = np.asarray(Z)
     if arr.ndim == 1:
@@ -63,6 +69,35 @@ def _rows_from_Z(Z, estimand: Estimand) -> list[dict]:
         {k: arr[i, j] for j, k in enumerate(estimand.feature_keys)}
         for i in range(arr.shape[0])
     ]
+
+
+def _features_from_Z(Z, estimand: Estimand) -> np.ndarray:
+    """Fast DataFrame/ndarray → ``feature_keys``-ordered float ndarray.
+
+    Skips the ``list[dict]`` pivot used by the fit path. Used by the
+    predict-only entry points (where the augmentation engine isn't
+    needed) so prediction stays at numpy / Cython speed end-to-end.
+    """
+    if _is_dataframe(Z):
+        cols_needed = list(estimand.feature_keys)
+        missing = [c for c in cols_needed if c not in Z.columns]
+        if missing:
+            raise ValueError(
+                f"DataFrame is missing columns required by estimand "
+                f"{estimand.name!r}: {missing}"
+            )
+        return Z[cols_needed].to_numpy(dtype=float)
+
+    arr = np.asarray(Z, dtype=float)
+    if arr.ndim == 1:
+        arr = arr.reshape(-1, 1)
+    if arr.shape[1] != len(estimand.feature_keys):
+        raise ValueError(
+            f"Estimand {estimand.name!r} expects {len(estimand.feature_keys)} "
+            f"feature columns ({estimand.feature_keys}), got Z.shape[1]="
+            f"{arr.shape[1]}."
+        )
+    return arr
 
 
 def _ys_from_y(y, n: int) -> list | None:
@@ -296,8 +331,9 @@ class RieszEstimator(BaseEstimator):
     def predict(self, Z) -> np.ndarray:
         if not hasattr(self, "predictor_"):
             raise RuntimeError(f"{type(self).__name__} is not fitted yet. Call .fit() first.")
-        rows = _rows_from_Z(Z, self.estimand)
-        feats = _features_from_rows(rows, self.estimand)
+        # Fast path: DataFrame -> ndarray directly, skipping the
+        # list-of-dicts pivot (which was O(n*p) Python overhead).
+        feats = _features_from_Z(Z, self.estimand)
         return self.predictor_.predict_alpha(feats)
 
     def riesz_loss(self, Z, y=None) -> float:
