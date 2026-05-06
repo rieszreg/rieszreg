@@ -14,6 +14,8 @@ pip install -e ./python
 
 This package depends on `rieszreg` (the meta-package) and `torch>=2.0`. Clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling and `pip install -e ../rieszreg/python` first.
 
+If you also use `rieszboost` in the same Python process, the macOS pip wheels of `torch` and `xgboost` each bundle their own `libomp.dylib` and the two OpenMP runtimes can deadlock during a fit. Either install both via conda-forge or set `OMP_NUM_THREADS=1` before importing — see the [troubleshooting page](https://rieszreg.github.io/rieszreg/troubleshooting.html) in the user guide.
+
 ## Quickstart
 
 ```python
