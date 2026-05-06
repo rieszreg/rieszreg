@@ -219,6 +219,46 @@ def best_split_at_hist(
     )
 
 
+def best_split_continuous_random(
+    feature_col: np.ndarray,
+    D: np.ndarray,
+    C: np.ndarray,
+    idx: np.ndarray,
+    *,
+    loss_kind: int,
+    bounded_lo: float,
+    bounded_hi: float,
+    min_orig_leaf: int,
+    rng: np.random.Generator,
+):
+    """Random-threshold split (sklearn ``splitter='random'``).
+
+    Draws one uniform threshold in ``[col_min, col_max]`` from ``rng``
+    and evaluates the gain at that single point in Cython. Returns
+    ``None`` when the column is constant (no valid threshold exists).
+    """
+    if idx.size < 2:
+        return None
+    feature_col = np.ascontiguousarray(feature_col, dtype=np.float64)
+    D = np.ascontiguousarray(D, dtype=np.float64)
+    C = np.ascontiguousarray(C, dtype=np.float64)
+    idx = np.ascontiguousarray(idx, dtype=np.int64)
+
+    leaf_vals = feature_col[idx]
+    lo = float(leaf_vals.min())
+    hi = float(leaf_vals.max())
+    if lo == hi:
+        return None  # constant column — no split possible
+    threshold = float(rng.uniform(lo, hi))
+
+    from . import _splitter_c  # type: ignore[attr-defined]
+    return _splitter_c.best_split_continuous_random_c(
+        feature_col, D, C, idx,
+        int(loss_kind), float(bounded_lo), float(bounded_hi),
+        int(min_orig_leaf), threshold,
+    )
+
+
 def best_split_continuous_fast(
     feature_col: np.ndarray,
     D: np.ndarray,

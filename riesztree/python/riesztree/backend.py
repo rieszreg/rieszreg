@@ -96,6 +96,10 @@ class RieszTreeBackend:
     splitter
         ``"exact"`` (default) routes continuous-feature splits through
         the Cython sweep in :mod:`riesztree.fast._splitter_c`;
+        ``"hist"`` uses the histogram-based Cython splitter
+        (:mod:`riesztree.fast._splitter_hist`) with quantile pre-binning;
+        ``"random"`` (sklearn ExtraTrees-style) draws a single uniform
+        threshold per feature per leaf and evaluates the gain there;
         ``"python"`` keeps the original pure-Python splitter (kept for
         debugging and as the fallback for losses outside the four
         built-ins).

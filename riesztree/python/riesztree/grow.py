@@ -22,6 +22,7 @@ import numpy as np
 from .fast._splitter import (
     best_split_at_hist,
     best_split_continuous_fast,
+    best_split_continuous_random,
     loss_kind_for,
     warn_python_fallback,
 )
@@ -129,6 +130,7 @@ def best_split_at(
     bounded_hi: float = float("nan"),
     user_cfunc_addr: int = 0,
     hist_payload: dict | None = None,
+    random_splitter_rng: np.random.Generator | None = None,
 ):
     """Best (gain, feature_index, split_payload) across all considered features.
 
@@ -181,7 +183,15 @@ def best_split_at(
             best_feat = feat_h
     elif cont_cols:
         for j in cont_cols:
-            if fast_loss_kind is not None:
+            if random_splitter_rng is not None and fast_loss_kind is not None:
+                cand = best_split_continuous_random(
+                    features[:, j], D, C, idx,
+                    loss_kind=fast_loss_kind,
+                    bounded_lo=bounded_lo, bounded_hi=bounded_hi,
+                    min_orig_leaf=min_orig_leaf,
+                    rng=random_splitter_rng,
+                )
+            elif fast_loss_kind is not None:
                 cand = best_split_continuous_fast(
                     features[:, j], D, C, idx,
                     loss_kind=fast_loss_kind,
@@ -217,7 +227,7 @@ def best_split_at(
     return best_feat, best
 
 
-_VALID_SPLITTERS = ("exact", "hist", "python")
+_VALID_SPLITTERS = ("exact", "hist", "random", "python")
 
 
 def _resolve_fast_loss_args(
@@ -235,7 +245,7 @@ def _resolve_fast_loss_args(
     """
     if splitter == "python":
         return None, float("nan"), float("nan"), 0
-    if splitter not in ("exact", "hist"):
+    if splitter not in ("exact", "hist", "random"):
         raise ValueError(
             f"splitter={splitter!r}; expected one of {_VALID_SPLITTERS}."
         )
@@ -365,6 +375,11 @@ def grow_depthwise(
     n_features = features.shape[1]
     n_features_to_consider = _resolve_max_features(max_features, n_features)
     rng = np.random.default_rng(random_state)
+    # Random splitter draws one threshold per feature per leaf from a
+    # dedicated stream (independent of the max_features subsample stream).
+    random_splitter_rng = (
+        np.random.default_rng(random_state + 1) if splitter == "random" else None
+    )
     n_orig_total = int((D > 0).sum())
     eff_min_orig_leaf = _effective_min_orig_leaf(
         min_orig_leaf, min_weight_fraction_leaf, n_orig_total
@@ -404,6 +419,7 @@ def grow_depthwise(
             bounded_lo=bounded_lo, bounded_hi=bounded_hi,
             user_cfunc_addr=user_cfunc_addr,
             hist_payload=hist_payload,
+            random_splitter_rng=random_splitter_rng,
         )
         if best is None:
             return
@@ -474,6 +490,9 @@ def grow_leafwise(
         valid_features, D_v, C_v = aug_valid
 
     n_features = features.shape[1]
+    random_splitter_rng = (
+        np.random.default_rng(random_state + 1) if splitter == "random" else None
+    )
     n_features_to_consider = _resolve_max_features(max_features, n_features)
     rng = np.random.default_rng(random_state)
     n_orig_total = int((D > 0).sum())
@@ -508,6 +527,7 @@ def grow_leafwise(
             bounded_lo=bounded_lo, bounded_hi=bounded_hi,
             user_cfunc_addr=user_cfunc_addr,
             hist_payload=hist_payload,
+            random_splitter_rng=random_splitter_rng,
         )
         if best is None:
             return
