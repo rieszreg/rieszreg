@@ -36,7 +36,7 @@ def test_bounded_squared_supported():
     assert is_supported(BoundedSquaredLoss(lo=0.1, hi=5.0, max_abs_eta=10.0))
 
 
-class _DummyLossSpec:
+class _DummyLoss:
     name = "dummy"
 
     def to_spec(self):
@@ -72,7 +72,7 @@ def test_unsupported_loss_raises(linear_gaussian_ate_df):
         estimand=ATE(),
         hidden_sizes=(4,),
         epochs=2,
-        loss=_DummyLossSpec(),
+        loss=_DummyLoss(),
         random_state=0,
     )
     with pytest.raises(NotImplementedError, match="DummyLoss"):

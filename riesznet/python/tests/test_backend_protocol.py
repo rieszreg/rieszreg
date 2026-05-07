@@ -51,7 +51,7 @@ def test_namespace_exports_match_design():
         "KLLoss",
         "LinearForm",
         "LocalShift",
-        "LossSpec",
+        "Loss",
         "SquaredLoss",
         "TSM",
         "Tracer",

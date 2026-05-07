@@ -27,14 +27,14 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from rieszreg.losses import LossSpec
+from rieszreg.losses import Loss
 
 
-def _spec_type(loss_spec: LossSpec) -> str:
+def _spec_type(loss_spec: Loss) -> str:
     return loss_spec.to_spec()["type"]
 
 
-def is_supported(loss_spec: LossSpec) -> bool:
+def is_supported(loss_spec: Loss) -> bool:
     return _spec_type(loss_spec) in {
         "SquaredLoss",
         "KLLoss",
@@ -43,7 +43,7 @@ def is_supported(loss_spec: LossSpec) -> bool:
     }
 
 
-def validate_supported(loss_spec: LossSpec) -> None:
+def validate_supported(loss_spec: Loss) -> None:
     if not is_supported(loss_spec):
         raise NotImplementedError(
             f"riesznet does not support loss type {_spec_type(loss_spec)!r}. "
@@ -52,7 +52,7 @@ def validate_supported(loss_spec: LossSpec) -> None:
         )
 
 
-def _clamp_for_loss(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
+def _clamp_for_loss(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
     """Apply the loss spec's η clamp (matches numpy backends' numerical safety)."""
     t = _spec_type(loss_spec)
     if t == "KLLoss":
@@ -64,7 +64,7 @@ def _clamp_for_loss(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
     return eta  # SquaredLoss has no clamp
 
 
-def psi_alpha(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
+def psi_alpha(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
     """ψ(α(η)) — the convex generator evaluated at the link of η."""
     t = _spec_type(loss_spec)
     if t == "SquaredLoss":
@@ -85,7 +85,7 @@ def psi_alpha(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
     raise NotImplementedError(t)
 
 
-def phi_prime_alpha(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
+def phi_prime_alpha(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
     """φ'(α(η)) — the derivative of the convex generator, in η-space."""
     t = _spec_type(loss_spec)
     if t == "SquaredLoss":
@@ -110,7 +110,7 @@ def phi_prime_alpha(loss_spec: LossSpec, eta: torch.Tensor) -> torch.Tensor:
 
 
 def per_row_riesz_loss(
-    loss_spec: LossSpec,
+    loss_spec: Loss,
     eta_orig: torch.Tensor,
     eta_pts: torch.Tensor,
     coefs_pts: torch.Tensor,
@@ -125,7 +125,7 @@ def per_row_riesz_loss(
 
     Parameters
     ----------
-    loss_spec : LossSpec
+    loss_spec : Loss
         The Bregman loss to use. Validated by ``validate_supported``.
     eta_orig : torch.Tensor of shape (n_rows,)
         Network output η at each original row's feature point.

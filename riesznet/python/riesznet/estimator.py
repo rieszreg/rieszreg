@@ -16,7 +16,7 @@ from typing import Sequence
 
 import numpy as np
 
-from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
 from rieszreg.estimator import _features_from_rows, _rows_from_Z
 
 from .backend import TorchBackend, auto_snapshot_epochs
@@ -49,7 +49,7 @@ class RieszNet(RieszEstimator):
     device : {"cpu", "cuda", "mps", "auto"}, default "cpu"
     dtype : {"float32", "float64"}, default "float32"
     grad_clip_norm : float or None, default None
-    loss : rieszreg.LossSpec, default SquaredLoss()
+    loss : rieszreg.Loss, default SquaredLoss()
         Any of ``SquaredLoss``, ``KLLoss``, ``BernoulliLoss``,
         ``BoundedSquaredLoss``.
     init : float or None
@@ -84,7 +84,7 @@ class RieszNet(RieszEstimator):
         device: str = "cpu",
         dtype: str = "float32",
         grad_clip_norm: float | None = None,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         init: float | str | None = None,
         validation_fraction: float = 0.0,
         early_stopping_rounds: int | None = None,
@@ -114,7 +114,7 @@ class RieszNet(RieszEstimator):
 
     # ---- defaults / backend construction ----
 
-    def _resolved_loss(self) -> LossSpec:
+    def _resolved_loss(self) -> Loss:
         return self.loss if self.loss is not None else SquaredLoss()
 
     def _resolved_snapshot_epochs(self) -> tuple[int, ...]:

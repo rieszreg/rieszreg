@@ -22,7 +22,7 @@ import torch
 from rieszreg import (
     Estimand,
     FitResult,
-    LossSpec,
+    Loss,
     register_predictor_loader,
     trace,
 )
@@ -209,7 +209,7 @@ class TorchPredictor:
     """
 
     model: torch.nn.Module
-    loss: LossSpec
+    loss: Loss
     base_score: float
     input_dim: int
     dtype: str
@@ -471,7 +471,7 @@ class TorchBackend:
         rows_train: list[dict[str, Any]],
         rows_valid: list[dict[str, Any]] | None,
         estimand: Estimand,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,
@@ -642,7 +642,7 @@ class TorchBackend:
     def _validation_loss(
         model: torch.nn.Module,
         base: torch.Tensor,
-        loss: LossSpec,
+        loss: Loss,
         x_t: torch.Tensor,
         pts_t: torch.Tensor,
         coefs_t: torch.Tensor,

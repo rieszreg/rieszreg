@@ -7,7 +7,7 @@
 
 Neural-network backend for the [RieszReg meta-package](../README.md), in the spirit of [Chernozhukov et al. (2021)](https://arxiv.org/abs/2110.03031). Trains the Riesz representer α(x) only — outcome regression is the user's responsibility.
 
-This package depends on `rieszreg` for the shared abstractions (`Estimand`, `LossSpec`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). `riesznet` contributes:
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). `riesznet` contributes:
 
 - `TorchBackend` — `MomentBackend` Protocol implementation. Receives raw rows + the estimand, evaluates per-row moments via `rieszreg.trace`, and minimizes the per-row Bregman-Riesz loss with a PyTorch training loop.
 - `TorchPredictor` — wraps the trained `nn.Module` and registers itself with the rieszreg loader registry.
@@ -62,7 +62,7 @@ Rscript -e '
 `riesznet` depends on `rieszreg` and reuses, without modification:
 
 - `Estimand`, `Tracer`/`LinearForm`, `trace` — the moment-functional abstraction. The neural backend uses `trace` directly to compute per-row moments.
-- `LossSpec`, all four built-in losses — the Bregman-Riesz loss framework.
+- `Loss`, all four built-in losses — the Bregman-Riesz loss framework.
 - `Diagnostics`, `diagnose` — base diagnostics.
 - `RieszEstimator` — orchestration; `RieszNet` is a thin subclass.
 
