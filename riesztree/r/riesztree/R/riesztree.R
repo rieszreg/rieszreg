@@ -48,10 +48,14 @@ use_python_riesztree <- function(python = NULL, required = TRUE) {
 #' RieszTreeRegressor — single-tree Riesz regression.
 #'
 #' Subclass of [rieszreg::RieszEstimatorR6] that defaults the backend to a
-#' single tree fit on the augmented Bregman-Riesz loss. Surfaces tree
-#' hyperparameters (`max_depth`, `min_samples_split`, `min_samples_leaf`,
-#' `max_leaves`, `growth_policy`, `pruning_alpha`, `early_stopping_rounds`,
-#' `categorical_features`, ...) on the constructor.
+#' single tree fit on the augmented Bregman-Riesz loss. Hyperparameters
+#' mirror `sklearn.tree.DecisionTreeRegressor` where the augmented
+#' Bregman-Riesz setting allows: `max_depth`, `min_samples_split`,
+#' `min_samples_leaf`, `min_weight_fraction_leaf`, `max_leaf_nodes`,
+#' `max_features`, `growth_policy`, `min_impurity_decrease`, `ccp_alpha`,
+#' `early_stopping_rounds`, `validation_fraction`, `categorical_features`,
+#' `splitter`, `max_bins`. The v0.0.1 names `max_leaves` / `pruning_alpha`
+#' remain as deprecated aliases (emit `FutureWarning` from Python).
 #'
 #' @export
 RieszTreeRegressor <- R6::R6Class(
@@ -63,33 +67,50 @@ RieszTreeRegressor <- R6::R6Class(
                           max_depth = 8L,
                           min_samples_split = 20L,
                           min_samples_leaf = 10L,
-                          max_leaves = 31L,
+                          min_weight_fraction_leaf = 0.0,
+                          max_leaf_nodes = 31L,
+                          max_features = NULL,
                           growth_policy = "depthwise",
-                          pruning_alpha = 0.0,
+                          min_impurity_decrease = 0.0,
+                          ccp_alpha = 0.0,
                           early_stopping_rounds = NULL,
                           validation_fraction = 0.1,
                           categorical_features = NULL,
                           init = NULL,
-                          random_state = 0L) {
+                          random_state = 0L,
+                          splitter = "exact",
+                          max_bins = 255L,
+                          # Deprecated aliases for v0.0.1 compatibility.
+                          max_leaves = NULL,
+                          pruning_alpha = NULL) {
       args <- list(
         estimand = estimand,
         max_depth = as.integer(max_depth),
         min_samples_split = as.integer(min_samples_split),
         min_samples_leaf = as.integer(min_samples_leaf),
-        max_leaves = as.integer(max_leaves),
+        min_weight_fraction_leaf = min_weight_fraction_leaf,
+        max_leaf_nodes = as.integer(max_leaf_nodes),
         growth_policy = growth_policy,
-        pruning_alpha = pruning_alpha,
+        min_impurity_decrease = min_impurity_decrease,
+        ccp_alpha = ccp_alpha,
         validation_fraction = validation_fraction,
-        random_state = as.integer(random_state)
+        random_state = as.integer(random_state),
+        splitter = splitter,
+        max_bins = as.integer(max_bins)
       )
       if (!is.null(loss)) args$loss <- loss
       if (!is.null(init)) args$init <- init
+      if (!is.null(max_features)) args$max_features <- max_features
       if (!is.null(early_stopping_rounds)) {
         args$early_stopping_rounds <- as.integer(early_stopping_rounds)
       }
       if (!is.null(categorical_features)) {
         args$categorical_features <- as.integer(categorical_features)
       }
+      # Deprecated aliases — pass through if explicitly set; Python emits
+      # the FutureWarning.
+      if (!is.null(max_leaves)) args$max_leaves <- as.integer(max_leaves)
+      if (!is.null(pruning_alpha)) args$pruning_alpha <- pruning_alpha
       py_object <- do.call(.module()$RieszTreeRegressor, args)
       super$initialize(py_object = py_object, estimand = estimand)
     }

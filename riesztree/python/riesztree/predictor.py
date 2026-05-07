@@ -24,7 +24,7 @@ from typing import ClassVar, Sequence
 
 import numpy as np
 
-from rieszreg import LossSpec, register_predictor_loader
+from rieszreg import Loss, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 
 from .fast import FlatTree, flat_tree_from_node, predict_alpha as _flat_predict_alpha
@@ -34,7 +34,7 @@ from .tree import Node, from_dict, to_dict
 @dataclass
 class RieszTreePredictor:
     tree: Node
-    loss: LossSpec
+    loss: Loss
     base_score: float
     feature_keys: tuple[str, ...]
     categorical_features: tuple[int, ...] = ()

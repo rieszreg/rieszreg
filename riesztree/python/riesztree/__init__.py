@@ -21,7 +21,7 @@ from rieszreg import (
     Estimand,
     KLLoss,
     LocalShift,
-    LossSpec,
+    Loss,
     SquaredLoss,
     TSM,
 )
@@ -30,7 +30,7 @@ from .backend import RieszTreeBackend
 from .diagnostics import TreeDiagnostics, diagnose_tree
 from .estimator import RieszTreeRegressor
 from .predictor import RieszTreePredictor
-from .pruning import cost_complexity_prune
+from .pruning import cost_complexity_prune, cost_complexity_pruning_path
 from .splitter import make_leaf_solvers
 from .tree import Node, feature_importance, max_depth, n_leaves
 
@@ -43,7 +43,7 @@ __all__ = [
     "Estimand",
     "KLLoss",
     "LocalShift",
-    "LossSpec",
+    "Loss",
     "Node",
     "RieszTreeBackend",
     "RieszTreePredictor",
@@ -52,6 +52,7 @@ __all__ = [
     "TSM",
     "TreeDiagnostics",
     "cost_complexity_prune",
+    "cost_complexity_pruning_path",
     "diagnose_tree",
     "feature_importance",
     "make_leaf_solvers",

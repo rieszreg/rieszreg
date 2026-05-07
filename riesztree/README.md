@@ -70,9 +70,9 @@ alpha_hat = est.predict(df)
 - **Diagnostics**: `TreeDiagnostics` extends `rieszreg.Diagnostics` with `n_leaves`, `max_depth_actual`, `mean_leaf_size`, `feature_importances` (per-feature normalised split-gain).
 - **R wrapper**: R6 mirror via reticulate.
 - **Cython prediction**: `predict` walks a flat-array tree (built once per fit) at C speed. The `Node` tree continues to back diagnostics, pruning, and serialization.
-- **Cython continuous-split sweep** (`splitter="exact"`, default): per-feature threshold sweep runs in a `cdef` inner loop over per-built-in leaf-loss kernels. `splitter="python"` keeps the original pure-Python path for debugging.
-- **Custom-loss extension hook**: `riesztree.fast.register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` plugs a Numba `@cfunc` (signature `float64(float64, float64)`) into the Cython splitter for any user `LossSpec` subclass.
-- **96 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration.
+- **Three Cython splitter paths**: `splitter="exact"` (default; per-feature threshold sweep), `splitter="hist"` (quantile-binned histogram, fastest at large `n`), `splitter="random"` (sklearn ExtraTrees-style; one uniform threshold per feature). `splitter="python"` keeps the legacy pure-Python path (deprecated, scheduled for removal in v0.0.3).
+- **Custom-loss extension hook**: `riesztree.fast.register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` plugs a Numba `@cfunc` (signature `float64(float64, float64)`) into the Cython splitter for any user `Loss` subclass.
+- **122 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, random splitter, deprecation of the python splitter.
 
 ## Hyperparameters
 
@@ -92,9 +92,61 @@ alpha_hat = est.predict(df)
 | `categorical_features` | None | Sequence of column indices treated as integer category labels. |
 | `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
 | `random_state` | 0 | Seeds the per-split feature subsample under `max_features`. |
-| `splitter` | `"exact"` | `"exact"` routes continuous-feature splits through the Cython sweep; `"python"` keeps the legacy pure-Python path (fallback for losses outside the four built-ins, debugging). |
+| `splitter` | `"exact"` | One of `"exact"`, `"hist"`, `"random"`, `"python"`. See the Splitter modes section below. |
+| `max_bins` | 255 | Bins per feature when `splitter="hist"`. Sklearn HGB convention; fits in `uint8`. |
 
-The v0.0.1 names `max_leaves` and `pruning_alpha` are accepted as deprecated aliases for `max_leaf_nodes` and `ccp_alpha`; passing them emits a `FutureWarning` and behaves identically.
+The v0.0.1 names `max_leaves` and `pruning_alpha` are accepted as deprecated aliases for `max_leaf_nodes` and `ccp_alpha`; passing them emits a `FutureWarning` and behaves identically. `splitter="python"` is also deprecated and will be removed in v0.0.3.
+
+## Splitter modes
+
+| `splitter=` | When to use | Implementation |
+|---|---|---|
+| `"exact"` (default) | Most fits. Best partition; per-feature linear scan over distinct values. | Cython per-feature sweep with C-call dispatch into the Bregman leaf-loss kernels in `riesztree.fast._loss_kernels`. |
+| `"hist"` | Large `n` (≥ 10⁵), or inside a forest where slight discretization is fine. | Quantile pre-binning (`max_bins`, default 255) once per fit; per-leaf histogram accumulation + sweep, all in Cython. |
+| `"random"` | ExtraTrees-style forests; cheap baseline. | One uniform threshold per feature per leaf; single Cython pass. |
+| `"python"` | Legacy / debugging. Deprecated, removed in v0.0.3. | Pure-Python sweep over distinct values. |
+
+Custom user `Loss` subclasses are routed to the Cython exact / hist / random paths once registered via [`riesztree.fast.register_fast_leaf_solver`](#custom-loss-extension-hook); unregistered ones fall back to the Python path with a one-time warning.
+
+## Custom loss extension hook
+
+```python
+import numba
+from rieszreg import Loss
+from riesztree.fast import register_fast_leaf_solver
+
+class MyLoss(Loss):
+    ...   # implement the Loss interface
+
+@numba.cfunc("float64(float64, float64)", cache=True, nopython=True)
+def my_leaf_loss(D, C):
+    if D <= 0.0:
+        return 0.0
+    return -C * C / D                      # SquaredLoss-equivalent here
+
+def my_alpha(D, C):
+    return 0.0 if D <= 0 else -C / D
+
+register_fast_leaf_solver(MyLoss, my_leaf_loss, my_alpha)
+
+# Subsequent fits with loss=MyLoss() use the C-speed Cython splitter.
+```
+
+The cfunc is called from the Cython splitter's tight loop without the GIL — same per-evaluation cost as the four built-in losses.
+
+## Speed
+
+`bench_fit.py` and `bench_compare.py` (under `python/benchmarks/`) document where `riesztree` sits versus state-of-the-art tree libraries on equivalent `(n_aug, p, max_depth)` workloads. Headline cell `(n_aug=100k, p=20, depth=16)` with `splitter="hist"`:
+
+| Library | Fit time | vs riesztree |
+|---|---|---|
+| **riesztree-hist** | **0.62 s** | 1.0× |
+| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.64 s | parity |
+| sklearn `DecisionTreeRegressor` (exact) | 2.44 s | we're 4× faster |
+| XGBoost (n_estimators=1, hist) | 0.36 s | 1.7× behind |
+| LightGBM (n_estimators=1) | 5.67 s | we're 9× faster |
+
+We're at parity with sklearn HGB, faster than sklearn-DTR, and within ~1.7× of XGBoost. Concrete attribution for the remaining XGBoost gap (Python-level growth loop, no parent-minus-sibling histogram trick, no presort reuse, per-split numpy index allocation) is left as documented future work in [`BENCH_BASELINE.md`](BENCH_BASELINE.md). See that file for the full benchmark protocol and locked baselines.
 
 ## Known sharp edges
 

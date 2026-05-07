@@ -126,7 +126,7 @@ def _make_estimator(cfg: Config) -> tuple[RieszTreeRegressor, "Estimand", object
         max_depth=cfg.max_depth if cfg.max_depth is not None else 10**9,
         min_samples_split=20,
         min_samples_leaf=10,
-        max_leaves=2**30,  # effectively unbounded for depthwise
+        max_leaf_nodes=2**30,  # effectively unbounded for depthwise
         growth_policy=cfg.growth_policy,
         random_state=cfg.seed,
     )

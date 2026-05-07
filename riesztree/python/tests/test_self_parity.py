@@ -11,7 +11,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from rieszreg import build_augmented
 from riesztree import ATE, RieszTreeRegressor
 
 
@@ -38,9 +37,8 @@ def test_leaf_values_match_closed_form_on_same_partition():
     estimand = ATE(treatment="a", covariates=("x0", "x1", "x2"))
     est = RieszTreeRegressor(estimand=estimand, max_depth=4).fit(df)
 
-    rows = [dict(zip(("a", "x0", "x1", "x2"), r))
-            for r in df[["a", "x0", "x1", "x2"]].values]
-    aug = build_augmented(rows, estimand)
+    feats_full = df[["a", "x0", "x1", "x2"]].to_numpy(dtype=float)
+    aug = estimand.augment(feats_full)
     # For each augmented row, walk the tree to find its leaf.
     feats = aug.features
     leaf_idx = {}

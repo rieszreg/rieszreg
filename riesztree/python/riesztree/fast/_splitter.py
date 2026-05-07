@@ -1,6 +1,6 @@
 """Python-side facade for the Cython splitter.
 
-Translates a ``LossSpec`` instance to the integer ``loss_kind`` used by
+Translates a ``Loss`` instance to the integer ``loss_kind`` used by
 the compiled kernels, plus the ``(lo, hi)`` parameters needed by
 ``BoundedSquaredLoss``. Custom user losses (anything not in the four
 built-ins) can plug in via :func:`register_fast_leaf_solver`, which
@@ -23,7 +23,7 @@ from rieszreg import (
     BernoulliLoss,
     BoundedSquaredLoss,
     KLLoss,
-    LossSpec,
+    Loss,
     SquaredLoss,
 )
 
@@ -44,7 +44,7 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# User-loss registry: subclass-of-LossSpec →
+# User-loss registry: subclass-of-Loss →
 # (leaf_loss_cfunc_address, alpha_at_opt_python_callable).
 #
 # The leaf-loss is a C-callable address used by the Cython splitter's
@@ -69,7 +69,7 @@ def register_fast_leaf_solver(
     Parameters
     ----------
     loss_class
-        The user's LossSpec subclass. The splitter uses MRO to
+        The user's Loss subclass. The splitter uses MRO to
         match — registering the most specific class wins.
     leaf_loss_addr_or_cfunc
         Either an integer (a raw C-callable address) or an object
@@ -86,10 +86,10 @@ def register_fast_leaf_solver(
     Worked example::
 
         import numba
-        from rieszreg import LossSpec
+        from rieszreg import Loss
         from riesztree.fast import register_fast_leaf_solver
 
-        class MyLoss(LossSpec):
+        class MyLoss(Loss):
             ...
 
         @numba.cfunc("float64(float64, float64)", cache=True, nopython=True)
@@ -131,7 +131,7 @@ def register_fast_leaf_solver(
         _USER_CFUNC_OBJECTS[addr] = cfunc_obj
 
 
-def _lookup_user_kernel(loss: LossSpec) -> tuple[int, callable] | None:
+def _lookup_user_kernel(loss: Loss) -> tuple[int, callable] | None:
     """Return ``(leaf_loss_addr, alpha_at_opt_callable)`` for the
     closest registered ancestor of ``type(loss)``, or ``None``."""
     for cls in type(loss).__mro__:
@@ -140,7 +140,7 @@ def _lookup_user_kernel(loss: LossSpec) -> tuple[int, callable] | None:
     return None
 
 
-def lookup_user_alpha_at_opt(loss: LossSpec):
+def lookup_user_alpha_at_opt(loss: Loss):
     """Public accessor: returns the registered Python alpha_at_opt
     callable for ``loss``, or ``None`` if not registered. Used by
     ``riesztree.splitter.make_leaf_solvers`` to extend its dispatch
@@ -158,9 +158,9 @@ LOSS_USER_CFUNC = -1
 
 
 def loss_kind_for(
-    loss: LossSpec,
+    loss: Loss,
 ) -> tuple[int, float, float, int] | None:
-    """Map a LossSpec to ``(loss_kind, bounded_lo, bounded_hi, user_addr)``.
+    """Map a Loss to ``(loss_kind, bounded_lo, bounded_hi, user_addr)``.
 
     Returns ``None`` only when the loss is *neither* a built-in *nor*
     in the user registry. For built-ins ``user_addr`` is 0; for
@@ -184,6 +184,64 @@ def loss_kind_for(
     if isinstance(loss, BoundedSquaredLoss):
         return LOSS_BOUNDED_SQUARED, float(loss.lo), float(loss.hi), 0
     return None
+
+
+def accumulate_hist(
+    X_binned: np.ndarray,
+    D: np.ndarray,
+    C: np.ndarray,
+    idx: np.ndarray,
+    candidate_features: np.ndarray,
+    max_bins: int,
+):
+    """Build per-feature histograms over the rows in ``idx``.
+
+    Returns ``(hD, hC, hO, total_D, total_C, total_orig)``. See
+    :mod:`riesztree.fast._splitter_hist.accumulate_hist_c` for the
+    contract. Used by the parent-minus-sibling path in
+    :mod:`riesztree.grow`.
+    """
+    from . import _splitter_hist  # type: ignore[attr-defined]
+    candidate_features = np.ascontiguousarray(candidate_features, dtype=np.int32)
+    return _splitter_hist.accumulate_hist_c(
+        X_binned, D, C, idx, candidate_features, int(max_bins),
+    )
+
+
+def find_best_split_in_hist(
+    hD: np.ndarray,
+    hC: np.ndarray,
+    hO: np.ndarray,
+    total_D: float,
+    total_C: float,
+    total_orig: int,
+    candidate_features: np.ndarray,
+    n_bins_per_feature: np.ndarray,
+    *,
+    loss_kind: int,
+    bounded_lo: float,
+    bounded_hi: float,
+    min_orig_leaf: int,
+):
+    """Find the best split given pre-built histograms.
+
+    Returns ``(best_feat, best_bin, gain)`` or ``None``.
+    """
+    from . import _splitter_hist  # type: ignore[attr-defined]
+    candidate_features = np.ascontiguousarray(candidate_features, dtype=np.int32)
+    n_bins_per_feature = np.ascontiguousarray(n_bins_per_feature, dtype=np.int32)
+    return _splitter_hist.find_best_split_in_hist_c(
+        hD, hC, hO, float(total_D), float(total_C), int(total_orig),
+        candidate_features, n_bins_per_feature,
+        int(loss_kind), float(bounded_lo), float(bounded_hi),
+        int(min_orig_leaf),
+    )
+
+
+def partition_idx_by_bin(X_binned: np.ndarray, idx: np.ndarray, best_feat: int, best_bin: int):
+    """Partition ``idx`` into (left, right) on ``X_binned[:, best_feat] <= best_bin``."""
+    from . import _splitter_hist  # type: ignore[attr-defined]
+    return _splitter_hist.partition_idx_by_bin_c(X_binned, idx, int(best_feat), int(best_bin))
 
 
 def best_split_at_hist(
@@ -216,6 +274,46 @@ def best_split_at_hist(
         n_bins_per_feature, candidate_features, bin_thresholds,
         int(loss_kind), float(bounded_lo), float(bounded_hi),
         int(min_orig_leaf), int(max_bins),
+    )
+
+
+def best_split_continuous_random(
+    feature_col: np.ndarray,
+    D: np.ndarray,
+    C: np.ndarray,
+    idx: np.ndarray,
+    *,
+    loss_kind: int,
+    bounded_lo: float,
+    bounded_hi: float,
+    min_orig_leaf: int,
+    rng: np.random.Generator,
+):
+    """Random-threshold split (sklearn ``splitter='random'``).
+
+    Draws one uniform threshold in ``[col_min, col_max]`` from ``rng``
+    and evaluates the gain at that single point in Cython. Returns
+    ``None`` when the column is constant (no valid threshold exists).
+    """
+    if idx.size < 2:
+        return None
+    feature_col = np.ascontiguousarray(feature_col, dtype=np.float64)
+    D = np.ascontiguousarray(D, dtype=np.float64)
+    C = np.ascontiguousarray(C, dtype=np.float64)
+    idx = np.ascontiguousarray(idx, dtype=np.int64)
+
+    leaf_vals = feature_col[idx]
+    lo = float(leaf_vals.min())
+    hi = float(leaf_vals.max())
+    if lo == hi:
+        return None  # constant column — no split possible
+    threshold = float(rng.uniform(lo, hi))
+
+    from . import _splitter_c  # type: ignore[attr-defined]
+    return _splitter_c.best_split_continuous_random_c(
+        feature_col, D, C, idx,
+        int(loss_kind), float(bounded_lo), float(bounded_hi),
+        int(min_orig_leaf), threshold,
     )
 
 
@@ -276,7 +374,7 @@ def best_split_continuous_fast(
 _WARNED_FALLBACK: set[type] = set()
 
 
-def warn_python_fallback(loss: LossSpec) -> None:
+def warn_python_fallback(loss: Loss) -> None:
     """Emit a one-time UserWarning when the user's loss isn't in the four
     built-ins and growth has to use the Python splitter."""
     cls = type(loss)

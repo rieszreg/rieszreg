@@ -2,7 +2,7 @@
 
 Single-tree backend for the [RieszReg meta-package](../README.md). Greedy splits on the augmented Bregman-Riesz loss; closed-form per-leaf α* = -C/D (loss-projected to the link's α-domain).
 
-This package depends on `rieszreg` for shared abstractions (`Estimand`, `LossSpec`, `Backend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `build_augmented`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `riesztree` contributes:
+This package depends on `rieszreg` for shared abstractions (`Estimand`, `Loss`, `Backend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `AugmentedDataset`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `riesztree` contributes:
 
 - `RieszTreeBackend` — `Backend` Protocol implementation (the augmentation-style entry point). Consumes the precomputed `AugmentedDataset` and grows / prunes a single decision tree with loss-aware splits.
 - `RieszTreeRegressor` — convenience subclass of `rieszreg.RieszEstimator` with tree-specific hyperparameters mirroring `sklearn.tree.DecisionTreeRegressor` where the augmented Bregman-Riesz setting allows: `max_depth`, `min_samples_split`, `min_samples_leaf`, `min_weight_fraction_leaf`, `max_leaf_nodes`, `max_features`, `growth_policy`, `min_impurity_decrease`, `ccp_alpha`, `early_stopping_rounds`, `validation_fraction`, `categorical_features`. The v0.0.1 names `max_leaves`/`pruning_alpha` remain as deprecated aliases (emit `FutureWarning`).
@@ -11,9 +11,10 @@ This package depends on `rieszreg` for shared abstractions (`Estimand`, `LossSpe
 - `riesztree.fast` — compiled extensions:
   - `FlatTree` + Cython `predict_alpha` (`fast/_tree_c.pyx`).
   - `_loss_kernels.pyx` — built-in leaf-loss + alpha-at-opt kernels for the four Bregman losses.
-  - `_splitter_c.pyx` — Cython continuous-feature best-split sweep, used when `splitter="exact"` (the new default) is set on `RieszTreeRegressor`.
-  - `_splitter.py` — Python facade that maps a `LossSpec` to a loss-kind integer + bounded clip parameters; falls back to the pure-Python splitter for losses outside the four built-ins (with a one-time `UserWarning`).
-  Subsequent phases will add the histogram splitter (`_splitter_hist.pyx`) and Numba `cfunc` registration hook here.
+  - `_splitter_c.pyx` — Cython continuous-feature best-split sweep, used when `splitter="exact"` (the default). Includes the random-threshold variant for `splitter="random"`.
+  - `_splitter_hist.pyx` — Cython histogram splitter, used when `splitter="hist"`. Per-leaf histogram accumulation + sweep over bin boundaries; quantile pre-binning via `_binner.py`.
+  - `_binner.py` — quantile `BinMapper` for the histogram splitter (sklearn HGB-style; default 255 bins).
+  - `_splitter.py` — Python facade. Maps a `Loss` to a loss-kind integer + bounded clip parameters; dispatches to exact / hist / random Cython kernels; provides `register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` for users to plug a Numba `@cfunc` into the splitter for any custom `Loss`.
 - R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
 
 ## Living-doc rule (README + meta-project docs)
@@ -38,7 +39,8 @@ R-side mirrors this: R6 class `RieszTreeRegressor$new(estimand=, max_depth=, ...
 - `python/riesztree/` — `splitter.py` (per-loss leaf-loss + best-split sweep), `tree.py` (Node + traversal + serialisation), `grow.py` (depthwise + leafwise), `pruning.py` (cost-complexity), `backend.py` (`RieszTreeBackend`), `predictor.py` (`RieszTreePredictor` + loader registration), `estimator.py` (`RieszTreeRegressor` convenience subclass), `diagnostics.py` (`TreeDiagnostics`), `fast/` (`FlatTree` + Cython `predict` extension).
 - `r/riesztree/` — R6 wrapper via reticulate. `RieszTreeRegressor` subclasses `rieszreg::RieszEstimatorR6`.
 - `examples/` — runnable demonstrations of each built-in estimand (ATE, ATT, TSM, AdditiveShift, LocalShift).
-- `python/tests/` — 38 tests covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity.
+- `python/tests/` — 122 tests covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, random splitter, deprecation of the python splitter.
+- `python/benchmarks/` — `bench_fit.py` (locked perf grid; baseline in `BENCH_BASELINE.md`) and `bench_compare.py` (sklearn DTR / HGB, LightGBM, XGBoost comparison).
 
 ## Run tests
 
@@ -64,8 +66,8 @@ Rscript -e '
 
 `riesztree` depends on `rieszreg` and reuses, without modification:
 
-- `Estimand`, `Tracer`/`LinearForm`, `trace`, `build_augmented`, `AugmentedDataset` — the augmentation engine.
-- `LossSpec`, `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` — the Bregman-Riesz loss framework.
+- `Estimand`, `Tracer`/`LinearForm`, `trace`, `Estimand.augment`, `AugmentedDataset` — the augmentation engine.
+- `Loss`, `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` — the Bregman-Riesz loss framework.
 - `Diagnostics`, `diagnose` — base diagnostics (`TreeDiagnostics` extends with tree-specific extras).
 - `RieszEstimator` — orchestration; `RieszTreeRegressor` is a thin subclass with the tree backend defaulted.
 - `register_predictor_loader` — registry-based save/load.

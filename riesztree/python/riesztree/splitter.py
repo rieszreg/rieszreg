@@ -1,7 +1,7 @@
 """Per-leaf Bregman optimum and split-gain computation.
 
 Given the per-augmented-row coefficients ``(D_r, C_r)`` from
-``rieszreg.build_augmented`` (where ``D_r`` is ``is_original`` and ``C_r``
+``Estimand.augment`` (where ``D_r`` is ``is_original`` and ``C_r``
 is ``potential_deriv_coef``), the constant-per-leaf augmented Bregman loss
 in leaf ``ℓ`` is
 

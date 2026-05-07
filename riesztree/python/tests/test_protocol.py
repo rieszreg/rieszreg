@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from rieszreg import ATE, FitResult, RieszEstimator, build_augmented
+from rieszreg import ATE, FitResult, RieszEstimator
 from riesztree import RieszTreeBackend, RieszTreePredictor, RieszTreeRegressor
 
 
@@ -11,8 +11,8 @@ def test_backend_returns_fitresult(linear_gaussian_ate, covariate_keys):
     make, _ = linear_gaussian_ate
     df = make(500, seed=0)
     estimand = ATE(treatment="a", covariates=covariate_keys)
-    rows = [dict(zip(("a",) + covariate_keys, r)) for r in df[["a", *covariate_keys]].values]
-    aug = build_augmented(rows, estimand)
+    feats = df[["a", *covariate_keys]].to_numpy(dtype=float)
+    aug = estimand.augment(feats)
     from rieszreg import SquaredLoss
     out = RieszTreeBackend(max_depth=3).fit_augmented(
         aug, None, SquaredLoss(),

@@ -1,9 +1,9 @@
 """Phase 5: ``register_fast_leaf_solver`` plugs a Numba ``@cfunc`` (or
-any C-callable address) into the Cython splitter for a user LossSpec.
+any C-callable address) into the Cython splitter for a user Loss.
 
 The registered cfunc is called from the Cython splitter's tight loop
 at C speed — no Python dispatch per evaluation. The smoke tests below
-register a SquaredLoss-equivalent kernel for a fresh LossSpec subclass
+register a SquaredLoss-equivalent kernel for a fresh Loss subclass
 and verify that the resulting fitted tree matches a vanilla SquaredLoss
 fit on the same DGP.
 """
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from rieszreg import ATE, LossSpec, SquaredLoss
+from rieszreg import ATE, Loss, SquaredLoss
 from riesztree import RieszTreeRegressor
 from riesztree.fast import register_fast_leaf_solver
 from riesztree.fast._splitter import (
@@ -28,12 +28,12 @@ numba = pytest.importorskip("numba")
 
 
 # ---------------------------------------------------------------------------
-# A user LossSpec subclass that does the same math as SquaredLoss. Keeping
+# A user Loss subclass that does the same math as SquaredLoss. Keeping
 # it isinstance-incompatible with SquaredLoss forces the splitter to fall
 # back to the user registry rather than the built-in dispatch.
 
-class _MySquaredLoss(LossSpec):
-    """Identical math to SquaredLoss, but a fresh LossSpec subclass —
+class _MySquaredLoss(Loss):
+    """Identical math to SquaredLoss, but a fresh Loss subclass —
     the built-in `loss_kind_for` returns ``None`` for it."""
 
     name = "_MySquaredLoss"

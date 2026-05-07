@@ -114,6 +114,91 @@ def best_split_continuous_c(
     return (best_gain, best_threshold, left_idx, right_idx)
 
 
+def best_split_continuous_random_c(
+    cnp.ndarray[f64, ndim=1] feature_col,
+    cnp.ndarray[f64, ndim=1] D,
+    cnp.ndarray[f64, ndim=1] C,
+    cnp.ndarray[i64, ndim=1] idx,
+    int loss_kind,
+    double bounded_lo,
+    double bounded_hi,
+    int min_orig_leaf,
+    double random_threshold,
+):
+    """Random-threshold split on a continuous feature for the rows in ``idx``.
+
+    Mirrors :class:`sklearn.tree.DecisionTreeRegressor`'s
+    ``splitter='random'``: instead of sweeping every distinct value, the
+    caller draws a single uniform threshold in ``[col_min, col_max]``
+    per feature and we just evaluate the gain at that one point.
+
+    Returns ``(gain, threshold, left_idx, right_idx)`` or ``None``.
+    """
+    cdef Py_ssize_t n = idx.shape[0]
+    if n < 2:
+        return None
+
+    cdef Py_ssize_t i
+    cdef i64 row
+    cdef i64[::1] idx_v = idx
+    cdef f64[::1] feat_v = feature_col
+    cdef f64[::1] D_v = D
+    cdef f64[::1] C_v = C
+
+    # Single pass: compute parent (D, C, n_orig) and split the rows on
+    # `random_threshold` simultaneously.
+    cdef double total_D = 0.0
+    cdef double total_C = 0.0
+    cdef i64 total_orig = 0
+    cdef double D_l = 0.0
+    cdef double C_l = 0.0
+    cdef i64 n_l = 0
+    cdef double v
+    cdef i64 d_int
+
+    cdef cnp.ndarray[i64, ndim=1] left_idx = np.empty(n, dtype=np.int64)
+    cdef cnp.ndarray[i64, ndim=1] right_idx = np.empty(n, dtype=np.int64)
+    cdef Py_ssize_t k_l = 0, k_r = 0
+
+    for i in range(n):
+        row = idx_v[i]
+        v = feat_v[row]
+        total_D += D_v[row]
+        total_C += C_v[row]
+        d_int = 1 if D_v[row] > 0.0 else 0
+        total_orig += d_int
+        if v <= random_threshold:
+            D_l += D_v[row]
+            C_l += C_v[row]
+            n_l += d_int
+            left_idx[k_l] = row
+            k_l += 1
+        else:
+            right_idx[k_r] = row
+            k_r += 1
+
+    cdef i64 n_r = total_orig - n_l
+    if n_l < min_orig_leaf or n_r < min_orig_leaf:
+        return None
+
+    cdef double parent_loss = dispatch_leaf_loss(
+        loss_kind, total_D, total_C, bounded_lo, bounded_hi
+    )
+    cdef double D_r = total_D - D_l
+    cdef double C_r = total_C - C_l
+    cdef double L_l = dispatch_leaf_loss(loss_kind, D_l, C_l, bounded_lo, bounded_hi)
+    cdef double L_r = dispatch_leaf_loss(loss_kind, D_r, C_r, bounded_lo, bounded_hi)
+    if not isfinite(L_l) or not isfinite(L_r):
+        return None
+    cdef double gain = parent_loss - L_l - L_r
+
+    return (
+        gain, random_threshold,
+        np.asarray(left_idx[:k_l]),
+        np.asarray(right_idx[:k_r]),
+    )
+
+
 def best_split_continuous_user_c(
     cnp.ndarray[f64, ndim=1] feature_col,
     cnp.ndarray[f64, ndim=1] D,

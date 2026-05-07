@@ -19,9 +19,8 @@ import numpy as np
 from rieszreg import (
     AugmentedDataset,
     FitResult,
-    LossSpec,
+    Loss,
     SquaredLoss,
-    aug_loss_alpha,
 )
 
 from .grow import grow_depthwise, grow_leafwise
@@ -32,14 +31,20 @@ from .tree import Node
 
 
 def _holdout_riesz_loss(
-    tree: Node, aug_valid: AugmentedDataset, loss: LossSpec
+    tree: Node, aug_valid: AugmentedDataset, loss: Loss
 ) -> float:
-    from .tree import predict_array
+    """Final-fit held-out Riesz loss reported via ``FitResult.best_score``.
 
-    alpha_hat = predict_array(tree, aug_valid.features)
+    Uses the Cython flat-array predict path (Phase 9) — much faster
+    than the Python Node tree-walk this used to call
+    (``riesztree.tree.predict_array``).
+    """
+    from .fast import flat_tree_from_node, predict_alpha as _flat_predict
+    flat = flat_tree_from_node(tree)
+    alpha_hat = _flat_predict(flat, aug_valid.features)
     return float(
-        np.sum(aug_loss_alpha(
-            loss, aug_valid.is_original, aug_valid.potential_deriv_coef, alpha_hat
+        np.sum(loss.aug_loss_alpha(
+            aug_valid.is_original, aug_valid.potential_deriv_coef, alpha_hat
         ))
         / aug_valid.n_rows
     )
@@ -96,6 +101,10 @@ class RieszTreeBackend:
     splitter
         ``"exact"`` (default) routes continuous-feature splits through
         the Cython sweep in :mod:`riesztree.fast._splitter_c`;
+        ``"hist"`` uses the histogram-based Cython splitter
+        (:mod:`riesztree.fast._splitter_hist`) with quantile pre-binning;
+        ``"random"`` (sklearn ExtraTrees-style) draws a single uniform
+        threshold per feature per leaf and evaluates the gain there;
         ``"python"`` keeps the original pure-Python splitter (kept for
         debugging and as the fallback for losses outside the four
         built-ins).
@@ -121,7 +130,7 @@ class RieszTreeBackend:
         self,
         aug_train: AugmentedDataset,
         aug_valid: AugmentedDataset | None,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,

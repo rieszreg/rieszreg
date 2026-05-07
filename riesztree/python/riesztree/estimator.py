@@ -15,7 +15,7 @@ from __future__ import annotations
 import warnings
 from typing import Sequence
 
-from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
 
 from .backend import RieszTreeBackend
 
@@ -32,7 +32,7 @@ class RieszTreeRegressor(RieszEstimator):
     ----------
     estimand : rieszreg.Estimand
         Carries ``feature_keys`` and the ``m(alpha)(z, y)`` operator.
-    loss : rieszreg.LossSpec, default=None
+    loss : rieszreg.Loss, default=None
         Bregman-Riesz loss. ``None`` resolves to ``SquaredLoss()``. Built-in
         support: ``SquaredLoss``, ``KLLoss``, ``BernoulliLoss``,
         ``BoundedSquaredLoss``.
@@ -80,7 +80,7 @@ class RieszTreeRegressor(RieszEstimator):
     def __init__(
         self,
         estimand: Estimand,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         max_depth: int = 8,
         min_samples_split: int = 20,
         min_samples_leaf: int = 10,
@@ -155,7 +155,7 @@ class RieszTreeRegressor(RieszEstimator):
 
     # ---- backend construction ----
 
-    def _resolved_loss(self) -> LossSpec:
+    def _resolved_loss(self) -> Loss:
         return self.loss if self.loss is not None else SquaredLoss()
 
     def _resolved_backend(self) -> RieszTreeBackend:
@@ -195,6 +195,55 @@ class RieszTreeRegressor(RieszEstimator):
         super().fit(Z, y=y, eval_set=eval_set, eval_y=eval_y)
         self.predictor_.feature_keys = tuple(self.feature_keys_)
         return self
+
+    def cost_complexity_pruning_path(self, Z=None, y=None):
+        """Cost-complexity pruning path (sklearn convention).
+
+        Returns ``(ccp_alphas, impurities)`` arrays describing the
+        sequence of effective ``ccp_alpha`` values and the corresponding
+        sum-of-leaf-loss-at-optimum at each pruning step. Mirrors
+        :meth:`sklearn.tree.DecisionTreeRegressor.cost_complexity_pruning_path`.
+
+        Two usage patterns:
+
+        * ``est.fit(Z); est.cost_complexity_pruning_path()`` — uses the
+          already-fitted tree (assumes ``est.ccp_alpha == 0`` so the
+          starting tree is unpruned).
+        * ``est.cost_complexity_pruning_path(Z, y)`` — clones the
+          estimator with ``ccp_alpha=0``, fits, and walks the path.
+
+        Typical workflow: get the alpha grid, cross-validate over it,
+        refit with the chosen alpha::
+
+            path_alphas, _ = est.cost_complexity_pruning_path(Z, y)
+            best = min(path_alphas, key=lambda a: cv_score(
+                clone(est).set_params(ccp_alpha=a).fit(Z, y), Z, y
+            ))
+            est.set_params(ccp_alpha=best).fit(Z, y)
+        """
+        from sklearn.base import clone
+
+        from .pruning import cost_complexity_pruning_path as _path
+
+        if Z is not None:
+            # Sklearn-style: fit a fresh copy with ccp_alpha=0 to get the
+            # full unpruned tree, then walk the path on that. Keeps the
+            # caller's `est` unmutated.
+            scratch = clone(self).set_params(ccp_alpha=0.0)
+            scratch.fit(Z, y=y)
+            tree = scratch.predictor_.tree
+            loss = scratch._resolved_loss()
+        else:
+            if not hasattr(self, "predictor_"):
+                raise RuntimeError(
+                    f"{type(self).__name__}.cost_complexity_pruning_path() "
+                    f"called without (Z, y) on an unfitted estimator. "
+                    f"Either pass (Z, y) or call fit(Z, y) first."
+                )
+            tree = self.predictor_.tree
+            loss = self.loss_
+
+        return _path(tree, loss)
 
     # ---- save/load ----
 

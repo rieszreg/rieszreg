@@ -10,13 +10,12 @@ from rieszreg import (
     BoundedSquaredLoss,
     KLLoss,
     SquaredLoss,
-    build_augmented,
 )
 from riesztree.splitter import make_leaf_solvers
 
 
-def _rows(df, feature_keys):
-    return [dict(zip(feature_keys, r)) for r in df[list(feature_keys)].values]
+def _features(df, feature_keys):
+    return df[list(feature_keys)].to_numpy(dtype=float)
 
 
 def test_squared_closed_form_matches_numerical(linear_gaussian_ate, covariate_keys):
@@ -24,8 +23,8 @@ def test_squared_closed_form_matches_numerical(linear_gaussian_ate, covariate_ke
 
     make, _ = linear_gaussian_ate
     df = make(2000, seed=1)
-    rows = _rows(df, ("a",) + covariate_keys)
-    aug = build_augmented(rows, ATE(treatment="a", covariates=covariate_keys))
+    feats = _features(df, ("a",) + covariate_keys)
+    aug = ATE(treatment="a", covariates=covariate_keys).augment(feats)
     D, C = aug.is_original, aug.potential_deriv_coef
 
     leaf_loss, alpha_at = make_leaf_solvers(SquaredLoss())
@@ -54,8 +53,8 @@ def test_kl_closed_form_matches_numerical_when_in_domain(linear_gaussian_ate, co
 
     make, _ = linear_gaussian_ate
     df = make(2000, seed=2)
-    rows = _rows(df, ("a",) + covariate_keys)
-    aug = build_augmented(rows, TSM(level=1.0, treatment="a", covariates=covariate_keys))
+    feats = _features(df, ("a",) + covariate_keys)
+    aug = TSM(level=1.0, treatment="a", covariates=covariate_keys).augment(feats)
     D, C = aug.is_original, aug.potential_deriv_coef
 
     leaf_loss, alpha_at = make_leaf_solvers(KLLoss())

@@ -109,3 +109,45 @@ def cost_complexity_prune(
             break
         _collapse_to_leaf(weakest, leaf_loss)
     return root
+
+
+def cost_complexity_pruning_path(root: Node, loss):
+    """Compute the cost-complexity pruning path for ``root``.
+
+    Mirrors :meth:`sklearn.tree.DecisionTreeRegressor.cost_complexity_pruning_path`:
+    walks the weakest-link sequence from the unpruned tree all the way
+    down to the root, recording the effective ``ccp_alpha`` at each
+    collapse and the corresponding subtree impurity (sum of leaf-loss
+    over the remaining tree).
+
+    Returns
+    -------
+    ccp_alphas : np.ndarray[float64]
+        Sorted ascending. ``ccp_alphas[0] == 0.0`` (no pruning);
+        ``ccp_alphas[-1]`` is the smallest α at which the tree
+        collapses to the root.
+    impurities : np.ndarray[float64]
+        ``impurities[i]`` is the sum-of-leaf-loss-at-optimum for the
+        subtree that survives at ``ccp_alpha == ccp_alphas[i]``.
+        Same length as ``ccp_alphas``.
+
+    The input tree is **not** mutated — internally we deep-copy and
+    walk the copy.
+    """
+    import copy
+    work = copy.deepcopy(root)
+    leaf_loss, _ = make_leaf_solvers(loss)
+
+    alphas: list[float] = [0.0]
+    impurities: list[float] = [_leaves_loss_sum(work)]
+
+    while not work.is_leaf:
+        g_min, weakest = _weakest_link_alpha(work, leaf_loss)
+        if weakest is None:
+            break
+        _collapse_to_leaf(weakest, leaf_loss)
+        alphas.append(float(max(g_min, alphas[-1])))   # keep monotonic
+        impurities.append(_leaves_loss_sum(work))
+
+    import numpy as np
+    return np.asarray(alphas, dtype=np.float64), np.asarray(impurities, dtype=np.float64)

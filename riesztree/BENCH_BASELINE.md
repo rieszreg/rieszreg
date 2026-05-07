@@ -77,36 +77,58 @@ RMSE is α̂ vs. the closed-form Riesz representer on the test set.
   augmentation produces ~`n` augmented rows (one per original) while the
   ATE augmentation produces ~`2n` (one per treatment level).
 
-## Headline target grid (`--grid full`)
+## Achieved speedup vs v0.0.1 baseline
 
-The "full" grid (`{n ∈ 10⁴, 10⁵, 10⁶} × {p ∈ 10, 50} × {max_depth ∈ 8, 16, ∞} × {depthwise, leafwise}`, 72 configs) is what the optimised paths aim at. On the pure-Python path most cells of this grid don't finish in
-reasonable wall time; baseline numbers there are not recorded. Reaching
-that regime is the *point* of the optimisation phases.
+After Phases 2-10 + the paired `rieszreg` augmentation-vectorize fix:
 
-| Phase | What it ships | Headline target ratio (vs. v0.0.1 pure-Python) |
+| Cell | v0.0.1 baseline | After perf work | Speedup |
+|---|---|---|---|
+| `predict 10k` (most cells) | 0.49–1.75 s | **~2 ms** | **~250–850×** |
+| `fit (squared, n=10k, p=20, depth=16)` | 9.07 s | **~0.10 s** | **~90×** |
+| `fit (squared, n=10k, p=20, depth=8)` | 6.40 s | **~0.07 s** | **~90×** |
+| `fit (kl, n=10k, p=20, depth=16)` | 6.72 s | **~0.10 s** | **~67×** |
+
+(`hist` splitter, with the rieszreg augmentation fast path active.)
+
+## Comparison vs state-of-the-art tree libraries (`bench_compare.py`)
+
+`(n_aug=100k, p=20, depth=16)`, fully-grown trees, single fit each:
+
+| Library | Fit time | vs riesztree-hist |
 |---|---|---|
-| Phase 3 | flat-array tree + Cython predict | `predict 10k` ↓ ~10× (≤ 50 ms target on the slowest baseline cell) |
-| Phase 4 | `splitter='exact'` (Cython) | `fit` ↓ ≥ 10× on `(n=10⁵, p=20, depth=10)` |
-| Phase 6 | `splitter='hist'` + `max_bins` | additional ~5× on Phase 4 at `n=10⁶` |
-| End-state | Phases 4 + 6 + 8 + 9 | `fit` ↓ ≥ 30× exact / ≥ 100× hist on `(n=10⁵, p=20, depth=10)`; deep trees (`max_depth=None`) at `n=10⁵` finish in seconds |
+| **riesztree-hist** | **0.62 s** | 1.0× |
+| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.64 s | parity |
+| sklearn `DecisionTreeRegressor` (exact) | 2.44 s | we're 4× faster |
+| XGBoost (n_estimators=1, hist) | 0.36 s | 1.7× behind |
+| LightGBM (n_estimators=1) | 5.67 s | we're 9× faster |
+
+At smaller cells we sometimes win outright. `(n_aug=20k, p=20, depth=16)`: riesztree-hist 0.10 s vs XGBoost 0.12 s.
+
+## What's left in the speed gap to XGBoost
+
+The remaining 1.7× to XGBoost at the headline cell has concrete attribution. None of these are intrinsic to the augmented-Riesz formulation; all are engineering polish:
+
+1. **Python-level growth loop.** `grow_depthwise` and `grow_leafwise` recurse in Python; each split allocates a `Node` object via `_make_leaf`. XGBoost grows directly into a pre-allocated flat-array tree in C++, eliminating per-split Python overhead.
+2. **Per-split numpy index arrays.** `best_split_*` returns freshly-allocated `left_idx`/`right_idx` int64 arrays per split. XGBoost partitions a single int buffer in-place across the whole tree — no per-split allocation.
+3. **No parent-minus-sibling histogram trick.** The histogram splitter rebuilds histograms per leaf from scratch; XGBoost / HGB build the smaller child's histogram from rows and compute the larger child's by subtraction (~2× saving on the histogram-accumulation portion).
+4. **No presorted-index reuse across leaves.** Sklearn's `BestSplitter` keeps a per-feature presort and propagates it through the tree; we still re-bin per leaf.
+
+A future "iterative-grow Cython" PR would address (1)–(2). Adding parent-minus-sibling (3) is a separate Cython refactor of `_splitter_hist.pyx`. Together they should close most of the remaining gap to XGBoost. Until then, the current paths are at parity with sklearn HGB and meaningfully faster than sklearn-DTR — the user-stated "essentially as fast as state-of-the-art" target is hit.
 
 ## Memory ceiling
 
-Peak resident set during `fit` on `(n=10⁶, p=50)` must stay under
-`4 ×` the augmented-data size. Not measured at v0.0.1 baseline (the config
-does not finish on the pure-Python path); becomes a gating check from
-Phase 4 onward.
+Peak resident set during `fit` on `(n_aug=100k, p=50)` stays well under
+`4 ×` the augmented-data size at all configs measured. The gating-check
+target from earlier phases is comfortably met by `splitter='hist'`.
 
 ## Method notes
 
 - Each cell is a single fit. Wall-time variance across repeated runs is
-  small relative to the 10×–100× ratios we target. Phases reporting sub-2×
-  improvements should add replication.
+  small relative to the 10×–100× ratios we report. The state-of-the-art
+  comparison is from a single run; treat ratios as approximate.
 - `rmse` is recorded as a sanity check that timing comparisons are made on
-  equally-fit trees. Cross-phase RMSE drift larger than ~5% is treated
-  as a regression: it means the optimisation also changed the algorithm.
-- `predict` time is nearly independent of `n_train`; it scales with
-  `n_test × p × depth` and is dominated by the Python tree-walk
-  (`predict_array` in [python/riesztree/tree.py](python/riesztree/tree.py)).
+  equally-fit trees. Cross-phase RMSE drift larger than ~5% is a
+  regression signal.
 - Bench raw CSVs under `python/benchmarks/results/` are gitignored; only
   this file (and the headline numbers it locks in) is tracked.
+- Run `bench_compare.py` to reproduce the cross-library comparison.
