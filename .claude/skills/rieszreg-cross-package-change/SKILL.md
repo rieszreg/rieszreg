@@ -18,7 +18,7 @@ Hit list to mentally walk through:
 
 1. **Source** of every package — `packages/<pkg>/python/<pkg>/**/*.py`, `packages/<pkg>/r/<pkg>/R/*.R`. Update call sites and docstrings.
 2. **Tests** — `packages/<pkg>/python/tests/**/*.py`, `packages/<pkg>/r/<pkg>/tests/testthat/*.R`. Update imports, fixtures, assertions.
-3. **Examples** — `packages/<pkg>/python/examples/*.py` (one per estimand, per package; DESIGN.md §7.1). Update example code and any inline comments.
+3. **Examples** — `packages/<pkg>/python/examples/*.py` (one per built-in estimand, per package — `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`; this is the per-estimand-examples requirement enforced by `rieszreg-add-learner-package`). Update example code and any inline comments.
 4. **READMEs** — `README.md` at root + `packages/<pkg>/README.md` for each package. Update the API description and any code blocks.
 5. **CLAUDE.md files** — root and any per-package `packages/<pkg>/CLAUDE.md`.
 6. **DESIGN.md** — at root. Cross-reference notation tables and API descriptions.
@@ -31,7 +31,7 @@ If you're renaming a math symbol or a domain term — e.g. `g → mu`, `theta �
 
 ## When the rename has API consequences for downstream users
 
-This is research code (see [`rieszreg-coding`](../rieszreg-coding/SKILL.md) §1) — breaking changes are fine, no deprecation shims. The sweep is for *internal* consistency across the monorepo, not for backwards compatibility.
+This is research code (see [`rieszreg-coding-style`](../rieszreg-coding-style/SKILL.md) §1) — breaking changes are fine, no deprecation shims. The sweep is for *internal* consistency across the monorepo, not for backwards compatibility.
 
 If a downstream user (paper, downstream wrapper) is pinned to a specific tagged release, that pin keeps working — the rename only affects users on `main` or on tags after the rename. Don't add aliases or shims.
 
