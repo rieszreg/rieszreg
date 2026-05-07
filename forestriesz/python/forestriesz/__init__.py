@@ -19,7 +19,7 @@ from rieszreg import (
     AdditiveShift,
     Estimand,
     LocalShift,
-    LossSpec,
+    Loss,
     SquaredLoss,
     TSM,
 )
@@ -46,7 +46,7 @@ __all__ = [
     "ForestRieszBackend",
     "ForestRieszRegressor",
     "LocalShift",
-    "LossSpec",
+    "Loss",
     "SquaredLoss",
     "TSM",
     "default_riesz_features",

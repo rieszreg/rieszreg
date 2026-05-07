@@ -153,7 +153,7 @@ In each leaf the closed-form solve is `θ_ℓ = (Σ_i J_i)^{-1} Σ_i A_i`. The M
 
 ### Augmentation-style: `AugForestRieszBackend` (`Backend.fit_augmented`)
 
-Trained on the augmented dataset of M = k·n evaluation points produced by `rieszreg.build_augmented`. Per *augmented* row:
+Trained on the augmented dataset of M = k·n evaluation points produced by `Estimand.augment`. Per *augmented* row:
 
 ```
 J_k = 2 a_k · φ(z_k) φ(z_k)'        # zero for counterfactual eval points (a_k=0)

@@ -4,11 +4,11 @@ For SquaredLoss the per-leaf optimum has a closed form `θ = (Σ J)⁻¹ (Σ A)`
 that EconML's `LinearMomentGRFCriterion` solves directly. For non-quadratic
 Bregman losses the leaf-level loss is
 
-    L_leaf(θ) = Σ_{r ∈ leaf} aug_loss_alpha(loss, D_r, C_r, link(θ · φ(z_r)))
+    L_leaf(θ) = Σ_{r ∈ leaf} loss.aug_loss_alpha(D_r, C_r, link(θ · φ(z_r)))
 
-which is convex in θ (the loss spec's gradient is monotone) but non-linear,
-so we Newton-iterate. The per-row gradient and Hessian come from the loss
-spec's `aug_grad_eta(D, C, η)` and `aug_hess_eta(D, C, η, floor)` methods,
+which is convex in θ (the loss's gradient is monotone) but non-linear,
+so we Newton-iterate. The per-row gradient and Hessian come from
+``loss.aug_grad_eta(D, C, η)`` and ``loss.aug_hess_eta(D, C, η, floor)``,
 which work in η-space.
 
 Used by `AugForestRieszBackend` to post-hoc replace each leaf's stored value
@@ -22,11 +22,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from rieszreg import LossSpec
+from rieszreg import Loss
 
 
 def solve_leaf_bregman(
-    loss: LossSpec,
+    loss: Loss,
     is_original_leaf: np.ndarray,
     potential_deriv_coef_leaf: np.ndarray,
     phi_leaf: np.ndarray,
@@ -48,7 +48,7 @@ def solve_leaf_bregman(
     Parameters
     ----------
     loss
-        The Bregman loss spec. Provides ``aug_grad_eta(D, C, η)`` and
+        The Bregman loss. Provides ``aug_grad_eta(D, C, η)`` and
         ``aug_hess_eta(D, C, η, floor)`` per row in η-space.
     is_original_leaf, potential_deriv_coef_leaf
         Augmented coefficients (D, C) for the rows in this leaf, shape ``(m,)``.
@@ -143,7 +143,7 @@ def compute_leaf_eta_table(
     is_original_aug: np.ndarray,
     potential_deriv_coef_aug: np.ndarray,
     phi_aug: np.ndarray,
-    loss: LossSpec,
+    loss: Loss,
     *,
     base_score: float = 0.0,
 ) -> dict[tuple[int, int], np.ndarray]:

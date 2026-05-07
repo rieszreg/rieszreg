@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
 
 from .aug_backend import AugForestRieszBackend
 
@@ -19,7 +19,7 @@ from .aug_backend import AugForestRieszBackend
 class AugForestRieszRegressor(RieszEstimator):
     """Augmentation-style random-forest Riesz regression.
 
-    Trains on the M = k·n augmented dataset that ``rieszreg.build_augmented``
+    Trains on the M = k·n augmented dataset that ``Estimand.augment``
     produces. No sieve required — even with the constant basis the per-augmented-row
     Jacobian and moment vary across rows, so the forest can split usefully.
 
@@ -33,7 +33,7 @@ class AugForestRieszRegressor(RieszEstimator):
     max_features, max_samples, min_balancedness_tol, honest, inference,
     fit_intercept, subforest_size, l2, n_jobs, verbose
         Forwarded to EconML's ``BaseGRF``.
-    loss : rieszreg.LossSpec, default=SquaredLoss()
+    loss : rieszreg.Loss, default=SquaredLoss()
     init : float, "m1", or None
     random_state : int, default=0
     """
@@ -59,7 +59,7 @@ class AugForestRieszRegressor(RieszEstimator):
         l2: float = 0.01,
         n_jobs: int = -1,
         verbose: int = 0,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         init: float | str | None = None,
         random_state: int = 0,
     ):
@@ -89,7 +89,7 @@ class AugForestRieszRegressor(RieszEstimator):
         self.n_jobs = n_jobs
         self.verbose = verbose
 
-    def _resolved_loss(self) -> LossSpec:
+    def _resolved_loss(self) -> Loss:
         return self.loss if self.loss is not None else SquaredLoss()
 
     def _resolved_backend(self) -> AugForestRieszBackend:

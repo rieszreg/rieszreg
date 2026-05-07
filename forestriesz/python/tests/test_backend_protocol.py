@@ -40,7 +40,7 @@ def test_namespace_exports_match_design():
         "ForestRieszBackend",
         "ForestRieszRegressor",
         "LocalShift",
-        "LossSpec",
+        "Loss",
         "SquaredLoss",
         "TSM",
         "default_riesz_features",

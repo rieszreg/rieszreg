@@ -2,7 +2,7 @@
 
 Random-forest backend for the [RieszReg meta-package](../README.md), implementing [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf) for the full set of estimands the rieszreg framework supports.
 
-This package depends on `rieszreg` for the shared abstractions (`Estimand`, `LossSpec`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `forestriesz` contributes:
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `forestriesz` contributes:
 
 - `ForestRieszBackend` — `MomentBackend` Protocol implementation (the moment-style entry point added in the rieszreg refactor that ships with this package). Computes per-row moments via `rieszreg.trace` and packs them into EconML's linear-moment GRF.
 - `ForestRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with forest-specific hyperparameters (`n_estimators`, `max_depth`, `min_samples_leaf`, `honest`, `inference`, `l2`, `riesz_feature_fns`, ...) on the constructor.
@@ -67,8 +67,8 @@ Rscript -e '
 
 `forestriesz` depends on `rieszreg` and reuses, without modification:
 
-- `Estimand`, `Tracer`/`LinearForm`, `trace` — the moment-functional abstraction. Forest backends use `trace` directly to compute per-row moments without going through `build_augmented`.
-- `LossSpec`, `SquaredLoss` — the Bregman-Riesz loss framework. (KLLoss / Bernoulli / BoundedSquared are NOT yet supported by the forest backend; v2.)
+- `Estimand`, `Tracer`/`LinearForm`, `trace` — the moment-functional abstraction. Forest backends use `trace` directly to compute per-row moments without going through `Estimand.augment`.
+- `Loss`, `SquaredLoss` — the Bregman-Riesz loss framework. (KLLoss / Bernoulli / BoundedSquared are NOT yet supported by the forest backend; v2.)
 - `Diagnostics`, `diagnose` — base diagnostics (`ForestDiagnostics` extends with feature importance, leaf-size summary).
 - `RieszEstimator` — orchestration; `ForestRieszRegressor` is a thin subclass with the forest backend defaulted.
 

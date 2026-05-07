@@ -34,9 +34,8 @@ import numpy as np
 from rieszreg import (
     AugmentedDataset,
     FitResult,
-    LossSpec,
+    Loss,
     SquaredLoss,
-    aug_loss_alpha,
 )
 
 from ._grf import _RieszGRF
@@ -50,13 +49,13 @@ def _eval_phi(features: np.ndarray, phi_fns: Sequence[Callable]) -> np.ndarray:
 
 
 def _holdout_riesz_loss(
-    aug_valid: AugmentedDataset, predictor: AugForestPredictor, loss: LossSpec
+    aug_valid: AugmentedDataset, predictor: AugForestPredictor, loss: Loss
 ) -> float:
     eta = predictor.predict_eta(aug_valid.features)
     alpha = loss.link_to_alpha(eta)
     return float(
-        np.sum(aug_loss_alpha(
-            loss, aug_valid.is_original, aug_valid.potential_deriv_coef, alpha
+        np.sum(loss.aug_loss_alpha(
+            aug_valid.is_original, aug_valid.potential_deriv_coef, alpha
         ))
         / aug_valid.n_rows
     )
@@ -100,7 +99,7 @@ class AugForestRieszBackend:
         self,
         aug_train: AugmentedDataset,
         aug_valid: AugmentedDataset | None,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,

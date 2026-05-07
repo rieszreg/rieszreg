@@ -18,10 +18,8 @@ from rieszreg import (
     Estimand,
     FiniteEvalEstimand,
     FitResult,
-    LossSpec,
+    Loss,
     SquaredLoss,
-    aug_loss_alpha,
-    build_augmented,
     trace,
 )
 
@@ -72,23 +70,24 @@ def _holdout_riesz_loss(
     rows_valid: list[dict[str, Any]],
     estimand: Estimand,
     predictor: ForestPredictor,
-    loss: LossSpec,
+    loss: Loss,
     ys_valid: list | None = None,
 ) -> float:
     """Mean per-original-row Riesz loss on the validation rows.
 
-    Uses build_augmented + loss_row to share the formula with the rest of the
-    framework, so val scores are comparable across backends. ``ys_valid``
-    threads the per-row outcome through to ``m(alpha)(z, y)`` for
-    Y-dependent estimands.
+    Uses ``Estimand.augment`` + ``Loss.aug_loss_alpha`` to share the formula
+    with the rest of the framework, so val scores are comparable across
+    backends. ``ys_valid`` threads the per-row outcome through to
+    ``m(alpha)(z, y)`` for Y-dependent estimands.
     """
     if not rows_valid:
         return float("nan")
-    aug = build_augmented(rows_valid, estimand, ys_valid)
+    feats = _materialize_features(rows_valid, estimand.feature_keys)
+    aug = estimand.augment(feats, ys=ys_valid)
     eta = predictor.predict_eta(aug.features)
     alpha = loss.link_to_alpha(eta)
     return float(
-        np.sum(aug_loss_alpha(loss, aug.is_original, aug.potential_deriv_coef, alpha))
+        np.sum(loss.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha))
         / aug.n_rows
     )
 
@@ -154,7 +153,7 @@ class ForestRieszBackend:
         rows_train: list[dict[str, Any]],
         rows_valid: list[dict[str, Any]] | None,
         estimand: Estimand,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,

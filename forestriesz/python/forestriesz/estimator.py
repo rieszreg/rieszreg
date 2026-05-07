@@ -12,7 +12,7 @@ from typing import Callable, Sequence
 
 import numpy as np
 
-from rieszreg import Estimand, LossSpec, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
 
 from .backend import ForestRieszBackend
 
@@ -50,7 +50,7 @@ class ForestRieszRegressor(RieszEstimator):
         plus ``inference=True`` to use ``predict_interval``.
     l2 : float
         Ridge added to the per-leaf Jacobian for numerical stability.
-    loss : rieszreg.LossSpec, default=SquaredLoss()
+    loss : rieszreg.Loss, default=SquaredLoss()
         Currently only ``SquaredLoss`` is supported.
     init : float, "m1", or None
         α-space initialization. None defers to ``loss.default_init_alpha()``.
@@ -79,7 +79,7 @@ class ForestRieszRegressor(RieszEstimator):
         l2: float = 0.01,
         n_jobs: int = -1,
         verbose: int = 0,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         init: float | str | None = None,
         random_state: int = 0,
     ):
@@ -112,7 +112,7 @@ class ForestRieszRegressor(RieszEstimator):
 
     # ---- defaults / backend construction ----
 
-    def _resolved_loss(self) -> LossSpec:
+    def _resolved_loss(self) -> Loss:
         return self.loss if self.loss is not None else SquaredLoss()
 
     def _resolved_backend(self) -> ForestRieszBackend:

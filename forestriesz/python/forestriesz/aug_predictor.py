@@ -14,7 +14,7 @@ from typing import Callable, ClassVar
 
 import numpy as np
 
-from rieszreg import LossSpec, register_predictor_loader
+from rieszreg import Loss, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 
 
@@ -25,7 +25,7 @@ def _const_phi(features: np.ndarray) -> np.ndarray:
 @dataclass
 class AugForestPredictor:
     forest: object  # _RieszGRF
-    loss: LossSpec
+    loss: Loss
     base_score: float
     riesz_feature_fns: list[Callable] | None
     # Optional: Bregman-loss leaf overrides keyed by (tree_idx, leaf_node_id).
