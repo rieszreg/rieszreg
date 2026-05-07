@@ -665,9 +665,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="living-doc-rule" class="level2">
 <h2 class="anchored" data-anchor-id="living-doc-rule">Living-doc rule</h2>
 <p>Public-API changes update both <code>README.md</code> and the relevant <code>docs/*.qmd</code> page in the same commit. On bilingual pages, update both the Python and R tabs.</p>
-<p>The pre-commit hook at <code>.githooks/pre-commit</code> (currently per-package; a meta-project version is on the roadmap) enforces this. Activate per clone:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> config core.hooksPath .githooks</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The pre-commit hook at <code>.githooks/pre-commit</code> (monorepo-wide, auto-detects which <code>packages/&lt;pkg&gt;/</code> is touched) enforces this. Activate per clone:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> scripts/setup-hooks.sh</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That runs <code>git config core.hooksPath .githooks</code> once. After activation, every commit runs the hook automatically.</p>
 <p>The hook also greps the staged diff for two doc anti-patterns and blocks if it finds them: design-decision metacommentary (sentences describing the API’s negative space, e.g.&nbsp;what’s omitted, deferred, or rejected) and AI-flavored hedges (editorial framing, sweeping qualifiers, ornamental noun phrases). Match the <a href="https://stanfordmlgroup.github.io/ngboost/intro.html">ngboost user guide</a> tone: direct, instructive, short.</p>
+<p>The same doc-tone logic lives in <code>.githooks/lint-docs.sh</code> and runs in CI via the <code>lint-docs</code> job in <code>.github/workflows/test.yml</code>, so bypassing the local hook with <code>--no-verify</code> does not bypass enforcement.</p>
 <p>For internal refactors that don’t touch any signature, test additions, or comment fixes: <code>git commit --no-verify</code>.</p>
 </section>
 <section id="local-docs-render" class="level2">
