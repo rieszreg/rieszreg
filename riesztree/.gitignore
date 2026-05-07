@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.DS_Store
+.Rhistory
+.Rproj.user/
+
+# Benchmark outputs are reproducible and would churn the repo on every run.
+# The locked baseline lives in BENCH_BASELINE.md; raw CSVs stay local.
+python/benchmarks/results/
+
+# Cython build artifacts: the .c is regenerated from .pyx on every build,
+# the .so is platform-specific and rebuilt by `pip install -e .`. The
+# .pxd / .pyx / .py are sources and stay tracked.
+python/riesztree/fast/*.c
+python/riesztree/fast/*.so
+python/riesztree/fast/*.html

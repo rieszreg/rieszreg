@@ -1,0 +1,20 @@
+Package: riesztree
+Type: Package
+Title: Single-Tree Backend for Riesz Regression
+Version: 0.0.1
+Authors@R: person("Alejandro", "Schuler", role = c("aut", "cre"), email = "alejandro.schuler@berkeley.edu")
+Description: R wrapper around the Python 'riesztree' package. Fits a single
+    decision tree to estimate the Riesz representer of a linear functional
+    via greedy splits on the augmented Bregman-Riesz loss. Subclass of
+    'rieszreg::RieszEstimatorR6'.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Imports:
+    R6,
+    reticulate,
+    rieszreg
+Suggests:
+    testthat (>= 3.0.0),
+    pkgload
+Config/testthat/edition: 3
+RoxygenNote: 7.3.0
