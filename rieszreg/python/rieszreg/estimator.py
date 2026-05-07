@@ -18,16 +18,10 @@ from sklearn.base import BaseEstimator
 from sklearn.model_selection import train_test_split
 
 from ._omp import warn_if_multi_backend_omp
-from .augmentation import (
-    aug_loss_alpha,
-    build_augmented,
-    build_augmented_fast,
-    builtin_m_bar,
-)
 from .backends import Backend, load_predictor
 from .estimands.base import Estimand, FiniteEvalEstimand, estimand_from_spec
 from .estimands.tracer import trace
-from .losses import LossSpec, SquaredLoss, loss_from_spec
+from .losses import Loss, SquaredLoss, loss_from_spec
 
 
 def _is_dataframe(Z) -> bool:
@@ -171,7 +165,7 @@ class RieszEstimator(BaseEstimator):
         knobs (`n_estimators`, `learning_rate`, `early_stopping_rounds`,
         NN training-loop config, kernel choice, etc.) live on the backend
         constructor — see DESIGN.md §A.1 (the agnostic-orchestrator rule).
-    loss : LossSpec, default=None
+    loss : Loss, default=None
         The Bregman-Riesz loss to minimize. Defaults to `SquaredLoss()`.
     init : float or None
         α-space initialization. ``None`` (default) sets α to the constant
@@ -185,7 +179,7 @@ class RieszEstimator(BaseEstimator):
         self,
         estimand: Estimand,
         backend: Backend | None = None,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         init: float | str | None = None,
         random_state: int = 0,
     ):
@@ -205,7 +199,7 @@ class RieszEstimator(BaseEstimator):
             )
         return self.backend
 
-    def _resolved_loss(self) -> LossSpec:
+    def _resolved_loss(self) -> Loss:
         return self.loss if self.loss is not None else SquaredLoss()
 
     def _backend_hyperparams(self) -> dict:
@@ -258,67 +252,37 @@ class RieszEstimator(BaseEstimator):
             Z_train, Z_valid = Z, None
             y_train, y_valid = y, None
 
-        # Augmentation fast path: vectorised numpy for the five built-in
-        # estimand factories (no per-row symbolic tracing). Returns None
-        # to signal fall-back to the slow row-dict + tracer path for
-        # custom estimands or when y is provided.
-        n_train = len(Z_train) if _is_dataframe(Z_train) else len(np.asarray(Z_train))
-        n_valid = (
-            (len(Z_valid) if _is_dataframe(Z_valid) else len(np.asarray(Z_valid)))
-            if Z_valid is not None
-            else 0
-        )
+        # Augmentation: dispatch via `estimand.augment(features, ys)`.
+        # Built-in subclasses override with vectorised numpy; custom estimands
+        # use the inherited Tracer-based default.
         feats_train = _features_from_Z(Z_train, self.estimand)
-        aug_train_fast = build_augmented_fast(feats_train, self.estimand, y_train)
+        n_train = feats_train.shape[0]
+        ys_train = _ys_from_y(y_train, n_train)
+        aug_train = self.estimand.augment(feats_train, ys=ys_train)
+
         if Z_valid is not None and len(Z_valid) > 0:
             feats_valid = _features_from_Z(Z_valid, self.estimand)
-            aug_valid_fast = build_augmented_fast(
-                feats_valid, self.estimand, y_valid
-            )
+            ys_valid = _ys_from_y(y_valid, feats_valid.shape[0])
+            aug_valid = self.estimand.augment(feats_valid, ys=ys_valid)
         else:
-            aug_valid_fast = None
-
-        if aug_train_fast is not None:
-            # Built-in fast path — no row-dicts, no per-row trace.
-            aug_train = aug_train_fast
-            aug_valid = aug_valid_fast
-            ys_train = None  # built-ins ignore y
+            feats_valid = None
             ys_valid = None
-            rows_train = None  # not needed downstream when fast path is taken
-            rows_valid = None
-        else:
-            # Custom estimand or y supplied — slow row-dict + tracer path.
-            rows_train = _rows_from_Z(Z_train, self.estimand)
-            ys_train = _ys_from_y(y_train, len(rows_train))
-            rows_valid = (
-                _rows_from_Z(Z_valid, self.estimand)
-                if Z_valid is not None and len(Z_valid) > 0
-                else None
-            )
-            ys_valid = (
-                _ys_from_y(y_valid, len(rows_valid))
-                if rows_valid is not None
-                else None
-            )
-            aug_train = build_augmented(rows_train, self.estimand, ys=ys_train)
-            aug_valid = (
-                build_augmented(rows_valid, self.estimand, ys=ys_valid)
-                if rows_valid is not None
-                else None
-            )
+            aug_valid = None
 
         # Resolve init in α-space, then convert to η.
         # Default (init=None): use the constant that minimizes the empirical
         # Riesz loss. For any Bregman loss with strictly convex φ this is
         # m̄ = E[m(Z, 1)] (FOC ψ'(a) = φ''(a)·m̄ collapses to a = m̄ via
         # ψ'(t) = t·φ''(t)). Each loss projects m̄ into its α-domain.
-        # Built-in factories have closed-form m̄ — skip the per-row trace.
+        # Built-in subclasses carry the closed-form m_bar as a class attribute;
+        # custom estimands fall back to a per-row trace.
         init_arg = self.init
         if init_arg is None:
-            mbar_builtin = builtin_m_bar(self.estimand)
+            mbar_builtin = self.estimand.m_bar
             if mbar_builtin is not None and ys_train is None:
                 m_bar = float(mbar_builtin)
-            elif rows_train is not None:
+            else:
+                rows_train = _rows_from_Z(Z_train, self.estimand)
                 if ys_train is None:
                     m_bar = float(np.mean(
                         [sum(c for c, _ in trace(self.estimand, z)) for z in rows_train]
@@ -330,14 +294,6 @@ class RieszEstimator(BaseEstimator):
                             for z, y_i in zip(rows_train, ys_train)
                         ]
                     ))
-            else:
-                # Built-in fast path was taken but no closed-form m̄ registered
-                # (shouldn't happen — every built-in in _BUILTIN_M_BAR). Fall
-                # back to deriving rows on-demand.
-                rows_train = _rows_from_Z(Z_train, self.estimand)
-                m_bar = float(np.mean(
-                    [sum(c for c, _ in trace(self.estimand, z)) for z in rows_train]
-                ))
             init_alpha = loss.best_constant_init(m_bar)
         elif isinstance(init_arg, (int, float)):
             init_alpha = float(init_arg)
@@ -356,21 +312,14 @@ class RieszEstimator(BaseEstimator):
         # Backends implementing both default to fit_augmented for back-compat.
         uses_moment_path = hasattr(backend, "fit_rows") and not hasattr(backend, "fit_augmented")
         if uses_moment_path:
-            # Moment backends still need row-dicts. If we took the augmentation
-            # fast path above, materialise the rows now.
-            if rows_train is None:
-                rows_train = _rows_from_Z(Z_train, self.estimand)
-                ys_train = _ys_from_y(y_train, len(rows_train))
-                rows_valid = (
-                    _rows_from_Z(Z_valid, self.estimand)
-                    if Z_valid is not None and len(Z_valid) > 0
-                    else None
-                )
-                ys_valid = (
-                    _ys_from_y(y_valid, len(rows_valid))
-                    if rows_valid is not None
-                    else None
-                )
+            # Moment backends consume row-dicts; materialise from the feature
+            # ndarrays we already built.
+            rows_train = _rows_from_Z(Z_train, self.estimand)
+            rows_valid = (
+                _rows_from_Z(Z_valid, self.estimand)
+                if Z_valid is not None and len(Z_valid) > 0
+                else None
+            )
             result = backend.fit_rows(
                 rows_train,
                 rows_valid,
@@ -381,8 +330,6 @@ class RieszEstimator(BaseEstimator):
                 **common_kwargs,
             )
         else:
-            # aug_train / aug_valid are already populated upstream — either
-            # by the vectorised fast path or by the slow-path else-branch.
             result = backend.fit_augmented(aug_train, aug_valid, loss, **common_kwargs)
 
         self.predictor_ = result.predictor
@@ -408,13 +355,13 @@ class RieszEstimator(BaseEstimator):
         """
         if not hasattr(self, "predictor_"):
             raise RuntimeError(f"{type(self).__name__} is not fitted yet.")
-        rows = _rows_from_Z(Z, self.estimand)
-        ys = _ys_from_y(y, len(rows))
-        aug = build_augmented(rows, self.estimand, ys)
+        feats = _features_from_Z(Z, self.estimand)
+        ys = _ys_from_y(y, feats.shape[0])
+        aug = self.estimand.augment(feats, ys=ys)
         eta = self.predictor_.predict_eta(aug.features)
         alpha = self.loss_.link_to_alpha(eta)
         return float(
-            np.sum(aug_loss_alpha(self.loss_, aug.is_original, aug.potential_deriv_coef, alpha))
+            np.sum(self.loss_.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha))
             / aug.n_rows
         )
 
@@ -434,14 +381,14 @@ class RieszEstimator(BaseEstimator):
         """
         if not hasattr(self, "predictor_"):
             raise RuntimeError(f"{type(self).__name__} is not fitted yet.")
-        rows = _rows_from_Z(Z, self.estimand)
-        ys = _ys_from_y(y, len(rows))
-        aug = build_augmented(rows, self.estimand, ys)
+        feats = _features_from_Z(Z, self.estimand)
+        ys = _ys_from_y(y, feats.shape[0])
+        aug = self.estimand.augment(feats, ys=ys)
         eta = self.predictor_.predict_eta(aug.features)
         alpha_hat = self.loss_.link_to_alpha(eta)
         yardstick = SquaredLoss()
         return -float(
-            np.sum(aug_loss_alpha(yardstick, aug.is_original, aug.potential_deriv_coef, alpha_hat))
+            np.sum(yardstick.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha_hat))
             / aug.n_rows
         )
 

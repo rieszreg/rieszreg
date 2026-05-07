@@ -1,16 +1,9 @@
 """Pin the per-subject augmented-row counts for built-in estimands.
 
-The tracer + augmentation engine should generate exactly the rows the loss
-needs and no more. Specifically, for ATT and LocalShift, subjects whose
-multiplicative factor (`a` or `1{a < threshold}`) is zero should contribute
-only one augmented row (the original observation), not phantom counterfactual
-rows with zero coefficients. This matches Lee & Schuler (2025)'s ATT
-augmentation layout — counterfactuals only for treated subjects — and means
-our generic `Estimand.m → trace → build_augmented` pipeline produces the
-minimal augmentation automatically (no estimand-specific code path required).
-
-If the tracer ever stops short-circuiting on multiplicative zeros, this test
-fails and surfaces wasted work for ATT-style partial-parameter estimands.
+`Estimand.augment` should emit exactly the rows the loss needs and no more.
+For ATT and LocalShift, subjects whose multiplicative factor (`a` or
+`1{a < threshold}`) is zero contribute only one augmented row (the original
+observation), not phantom counterfactual rows with zero coefficients.
 """
 
 from __future__ import annotations
@@ -19,11 +12,11 @@ import collections
 
 import numpy as np
 
-from rieszreg import ATE, ATT, LocalShift, build_augmented
+from rieszreg import ATE, ATT, LocalShift
 
 
-def _make_rows(a: np.ndarray, x: np.ndarray) -> list[dict]:
-    return [{"a": float(a[i]), "x": float(x[i])} for i in range(len(a))]
+def _make_features(a: np.ndarray, x: np.ndarray) -> np.ndarray:
+    return np.column_stack([a.astype(float), x.astype(float)])
 
 
 def test_ate_two_rows_per_subject():
@@ -32,7 +25,7 @@ def test_ate_two_rows_per_subject():
     n = 50
     a = rng.binomial(1, 0.5, n).astype(float)
     x = rng.uniform(0, 1, n)
-    aug = build_augmented(_make_rows(a, x), ATE())
+    aug = ATE().augment(_make_features(a, x))
 
     assert aug.features.shape[0] == 2 * n
     counts = collections.Counter(aug.origin_index.tolist())
@@ -42,10 +35,9 @@ def test_ate_two_rows_per_subject():
 def test_att_treated_two_rows_untreated_one_row():
     """ATT (partial) skips counterfactuals for untreated subjects.
 
-    Untreated rows have `a_i = 0`, so the multiplicative factor in
-    `m(α)(z) = a · (α(1, x) − α(0, x))` evaluates to 0 before the tracer
-    sees any α(...) call. The tracer returns [] for those subjects, and
-    only the original observation row gets emitted by build_augmented.
+    Untreated rows have `a_i = 0`, so `m(α)(z) = a · (α(1, x) − α(0, x))`
+    contributes only the original row. Treated rows contribute the original
+    plus the (0, x) counterfactual.
 
     Total expected augmented rows = n + n_treated.
     """
@@ -55,7 +47,7 @@ def test_att_treated_two_rows_untreated_one_row():
     x = rng.uniform(0, 1, n)
     n_treated = int(a.sum())
 
-    aug = build_augmented(_make_rows(a, x), ATT())
+    aug = ATT().augment(_make_features(a, x))
     assert aug.features.shape[0] == n + n_treated, (
         f"expected {n + n_treated} augmented rows (1 per untreated, 2 per "
         f"treated); got {aug.features.shape[0]}"
@@ -67,8 +59,6 @@ def test_att_treated_two_rows_untreated_one_row():
     assert treated_counts == {2}, f"treated row counts: {treated_counts}"
     assert untreated_counts == {1}, f"untreated row counts: {untreated_counts}"
 
-    # For untreated subjects the single row should be the original
-    # observation: is_original = 1, potential_deriv_coef = 0.
     for i in range(n):
         if a[i] == 0:
             mask = aug.origin_index == i
@@ -87,8 +77,7 @@ def test_local_shift_skips_above_threshold_subjects():
     threshold = 0.0
     n_below = int((a < threshold).sum())
 
-    aug = build_augmented(_make_rows(a, x), LocalShift(delta=0.1, threshold=threshold))
-    # 1 row per subject above threshold + 2 rows per subject below.
+    aug = LocalShift(delta=0.1, threshold=threshold).augment(_make_features(a, x))
     expected = n + n_below
     assert aug.features.shape[0] == expected, (
         f"expected {expected} augmented rows; got {aug.features.shape[0]}"

@@ -1,4 +1,4 @@
-"""Smoke tests for Bregman-Riesz LossSpec implementations."""
+"""Smoke tests for Bregman-Riesz `Loss` implementations."""
 
 from __future__ import annotations
 
@@ -9,9 +9,8 @@ from rieszreg import (
     BernoulliLoss,
     BoundedSquaredLoss,
     KLLoss,
-    LossSpec,
+    Loss,
     SquaredLoss,
-    aug_loss_alpha,
     loss_from_spec,
 )
 
@@ -20,7 +19,7 @@ from rieszreg import (
     "loss",
     [SquaredLoss(), KLLoss(), BernoulliLoss(), BoundedSquaredLoss(lo=0.0, hi=1.0)],
 )
-def test_to_from_spec_round_trip(loss: LossSpec):
+def test_to_from_spec_round_trip(loss: Loss):
     rebuilt = loss_from_spec(loss.to_spec())
     assert type(rebuilt) is type(loss)
     assert rebuilt.name == loss.name
@@ -40,8 +39,8 @@ def test_squared_gradient_and_hessian_match_finite_diff():
     eta = np.array([0.5, 0.5, 0.5])
     h = 1e-6
     grad_analytic = loss.aug_grad_eta(is_original, pdc, eta)
-    loss_plus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(eta + h))
-    loss_minus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(eta - h))
+    loss_plus = loss.aug_loss_alpha(is_original, pdc, loss.link_to_alpha(eta + h))
+    loss_minus = loss.aug_loss_alpha(is_original, pdc, loss.link_to_alpha(eta - h))
     grad_numeric = (loss_plus - loss_minus) / (2 * h)
     np.testing.assert_allclose(grad_analytic, grad_numeric, rtol=1e-4)
     # Hessian under squared loss is 2D (floored).
@@ -134,7 +133,7 @@ def test_inline_loss_kl_matches_kl_built_in():
 def test_subclass_loss_pattern():
     """Subclassing `Loss` (mirroring the built-in style) should work
     end-to-end with the orchestrator helpers."""
-    from rieszreg import Loss, aug_loss_alpha
+    from rieszreg import Loss
 
     class MyLoss(Loss):
         name = "mine"
@@ -160,4 +159,4 @@ def test_subclass_loss_pattern():
         is_original * (alpha * loss.potential_deriv(alpha) - loss.potential(alpha))
         + pdc * loss.potential_deriv(alpha)
     )
-    np.testing.assert_allclose(aug_loss_alpha(loss, is_original, pdc, alpha), expected)
+    np.testing.assert_allclose(loss.aug_loss_alpha(is_original, pdc, alpha), expected)

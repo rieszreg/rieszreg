@@ -16,7 +16,7 @@
 
 A family of packages for Riesz regression. Top-level coordinator for:
 
-- [`rieszreg/`](rieszreg/) — meta-package: shared abstractions (`Estimand`, `LossSpec`, `RieszEstimator`, augmentation, diagnostics, `Backend` and `MomentBackend` Protocols, testing utilities, R6 base class).
+- [`rieszreg/`](rieszreg/) — meta-package: shared abstractions (`Estimand`, `Loss`, `RieszEstimator`, augmentation, diagnostics, `Backend` and `MomentBackend` Protocols, testing utilities, R6 base class).
 - [`rieszboost/`](rieszboost/) — gradient-boosting backend (Lee & Schuler 2025; uses `Backend.fit_augmented`).
 - [`krrr/`](krrr/) — kernel-ridge backend (Singh 2021; uses `Backend.fit_augmented`).
 - [`forestriesz/`](forestriesz/) — random-forest backend (Chernozhukov, Newey, Quintas-Martínez, Syrgkanis ICML 2022; uses `MomentBackend.fit_rows`).
@@ -50,9 +50,9 @@ rieszreg (no deps on impl packages)
 
 | Concern | Home |
 |---|---|
-| `Estimand` factories (ATE, ATT, …), `LinearForm`, `Tracer` | `rieszreg/python/rieszreg/estimands/` |
-| `LossSpec` Protocol + 4 built-in losses | `rieszreg/python/rieszreg/losses/` |
-| Augmentation engine | `rieszreg/python/rieszreg/augmentation.py` |
+| `Estimand` base class + 5 built-in subclasses (ATE, ATT, TSM, AdditiveShift, LocalShift), `LinearForm`, `Tracer` | `rieszreg/python/rieszreg/estimands/` |
+| `Loss` base class + 4 built-in losses | `rieszreg/python/rieszreg/losses/` |
+| `AugmentedDataset` packaging | `rieszreg/python/rieszreg/augmentation.py` |
 | `Backend` and `MomentBackend` Protocols + predictor-loader registry | `rieszreg/python/rieszreg/backends/base.py` |
 | `Diagnostics` base class + `diagnose()` | `rieszreg/python/rieszreg/diagnostics.py` |
 | `RieszEstimator` (sklearn orchestrator) | `rieszreg/python/rieszreg/estimator.py` |
@@ -122,7 +122,7 @@ User-facing docs describe what's currently in the package, in plain instructive 
 
 ## sklearn-first rule
 
-Before writing any procedural code with loops, splits, grids, or folds, ask *"is there an sklearn way?"*. If yes, use it. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `LossSpec`).
+Before writing any procedural code with loops, splits, grids, or folds, ask *"is there an sklearn way?"*. If yes, use it. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `Loss`).
 
 ## Status
 

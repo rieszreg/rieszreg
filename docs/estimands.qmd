@@ -196,7 +196,7 @@ $$
 \mathcal L_{h,n}(\alpha) = \sum_{i=1}^n \left[\tilde h(\alpha(Z_i)) - \sum_{j:\, D_{ij}=1} C_{ij}\, h'(\alpha(Z_i))\right] - \sum_{i=1}^n \sum_{j:\, D_{ij}=0} C_{ij}\, h'(\alpha(Z_{ij})).
 $$
 
-At each distinct evaluation point, the loss combines a $\tilde h$-weight and an $h'$-weight into one term. `build_augmented` collects these distinct points for each row and stores their coefficients. Let $r$ index an enumeration of the augmented data points. Each augmented row $r$ corresponds to either a $Z_{ij}$ or a $Z_i$ for some original row $i$; write $i_r$ for that origin row. The two weights are
+At each distinct evaluation point, the loss combines a $\tilde h$-weight and an $h'$-weight into one term. `Estimand.augment` collects these distinct points for each row and stores their coefficients. Let $r$ index an enumeration of the augmented data points. Each augmented row $r$ corresponds to either a $Z_{ij}$ or a $Z_i$ for some original row $i$; write $i_r$ for that origin row. The two weights are
 $$
 D_r = \mathbf{1}[Z_r = Z_{i_r}],
 \qquad
@@ -233,12 +233,12 @@ $$
 \mathcal L_{h,n}(\alpha) = \sum_{r=1}^{6} L_r = \sum_{i=1}^{3} \big[\tilde h(\alpha(Z_i)) - h'(\alpha(1, X_i)) + h'(\alpha(0, X_i))\big].
 $$
 
-`build_augmented` produces this table directly: it stores the two coefficients as `is_original` (the $\tilde h$-weight $D_r$) and `potential_deriv_coef` (the $h'$-weight $C_r$) on the returned `AugmentedDataset`.
+`Estimand.augment` produces this table directly: it stores the two coefficients as `is_original` (the $\tilde h$-weight $D_r$) and `potential_deriv_coef` (the $h'$-weight $C_r$) on the returned `AugmentedDataset`.
 
 ```{python}
 import numpy as np
 import pandas as pd
-from rieszreg import ATE, build_augmented
+from rieszreg import ATE
 
 df = pd.DataFrame({"a": [0, 1, 1], "x": [0.2, 0.5, 0.8]})
 df
@@ -246,7 +246,7 @@ df
 
 ```{python}
 estimand = ATE(treatment="a", covariates=("x",))
-aug = build_augmented(df.to_dict("records"), estimand)
+aug = estimand.augment(df[["a", "x"]].to_numpy(dtype=float))
 
 aug_df = pd.DataFrame({
     "i": aug.origin_index + 1,

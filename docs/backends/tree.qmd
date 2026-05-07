@@ -296,11 +296,11 @@ For losses outside the four built-ins (`SquaredLoss`, `KLLoss`, `BernoulliLoss`,
 
 ```python
 import numba
-from rieszreg import LossSpec
+from rieszreg import Loss
 from riesztree.fast import register_fast_leaf_solver
 
-class MyLoss(LossSpec):
-    ...   # implement the LossSpec interface
+class MyLoss(Loss):
+    ...   # implement the Loss interface
 
 @numba.cfunc("float64(float64, float64)", cache=True, nopython=True)
 def my_leaf_loss(D, C):

@@ -2,10 +2,10 @@
 
 A `Loss` describes a Bregman-Riesz loss as a function of `alpha` (and `eta`,
 via the link) only. The (is_original, potential_deriv_coef) augmented-row
-coefficients live with the augmentation engine, not the loss; the orchestrator
-helpers in `rieszreg.augmentation` (`aug_loss_alpha`, `aug_grad_eta`,
-`aug_hess_eta`) combine the loss's α-space functions with augmented
-coefficients.
+coefficients live on `AugmentedDataset` (produced by `Estimand.augment`); the
+loss's `aug_loss_alpha`, `aug_loss_eta`, `aug_grad_eta`, and `aug_hess_eta`
+methods combine those coefficients with the loss's α-space functions to give
+per-row loss / gradient / Hessian.
 
 The Bregman-Riesz loss with strictly convex potential `h` (`potential` in
 code) has the population form
@@ -211,34 +211,41 @@ class Loss:
             return self._link_inv_inline(alpha)
         return alpha  # identity default
 
-    # ---- Augmented-loss helpers in η-space ----
+    # ---- Augmented-loss helpers ----
     #
     # These take the augmentation packaging `(is_original, potential_deriv_coef)`
-    # — abbreviated D, C in the math — and return η-space gradients / hessians.
-    # The augmentation engine produces D and C; the loss's job here is to apply
-    # the chain rule through its link. Numerical defaults; override in subclasses
-    # for performance.
+    # — abbreviated D, C in the math — and combine them with the loss's α-space
+    # functions. `aug_loss_alpha` is the formula `D · h_tilde(α) + C · h'(α)`;
+    # `aug_loss_eta` is the same after applying the link to η. The grad/Hessian
+    # methods route through the link via numerical defaults; override in
+    # subclasses for an analytic form.
 
-    def _aug_loss(self, is_original, potential_deriv_coef, eta):
-        alpha = self.link_to_alpha(eta)
+    def aug_loss_alpha(self, is_original, potential_deriv_coef, alpha):
+        """Per-row augmented loss in α-space: D · h_tilde(α) + C · h'(α)."""
         return (
             is_original * self.tilde_potential(alpha)
             + potential_deriv_coef * self.potential_deriv(alpha)
         )
 
+    def aug_loss_eta(self, is_original, potential_deriv_coef, eta):
+        """Per-row augmented loss in η-space: aug_loss_alpha after the link."""
+        return self.aug_loss_alpha(
+            is_original, potential_deriv_coef, self.link_to_alpha(eta)
+        )
+
     def aug_grad_eta(self, is_original, potential_deriv_coef, eta):
         """∂[D · h_tilde(α) + C · h'(α)]/∂η."""
         eps = 1e-6
-        L_plus = self._aug_loss(is_original, potential_deriv_coef, eta + eps)
-        L_minus = self._aug_loss(is_original, potential_deriv_coef, eta - eps)
+        L_plus = self.aug_loss_eta(is_original, potential_deriv_coef, eta + eps)
+        L_minus = self.aug_loss_eta(is_original, potential_deriv_coef, eta - eps)
         return (L_plus - L_minus) / (2.0 * eps)
 
     def aug_hess_eta(self, is_original, potential_deriv_coef, eta, hessian_floor):
         """∂²[D · h_tilde(α) + C · h'(α)]/∂η² (floored)."""
         eps = 1e-4
-        L_plus = self._aug_loss(is_original, potential_deriv_coef, eta + eps)
-        L_zero = self._aug_loss(is_original, potential_deriv_coef, eta)
-        L_minus = self._aug_loss(is_original, potential_deriv_coef, eta - eps)
+        L_plus = self.aug_loss_eta(is_original, potential_deriv_coef, eta + eps)
+        L_zero = self.aug_loss_eta(is_original, potential_deriv_coef, eta)
+        L_minus = self.aug_loss_eta(is_original, potential_deriv_coef, eta - eps)
         h2 = (L_plus - 2.0 * L_zero + L_minus) / (eps * eps)
         return np.maximum(h2, hessian_floor)
 
@@ -275,6 +282,3 @@ class Loss:
             "the user's callable can't be JSON-serialized.)"
         )
 
-
-# Backward-compat alias for type hints. New code should use `Loss`.
-LossSpec = Loss

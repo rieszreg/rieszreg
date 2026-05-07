@@ -18,8 +18,6 @@ from rieszreg import (
     RieszEstimator,
     SquaredLoss,
     TSM,
-    aug_loss_alpha,
-    build_augmented,
 )
 
 
@@ -86,16 +84,13 @@ def test_score_uses_squared_yardstick():
     ).fit(df)
 
     def _expected_neg_squared(est):
-        rows = [
-            {k: df[k].iloc[i] for k in est.estimand.feature_keys}
-            for i in range(len(df))
-        ]
-        aug = build_augmented(rows, est.estimand)
+        feats = df[list(est.estimand.feature_keys)].to_numpy(dtype=float)
+        aug = est.estimand.augment(feats)
         eta = est.predictor_.predict_eta(aug.features)
         alpha = est.loss_.link_to_alpha(eta)
         sq = SquaredLoss()
         return -float(
-            np.sum(aug_loss_alpha(sq, aug.is_original, aug.potential_deriv_coef, alpha))
+            np.sum(sq.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha))
             / aug.n_rows
         )
 

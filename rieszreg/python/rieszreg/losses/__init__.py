@@ -1,6 +1,6 @@
 """Bregman-Riesz losses."""
 
-from .base import Loss, LossSpec
+from .base import Loss
 from .bernoulli import BernoulliLoss
 from .bounded_squared import BoundedSquaredLoss
 from .kl import KLLoss
@@ -11,7 +11,6 @@ __all__ = [
     "BoundedSquaredLoss",
     "KLLoss",
     "Loss",
-    "LossSpec",
     "SquaredLoss",
     "loss_from_spec",
 ]

@@ -4,7 +4,7 @@ title: "Related packages"
 
 A few existing tools cover overlapping ground.
 
-[**genriesz**](https://github.com/MasaKat0/genriesz) (Kato, 2026) is a single Python package implementing the Bregman-unified Riesz regression framework from [arXiv:2601.07752](https://arxiv.org/abs/2601.07752). It exposes `LinearFunctional` and `BregmanGenerator` abstractions, analogous to this project's `Estimand` and `LossSpec`. It ships several basis-function classes (polynomial, random Fourier features, Nyström, KNN catchments, random-forest leaves, PyTorch embeddings) inside the package itself. Third parties cannot publish their own learners against a stable protocol. Python only.
+[**genriesz**](https://github.com/MasaKat0/genriesz) (Kato, 2026) is a single Python package implementing the Bregman-unified Riesz regression framework from [arXiv:2601.07752](https://arxiv.org/abs/2601.07752). It exposes `LinearFunctional` and `BregmanGenerator` abstractions, analogous to this project's `Estimand` and `Loss`. It ships several basis-function classes (polynomial, random Fourier features, Nyström, KNN catchments, random-forest leaves, PyTorch embeddings) inside the package itself. Third parties cannot publish their own learners against a stable protocol. Python only.
 
 [**EconML**](https://github.com/py-why/EconML) (Microsoft) provides `RieszNet`, `ForestRiesz`, and an `automatic_debiased_ml` module. The `forestriesz` package in this family wraps EconML's `BaseGRF`. EconML is monolithic, with no third-party learner protocol, and Python only.
 

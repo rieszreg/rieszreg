@@ -9,9 +9,9 @@ RieszReg/
 ├── rieszreg/                 # meta-package: shared abstractions
 │   ├── python/rieszreg/
 │   │   ├── __init__.py            # public API surface
-│   │   ├── estimands/             # Estimand + 6 factories + tracer
-│   │   ├── losses/                # LossSpec Protocol + 4 losses
-│   │   ├── augmentation.py        # build_augmented + AugmentedDataset
+│   │   ├── estimands/             # Estimand base + 5 built-in subclasses + tracer
+│   │   ├── losses/                # Loss base class + 4 built-in losses
+│   │   ├── augmentation.py        # AugmentedDataset packaging
 │   │   ├── backends/base.py       # Backend + MomentBackend Protocols, FitResult, Predictor + loader registry
 │   │   ├── diagnostics.py         # Diagnostics dataclass + diagnose()
 │   │   ├── estimator.py           # RieszEstimator (sklearn BaseEstimator); dispatches between fit_augmented / fit_rows
@@ -67,27 +67,39 @@ Rscript -e '
 
 ## Tracer
 
-The user writes the operator `m(alpha)(z)` with `+`, `-`, scalar `*`, and calls to `alpha(...)`. `rieszreg.estimands.tracer` passes a `Tracer` in as `alpha`; each call returns a single-term `LinearForm`, and Python's operator overloading composes them. The result has `.as_pairs()` returning `[(coef, point), ...]`, which `build_augmented` consumes. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time.
+The user writes the operator `m(alpha)(z)` with `+`, `-`, scalar `*`, and calls to `alpha(...)`. `rieszreg.estimands.tracer` passes a `Tracer` in as `alpha`; each call returns a single-term `LinearForm`, and Python's operator overloading composes them. The result has `.as_pairs()` returning `[(coef, point), ...]`, which the default `FiniteEvalEstimand.augment` consumes to build the augmented dataset. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time.
 
-## Adding an estimand factory
+## Adding an estimand
 
-Estimand factories belong in `rieszreg.estimands.base`, not in the implementation packages. A factory returns a `FiniteEvalEstimand`:
+Estimands belong in `rieszreg.estimands.base`, not in the implementation packages. Built-ins subclass `FiniteEvalEstimand` and supply both an `m` operator and a vectorised `augment(features, ys=None)` override:
 
 ```python
-def MyEstimand(param, treatment="a", covariates=("x",)) -> FiniteEvalEstimand:
-    cov = tuple(covariates)
-    def m(alpha):
-        def inner(z, y=None):
-            x_kwargs = {k: z[k] for k in cov}
-            return alpha(**{treatment: param, **x_kwargs})
-        return inner
-    return FiniteEvalEstimand(
-        feature_keys=(treatment, *cov), m=m, name=f"MyEstimand({param})",
-        factory_spec={"factory": "MyEstimand", "args": {"param": param, ...}},
-    )
+class MyEstimand(FiniteEvalEstimand):
+    m_bar = 0.0  # closed-form E[m(alpha=1)(Z)]
+
+    def __init__(self, param, treatment="a", covariates=("x",)):
+        cov = tuple(covariates)
+        self.param = param
+        self.treatment = treatment
+        self.covariates = cov
+
+        def m(alpha):
+            def inner(z, y=None):
+                x_kwargs = {k: z[k] for k in cov}
+                return alpha(**{treatment: param, **x_kwargs})
+            return inner
+
+        super().__init__(
+            feature_keys=(treatment, *cov), m=m, name=f"MyEstimand({param})",
+            factory_spec={"factory": "MyEstimand", "args": {"param": param, "treatment": treatment, "covariates": list(cov)}},
+        )
+
+    def augment(self, features, ys=None):
+        # vectorised numpy emitter — return an AugmentedDataset
+        ...
 ```
 
-Then:
+Subclasses that don't override `augment` inherit the per-row Tracer-based default — fine for prototyping but slow. Then:
 
 1. Add to `_FACTORY_REGISTRY` in `rieszreg/python/rieszreg/estimands/base.py` so the round-trip serialization registry knows about it.
 2. Export from `rieszreg/python/rieszreg/__init__.py`.
@@ -96,7 +108,7 @@ Then:
 5. Add a test under `rieszreg/python/tests/`.
 6. Add a worked example under one of the implementation packages' `examples/`.
 
-## Adding a `LossSpec`
+## Adding a `Loss`
 
 Losses also belong in `rieszreg`, not the backends.
 

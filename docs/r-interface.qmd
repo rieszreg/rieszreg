@@ -146,7 +146,7 @@ Use `rsample::vfold_cv` for splits and a `for` loop over `$fit()` / `$predict()`
 
 ## Custom Python objects from R
 
-The `LinearForm` tracer is Python-only. To use a custom estimand or `LossSpec` subclass from R, define it in Python via reticulate:
+The `LinearForm` tracer is Python-only. To use a custom estimand or `Loss` subclass from R, define it in Python via reticulate:
 
 ```r
 reticulate::py_run_string("
@@ -165,7 +165,7 @@ booster$fit(df_r)
 booster$predict(df_r)[1:5]
 ```
 
-The same pattern works for custom `LossSpec` subclasses: subclass in Python and pass the instance via `loss=`.
+The same pattern works for custom `Loss` subclasses: subclass in Python and pass the instance via `loss=`.
 
 ## Reaching the Python object directly
 

@@ -10,17 +10,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from .augmentation import aug_loss_alpha, build_augmented
-from .estimator import _rows_from_Z
-from .losses import LossSpec, SquaredLoss
+from .estimator import _features_from_Z
+from .losses import Loss, SquaredLoss
 
 
-def riesz_scorer(loss: LossSpec | None = None):
+def riesz_scorer(loss: Loss | None = None):
     """Return an sklearn-compatible scorer (`(estimator, Z, y=None) -> float`).
 
     Parameters
     ----------
-    loss : LossSpec or None, default=None
+    loss : Loss or None, default=None
         Yardstick loss to evaluate on the held-out fold. If `None`, defaults
         to `SquaredLoss()` (matches `RieszEstimator.score`).
 
@@ -40,12 +39,12 @@ def riesz_scorer(loss: LossSpec | None = None):
             raise RuntimeError(
                 f"{type(estimator).__name__} is not fitted yet."
             )
-        rows = _rows_from_Z(Z, estimator.estimand)
-        aug = build_augmented(rows, estimator.estimand)
+        feats = _features_from_Z(Z, estimator.estimand)
+        aug = estimator.estimand.augment(feats)
         eta = estimator.predictor_.predict_eta(aug.features)
         alpha_hat = estimator.loss_.link_to_alpha(eta)
         return -float(
-            np.sum(aug_loss_alpha(yardstick, aug.is_original, aug.potential_deriv_coef, alpha_hat))
+            np.sum(yardstick.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha_hat))
             / aug.n_rows
         )
 

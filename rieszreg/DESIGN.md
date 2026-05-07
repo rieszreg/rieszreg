@@ -25,15 +25,15 @@ Tags used in Part B:
 - A single Python package + R package pair that holds **every shared abstraction** so implementation packages (rieszboost, krrr, future) depend on it instead of duplicating or cross-importing.
 - Mirror sklearn's structure: meta-package provides the framework (BaseEstimator-equivalent, protocols, primitives); implementation packages provide concrete backends and convenience wrappers.
 - Single docs site at the meta-package level. Single `reference/`. Shared base R6 class.
-- Eliminate the current code duplication: krrr today imports `Estimand`, `LinearForm`, `LossSpec`, `AugmentedDataset`, `build_augmented`, `Diagnostics`, and `RieszBooster` from rieszboost. Those imports should redirect to `rieszreg`.
+- Eliminate the current code duplication: krrr today imports `Estimand`, `LinearForm`, `Loss`, `AugmentedDataset`, `Diagnostics`, and `RieszBooster` from rieszboost. Those imports should redirect to `rieszreg`.
 
 ## A.2 Layering: tier-1, tier-2, tier-3
 
 Three tiers determine where an abstraction lives. Misclassifying an abstraction is the most common source of design rot in this project — the rule below is the operational test that catches it.
 
-**Tier 1 — universal.** Applies to *every* learner. Lives at the top of `rieszreg`'s public API: `Estimand`, `LossSpec`, `Diagnostics`, the `Backend` / `MomentBackend` Protocols, `RieszEstimator` orchestrator, the predictor-loader registry, `RieszEstimatorR6` base R6 class. Tier-1 objects accept only args that every plausible backend can use meaningfully.
+**Tier 1 — universal.** Applies to *every* learner. Lives at the top of `rieszreg`'s public API: `Estimand`, `Loss`, `Diagnostics`, the `Backend` / `MomentBackend` Protocols, `RieszEstimator` orchestrator, the predictor-loader registry, `RieszEstimatorR6` base R6 class. Tier-1 objects accept only args that every plausible backend can use meaningfully.
 
-**Tier 2 — shared utility.** Used by *multiple* learners but not all. `build_augmented` / `AugmentedDataset` (consumed by augmentation-style backends), `trace(estimand, row)` helper (consumed by moment-style backends), the `rieszreg.testing.dgps` canonical DGPs (used by every package's consistency suite, but optional). Lives in `rieszreg`, but tier-1 objects invoke them as opt-in services — never bake them in. Tier-1 dispatch may select between tier-2 utilities based on backend type; tier-2 must not appear in any tier-1 object's constructor signature or method-kwarg list.
+**Tier 2 — shared utility.** Used by *multiple* learners but not all. `Estimand.augment(features)` / `AugmentedDataset` (consumed by augmentation-style backends), `trace(estimand, row)` helper (consumed by moment-style backends), the `rieszreg.testing.dgps` canonical DGPs (used by every package's consistency suite, but optional). Lives in `rieszreg`, but tier-1 objects invoke them as opt-in services — never bake them in. Tier-1 dispatch may select between tier-2 utilities based on backend type; tier-2 must not appear in any tier-1 object's constructor signature or method-kwarg list.
 
 **Tier 3 — learner-specific.** `n_estimators`, `learning_rate`, `epochs`, `batch_size`, `early_stopping_rounds`, `kernel`, `lambda_grid`, `riesz_feature_fns`, `hessian_floor`, `solver`, `n_landmarks`, etc. Lives in implementation packages, on the concrete backend dataclass.
 
@@ -79,12 +79,12 @@ if hasattr(backend, "fit_rows") and not hasattr(backend, "fit_augmented"):
         ys_train=ys_train, ys_valid=ys_valid, **common_kwargs,
     )
 else:
-    aug_train = build_augmented(rows_train, self.estimand, ys_train)   # tier-2 service
-    aug_valid = build_augmented(rows_valid, self.estimand, ys_valid) if rows_valid else None
+    aug_train = self.estimand.augment(feats_train, ys=ys_train)        # tier-2 service
+    aug_valid = self.estimand.augment(feats_valid, ys=ys_valid) if feats_valid is not None else None
     result = backend.fit_augmented(aug_train, aug_valid, loss, **common_kwargs)
 ```
 
-Neither `build_augmented` nor `trace` appears in `RieszEstimator.__init__`. The orchestrator selects between them internally; the user-facing surface stays uniform.
+Neither `Estimand.augment` nor `trace` appears in `RieszEstimator.__init__`. The orchestrator selects between them internally; the user-facing surface stays uniform.
 
 ### When in doubt
 
@@ -97,16 +97,16 @@ A correct tier-1 abstraction reads cleanly under any plausible new backend you m
 rieszreg/
 ├── estimands/
 │   ├── __init__.py        # ATE, ATT, TSM, AdditiveShift, LocalShift
-│   ├── base.py            # Estimand dataclass, factory_spec registry
+│   ├── base.py            # Estimand base + ATE/ATT/TSM/AdditiveShift/LocalShift subclasses + factory_spec registry
 │   └── tracer.py          # LinearForm, Tracer, trace
 ├── losses/
 │   ├── __init__.py
-│   ├── base.py            # LossSpec Protocol, loss_from_spec
+│   ├── base.py            # Loss base class, loss_from_spec
 │   ├── squared.py
 │   ├── kl.py
 │   ├── bernoulli.py
 │   └── bounded_squared.py
-├── augmentation.py        # build_augmented, AugmentedDataset
+├── augmentation.py        # AugmentedDataset packaging
 ├── backends/
 │   └── base.py            # Backend Protocol, FitResult, Predictor base
 ├── diagnostics.py         # Diagnostics dataclass, diagnose function
@@ -204,19 +204,19 @@ This is the contract every implementation package must meet. Section structure f
 ## 1. Theoretical / statistical capabilities
 
 ### 1.1 Estimands
-- **[from rieszreg]** Import the abstract `Estimand` base, the concrete `FiniteEvalEstimand` subclass, and the five built-in factories (`ATE`, `ATT`, `TSM(level)`, `AdditiveShift(delta)`, `LocalShift(delta, threshold)`). All factories return `FiniteEvalEstimand`. Reference: [base.py](rieszreg/python/rieszreg/estimands/base.py). `StochasticIntervention` previously appeared here; it is currently stubbed (raises `NotImplementedError`) and will be reintroduced.
+- **[from rieszreg]** Import the abstract `Estimand` base, the concrete `FiniteEvalEstimand` subclass, and the five built-in subclasses (`ATE`, `ATT`, `TSM(level)`, `AdditiveShift(delta)`, `LocalShift(delta, threshold)`). All built-ins are subclasses of `FiniteEvalEstimand` with vectorised `augment()` overrides. Reference: [base.py](rieszreg/python/rieszreg/estimands/base.py). `StochasticIntervention` previously appeared here; it is currently stubbed (raises `NotImplementedError`) and will be reintroduced.
 - **[from rieszreg]** Support custom estimands via user-supplied `m(alpha)(z, y) -> LinearForm` wrapped in a `FiniteEvalEstimand`. Do not bypass the tracer; linearity violations must raise. The per-row outcome `y` flows in sklearn-style: separate from `Z` everywhere. `m`'s inner closure declares `def inner(z, y=None)`; built-ins ignore the second arg.
-- **[from rieszreg]** `trace()`, `build_augmented()`, and `RieszEstimator.fit()` accept only `FiniteEvalEstimand`. The base `Estimand` class is reserved for future subclasses outside the finite-evaluation algebra.
+- **[from rieszreg]** `trace()`, `Estimand.augment()`, and `RieszEstimator.fit()` accept only `FiniteEvalEstimand`. The base `Estimand` class is reserved for future subclasses outside the finite-evaluation algebra.
 - **[from rieszreg]** Honor the partial-parameter distinction (ATT and LocalShift fit partial representers; full ATT/LASE require delta-method downstream). Document this in any examples.
 - **[design rule]** If a new estimand factory belongs in the family at large, contribute it back to `rieszreg.estimands`, not to your package. A learner package never owns an `Estimand` factory.
 
 ### 1.2 Losses
-- **[from rieszreg]** Import `LossSpec` Protocol and the built-in losses (`SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`). Reference: [losses.py](rieszboost/python/rieszboost/losses.py).
-- **[design rule]** New Bregman losses contribute to `rieszreg.losses`, not to your package. The learner package's job is to consume `LossSpec`s, not to define them.
+- **[from rieszreg]** Import the `Loss` base class and the built-in losses (`SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`). Reference: [losses.py](rieszboost/python/rieszboost/losses.py).
+- **[design rule]** New Bregman losses contribute to `rieszreg.losses`, not to your package. The learner package's job is to consume `Loss` instances, not to define them.
 - **[your package]** Document which losses your backend supports (e.g., krrr's `KernelRidgeBackend` is `SquaredLoss`-only today). Validate at construction time and raise a clear error if an unsupported loss is passed.
 
 ### 1.3 Identification / debiasing
-- **[from rieszreg]** `LinearForm` tracer ([tracer.py](rieszboost/python/rieszboost/tracer.py)) and `build_augmented` / `AugmentedDataset` ([augmentation.py](rieszboost/python/rieszboost/augmentation.py)) are inherited. Do not reimplement.
+- **[from rieszreg]** `LinearForm` tracer ([tracer.py](rieszboost/python/rieszboost/tracer.py)), the `Estimand.augment(features, ys=None)` method, and `AugmentedDataset` ([augmentation.py](rieszboost/python/rieszboost/augmentation.py)) are inherited. Do not reimplement.
 - **[design rule]** Sample-splitting and cross-fitting use sklearn's `cross_val_predict`. Do not introduce a bespoke `crossfit()` function.
 - **[design rule]** `score(Z)` returns `−mean(per-row Riesz loss)` (sklearn "higher is better").
 
@@ -273,7 +273,7 @@ This is the contract every implementation package must meet. Section structure f
 - **[design rule]** Cross-fitting == `cross_val_predict`. Tuning == `GridSearchCV`. Don't reinvent.
 - **[design rule]** Swappable orthogonal components: backend, loss, estimand are independent.
 - **[design rule: agnostic orchestrator]** All learner-specific knobs (`n_estimators`, `learning_rate`, `epochs`, `batch_size`, `early_stopping_rounds`, `kernel`, `lambda_grid`, `riesz_feature_fns`, …) live as constructor args on the concrete backend dataclass — never on `RieszEstimator` and never in the `Backend`/`MomentBackend` Protocol method kwargs. Convenience subclasses surface them as their own ctor args and forward via `_resolved_backend()`. See §A.2 for the layering principle and the would-be-ignored lint test that catches violations.
-- **[design rule: sklearn-first, every feature]** Before writing any procedural code with loops, splits, grids, or folds, ask *"is there an sklearn way?"*. If yes, use it (`cross_val_predict`, `cross_validate`, `KFold`, `train_test_split`, `StratifiedKFold`, `GridSearchCV`, `HalvingGridSearchCV`, `RandomizedSearchCV`, `Pipeline`, `ColumnTransformer`, `FunctionTransformer`, `make_scorer`, `n_jobs=`). Hand-rolled fold loops are a code smell. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `LossSpec`).
+- **[design rule: sklearn-first, every feature]** Before writing any procedural code with loops, splits, grids, or folds, ask *"is there an sklearn way?"*. If yes, use it (`cross_val_predict`, `cross_validate`, `KFold`, `train_test_split`, `StratifiedKFold`, `GridSearchCV`, `HalvingGridSearchCV`, `RandomizedSearchCV`, `Pipeline`, `ColumnTransformer`, `FunctionTransformer`, `make_scorer`, `n_jobs=`). Hand-rolled fold loops are a code smell. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `Loss`).
 
 ### 3.3 Module separation of concerns
 - **[design rule]** Keep the seam structure that already works: `estimands/` (schema + functional), `losses/` (Bregman link/grad/Hessian), `tracer.py` + `augmentation.py` (symbolic linear-form algebra and dataset assembly — used by augmentation-style backends; moment-style backends call `trace` directly), `backends/` (algorithm-specific `fit_augmented` *or* `fit_rows`), `estimator.py` (sklearn wrapper that orchestrates and dispatches between the two backend paths), `diagnostics.py` (health checks), `serialization.py` (save/load + factory_spec), `testing/` (DGPs and conformance helpers).
@@ -281,7 +281,7 @@ This is the contract every implementation package must meet. Section structure f
 
 ### 3.4 Public API surface (entry points in `__init__.py`)
 - **[your package]** Re-export the rieszreg primitives a typical user needs (estimand factories, loss factories, top-level estimator class, `diagnose`, `LinearForm`, `Tracer`) plus your own backend factories and convenience class. Pattern: [__init__.py:14-49](rieszboost/python/rieszboost/__init__.py:14).
-- **[design rule]** The re-export list is invariant across the two backend Protocols: even moment-style packages re-export `LinearForm` and `Tracer` so users can author custom `m()`s the same way (the backend just consumes them through `trace(estimand, row)` instead of `build_augmented`). Backend choice is an internal implementation detail; the user-facing surface is one `RieszEstimator` subclass with `fit / predict / score / diagnose`.
+- **[design rule]** The re-export list is invariant across the two backend Protocols: even moment-style packages re-export `LinearForm` and `Tracer` so users can author custom `m()`s the same way (the backend just consumes them through `trace(estimand, row)` instead of `Estimand.augment`). Backend choice is an internal implementation detail; the user-facing surface is one `RieszEstimator` subclass with `fit / predict / score / diagnose`.
 - **[design rule]** Lazy `__getattr__` for any symbol that pulls in optional heavy deps.
 
 ### 3.5 Serialization & persistence
@@ -291,7 +291,7 @@ This is the contract every implementation package must meet. Section structure f
 - **[design rule]** Custom `m()` cannot be serialized in the metadata path; document as a limitation.
 
 ### 3.6 Data-flow conventions
-- **[design rule]** Honor the canonical data flow: construct estimand + loss + backend → orchestrator estimator → `.fit(Z)` traces m row-wise into a LinearForm → `build_augmented` produces (a, b) coefficients → backend consumes → predictor returned → `.predict(Z)` applies link → α̂.
+- **[design rule]** Honor the canonical data flow: construct estimand + loss + backend → orchestrator estimator → `.fit(Z)` calls `estimand.augment(features)` → built-in subclasses emit augmented `(a, b)` rows in vectorised numpy; custom estimands trace `m` row-wise via a LinearForm and emit the same shape → backend consumes → predictor returned → `.predict(Z)` applies link → α̂.
 - **[design rule]** `m()` is JAX-style opaque; the tracer enforces linearity. Any non-linear op raises and signals slow-path dispatch.
 - **[design rule]** Fast path = augmentation + closed-form-friendly fitting. The slow general path (Friedman gradient boosting against arbitrary base learners for non-finite-point m) is on the roadmap; do not block on it.
 
@@ -422,7 +422,7 @@ This is the contract every implementation package must meet. Section structure f
 
 ## 10. What NOT to do (concise summary)
 
-- Don't redefine `Estimand`, `FiniteEvalEstimand`, `LossSpec`, `AugmentedDataset`, `build_augmented`, `Diagnostics`, `RieszEstimator`, `LinearForm`, `Tracer`, factory-spec registries, or testing DGPs — import from `rieszreg`.
+- Don't redefine `Estimand`, `FiniteEvalEstimand`, `Loss`, `AugmentedDataset`, `Diagnostics`, `RieszEstimator`, `LinearForm`, `Tracer`, factory-spec registries, or testing DGPs — import from `rieszreg`.
 - Don't depend on another implementation package (rieszboost, krrr) — depend on `rieszreg`.
 - Don't add a custom-`m()` R entry point.
 - Don't reinvent `cross_val_predict`, `GridSearchCV`, or any sklearn primitive.

@@ -7,7 +7,7 @@ title: "Forest backend (forestriesz)"
 `forestriesz` ships two backends, both built on EconML's `BaseGRF` (the same Cython criterion the paper authors used):
 
 - **`ForestRieszRegressor`** — moment-style. Implements [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (ICML 2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf). Trains the GRF on the n original rows; needs a sieve (auto-resolved for ATE/ATT/TSM). Supports `predict_interval` for single-basis fits.
-- **`AugForestRieszRegressor`** — augmentation-style. Trains the GRF on the M = k·n augmented `(a, b)` evaluation points produced by `rieszreg.build_augmented`. **Estimand-agnostic** — works on every built-in estimand and any custom user `Estimand` without a sieve. The combination of GRF + augmented data appears to be novel; see [How they differ](#how-they-differ) below.
+- **`AugForestRieszRegressor`** — augmentation-style. Trains the GRF on the M = k·n augmented `(a, b)` evaluation points produced by `Estimand.augment`. **Estimand-agnostic** — works on every built-in estimand and any custom user `Estimand` without a sieve. The combination of GRF + augmented data appears to be novel; see [How they differ](#how-they-differ) below.
 
 `rieszreg` exposes the two entry points as `MomentBackend.fit_rows` and `Backend.fit_augmented` respectively.
 

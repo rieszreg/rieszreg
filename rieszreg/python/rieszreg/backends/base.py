@@ -1,5 +1,5 @@
 """Backend protocol: the swappable component that consumes the per-row data
-and a LossSpec and produces a fitted Predictor.
+and a Loss and produces a fitted Predictor.
 
 Two entry points are supported. A backend implements at most one:
 
@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import numpy as np
 
 from ..augmentation import AugmentedDataset
-from ..losses import LossSpec
+from ..losses import Loss
 
 if TYPE_CHECKING:  # pragma: no cover - type-only import
     from ..estimands.base import Estimand
@@ -84,7 +84,7 @@ class Backend(Protocol):
         self,
         aug_train: AugmentedDataset,
         aug_valid: AugmentedDataset | None,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,
@@ -113,7 +113,7 @@ class MomentBackend(Protocol):
         rows_train: list[dict[str, Any]],
         rows_valid: list[dict[str, Any]] | None,
         estimand: "Estimand",
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,

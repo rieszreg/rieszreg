@@ -21,14 +21,7 @@ _os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "True")
 _os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
 del _os
 
-from .augmentation import (
-    AugmentedDataset,
-    aug_grad_eta,
-    aug_hess_eta,
-    aug_loss_alpha,
-    aug_loss_eta,
-    build_augmented,
-)
+from .augmentation import AugmentedDataset
 from .backends import (
     Backend,
     FitResult,
@@ -57,7 +50,6 @@ from .losses import (
     BoundedSquaredLoss,
     KLLoss,
     Loss,
-    LossSpec,
     SquaredLoss,
     loss_from_spec,
 )
@@ -69,10 +61,6 @@ __all__ = [
     "AdditiveShift",
     "AugmentedDataset",
     "Backend",
-    "aug_grad_eta",
-    "aug_hess_eta",
-    "aug_loss_alpha",
-    "aug_loss_eta",
     "BernoulliLoss",
     "BoundedSquaredLoss",
     "Diagnostics",
@@ -83,14 +71,12 @@ __all__ = [
     "LinearForm",
     "LocalShift",
     "Loss",
-    "LossSpec",
     "MomentBackend",
     "Predictor",
     "RieszEstimator",
     "SquaredLoss",
     "TSM",
     "Tracer",
-    "build_augmented",
     "diagnose",
     "estimand_from_spec",
     "load_predictor",
