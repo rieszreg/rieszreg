@@ -1015,30 +1015,18 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>KernelRieszRegressor(estimand=LinearFormEstimand(feature_keys=('a', 'x'),
-                                                 m=&lt;function ATE.&lt;locals&gt;.m at 0x163e579c0&gt;,
-                                                 extra_keys=(),
-                                                 name='ATE',
-                                                 factory_spec={'args': {'covariates': ['x'],
-                                                                        'treatment': 'a'},
-                                                               'factory': 'ATE'}),
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>KernelRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f696502a660&gt;,
                      kernel=Gaussian(length_scale='median',
-                                     _resolved=0.9313282640811966),
+                                     _resolved=1.0000011555386372),
                      lambda_grid=array([1.00000000e-04, 1.58489319e-04, 2.51188643e-04, 3.98107171e-04,
        6.30957344e-04, 1.00000000e-03, 1.58489319e-03, 2.51188643e-03,
        3.98107171e-03, 6.30957344e-03, 1.00000000e-02, 1.58489319e-02,
        2.51188643e-02, 3.98107171e-02, 6.30957344e-02, 1.00000000e-01,
        1.58489319e-01, 2.51188643e-01, 3.98107171e-01, 6.30957344e-01,
        1.00000000e+00]),
-                     validation_fraction=0.25)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>KernelRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>KernelRieszRegressor(estimand=LinearFormEstimand(feature_keys=('a', 'x'),
-                                                 m=&lt;function ATE.&lt;locals&gt;.m at 0x163e579c0&gt;,
-                                                 extra_keys=(),
-                                                 name='ATE',
-                                                 factory_spec={'args': {'covariates': ['x'],
-                                                                        'treatment': 'a'},
-                                                               'factory': 'ATE'}),
+                     validation_fraction=0.25)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>KernelRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>KernelRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f696502a660&gt;,
                      kernel=Gaussian(length_scale='median',
-                                     _resolved=0.9313282640811966),
+                                     _resolved=1.0000011555386372),
                      lambda_grid=array([1.00000000e-04, 1.58489319e-04, 2.51188643e-04, 3.98107171e-04,
        6.30957344e-04, 1.00000000e-03, 1.58489319e-03, 2.51188643e-03,
        3.98107171e-03, 6.30957344e-03, 1.00000000e-02, 1.58489319e-02,
@@ -1055,19 +1043,19 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr(α̂, α₀)     = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>corr(α̂, α₀)     = 0.953</code></pre>
+<pre><code>corr(α̂, α₀)     = 0.950</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"RMSE             = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(np.mean((alpha_hat <span class="op">-</span> true_alpha)<span class="op">**</span><span class="dv">2</span>))<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>RMSE             = 0.772</code></pre>
+<pre><code>RMSE             = 0.795</code></pre>
 </div>
 </div>
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the krrr R wrapper (one-time per session) and configure reticulate.</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>pkgload<span class="sc">::</span><span class="fu">load_all</span>(<span class="st">"../krrr/r/krrr"</span>)</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_krrr</span>(<span class="fu">file.path</span>(<span class="fu">getwd</span>(), <span class="st">"../rieszboost/.venv/bin/python"</span>))</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>pkgload<span class="sc">::</span><span class="fu">load_all</span>(<span class="st">"../packages/krrr/r/krrr"</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_krrr</span>(<span class="fu">file.path</span>(<span class="fu">getwd</span>(), <span class="st">"../.venv/bin/python"</span>))</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">0</span>)</span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>n  <span class="ot">&lt;-</span> <span class="dv">1000</span></span>

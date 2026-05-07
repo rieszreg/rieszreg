@@ -764,7 +764,7 @@ window.Quarto = {
 <span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"best loss:"</span>, grid.best_params_[<span class="st">"loss"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>best loss: &lt;rieszreg.losses.squared.SquaredLoss object at 0x1669dea30&gt;</code></pre>
+<pre><code>best loss: &lt;rieszreg.losses.squared.SquaredLoss object at 0x7f6e1a74c8f0&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best score: </span><span class="sc">{</span>grid<span class="sc">.</span>best_score_<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
@@ -908,9 +908,9 @@ window.Quarto = {
 <summary>Load forestriesz and riesznet R wrappers</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>.project_root <span class="ot">&lt;-</span> <span class="fu">Sys.getenv</span>(<span class="st">"QUARTO_PROJECT_DIR"</span>, <span class="at">unset =</span> <span class="fu">getwd</span>())</span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressMessages</span>(pkgload<span class="sc">::</span><span class="fu">load_all</span>(</span>
-<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../forestriesz/r/forestriesz"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../packages/forestriesz/r/forestriesz"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span>
 <span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressMessages</span>(pkgload<span class="sc">::</span><span class="fu">load_all</span>(</span>
-<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../riesznet/r/riesznet"</span>),       <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../packages/riesznet/r/riesznet"</span>),       <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <div class="cell">

@@ -658,11 +658,11 @@ window.Quarto = {
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"SE     = </span><span class="sc">{</span>se<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>SE     = 0.097</code></pre>
+<pre><code>SE     = 0.096</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI = [</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>95% CI = [29.270, 29.648]</code></pre>
+<pre><code>95% CI = [29.270, 29.647]</code></pre>
 </div>
 </div>
 </section>
@@ -673,7 +673,7 @@ window.Quarto = {
 <summary>Load riesznet R wrapper</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>.project_root <span class="ot">&lt;-</span> <span class="fu">Sys.getenv</span>(<span class="st">"QUARTO_PROJECT_DIR"</span>, <span class="at">unset =</span> <span class="fu">getwd</span>())</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressMessages</span>(pkgload<span class="sc">::</span><span class="fu">load_all</span>(</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../riesznet/r/riesznet"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(.project_root, <span class="st">"../packages/riesznet/r/riesznet"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
 <div class="cell">
@@ -765,9 +765,9 @@ window.Quarto = {
 <span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"psi_ATE = %.3f</span><span class="sc">\n</span><span class="st">SE      = %.3f</span><span class="sc">\n</span><span class="st">95%% CI  = [%.3f, %.3f]</span><span class="sc">\n</span><span class="st">"</span>,</span>
 <span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>            psi, se, ci[<span class="dv">1</span>], ci[<span class="dv">2</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>psi_ATE = 29.499
-SE      = 0.095
-95% CI  = [29.313, 29.685]</code></pre>
+<pre><code>psi_ATE = 29.497
+SE      = 0.096
+95% CI  = [29.308, 29.685]</code></pre>
 </div>
 </div>
 </div>
