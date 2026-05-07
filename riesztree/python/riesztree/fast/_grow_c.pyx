@@ -297,6 +297,31 @@ def grow_depthwise_hist_c(
     cdef cnp.int32_t[::1] cand_v = candidate_features
     cdef cnp.int32_t[::1] nbins_v = n_bins_per_feature
 
+    # Histogram buffer pool. In DFS the maximum number of active leaf
+    # histograms in flight at any time is bounded by tree depth + slack
+    # for a per-split PMS smaller-child temporary. We pre-allocate a
+    # small pool of (n_features, max_bins) buffers and recycle slots,
+    # eliminating per-leaf np.zeros allocation overhead.
+    cdef int effective_depth_cap = max_depth if max_depth < 64 else 64
+    cdef int pool_size = effective_depth_cap + 2
+    cdef cnp.ndarray[f64, ndim=3] hD_pool = np.zeros((pool_size, n_features, max_bins), dtype=np.float64)
+    cdef cnp.ndarray[f64, ndim=3] hC_pool = np.zeros((pool_size, n_features, max_bins), dtype=np.float64)
+    cdef cnp.ndarray[i64, ndim=3] hO_pool = np.zeros((pool_size, n_features, max_bins), dtype=np.int64)
+    cdef f64[:, :, ::1] hD_pool_v = hD_pool
+    cdef f64[:, :, ::1] hC_pool_v = hC_pool
+    cdef i64[:, :, ::1] hO_pool_v = hO_pool
+    # free_slots managed as a Python list (small, ≤ pool_size); .pop() / .append() are O(1).
+    cdef list free_slots = list(range(pool_size))
+
+    # Per-slot scalar totals (sum_D, sum_C, sum_orig at the time of last
+    # accumulation into that slot). Indexed by slot id.
+    cdef cnp.ndarray[f64, ndim=1] slot_D = np.zeros(pool_size, dtype=np.float64)
+    cdef cnp.ndarray[f64, ndim=1] slot_C = np.zeros(pool_size, dtype=np.float64)
+    cdef cnp.ndarray[i64, ndim=1] slot_orig = np.zeros(pool_size, dtype=np.int64)
+    cdef f64[::1] slot_D_v = slot_D
+    cdef f64[::1] slot_C_v = slot_C
+    cdef i64[::1] slot_orig_v = slot_orig
+
     # Per-loop variables (cdef must be at function scope in Cython).
     cdef Py_ssize_t i
     cdef i64 row
@@ -319,10 +344,8 @@ def grow_depthwise_hist_c(
     cdef Py_ssize_t feat_idx_in_hist
     cdef Py_ssize_t b
     cdef bint pms_worth_it
-    cdef cnp.ndarray hD, hC, hO, smaller_hD, smaller_hC, smaller_hO
-    cdef f64[:, ::1] hD_v, hC_v, smaller_hD_v, smaller_hC_v
-    cdef i64[:, ::1] hO_v, smaller_hO_v
-    cdef tuple left_hist_t, right_hist_t
+    cdef int slot_id, smaller_slot_id, larger_slot_id
+    cdef int parent_slot
 
     # Bootstrap the root.
     for i in range(n_aug):
@@ -334,12 +357,11 @@ def grow_depthwise_hist_c(
     root_alpha = dispatch_alpha_at_opt(loss_kind, root_D, root_C, bounded_lo, bounded_hi)
     root_idx = _add_leaf(tree, root_D, root_C, root_orig, root_alpha, 0)
 
-    # Worklist entries: (node_idx, start, end, depth, parent_hist_or_None).
-    # parent_hist is a 6-tuple (hD, hC, hO, total_D, total_C, total_orig)
-    # or None for the root and after the PMS-not-worth-it branch.
-    cdef list worklist = [(root_idx, 0, n_aug, 0, None)]
+    # Worklist entries: (node_idx, start, end, depth, slot_id_or_-1).
+    # slot_id == -1 means "no parent_hist, allocate fresh" (root + PMS-skip).
+    cdef list worklist = [(root_idx, 0, n_aug, 0, -1)]
     cdef i64[::1] tree_n_orig = tree.n_orig
-    cdef object item, parent_hist
+    cdef object item
 
     while worklist:
         item = worklist.pop()
@@ -347,49 +369,53 @@ def grow_depthwise_hist_c(
         start = item[1]
         end = item[2]
         depth_v = item[3]
-        parent_hist = item[4]
+        slot_id = item[4]
 
         # Stopping conditions.
         if depth_v >= max_depth:
+            if slot_id >= 0:
+                free_slots.append(slot_id)
             continue
         if tree_n_orig[node_idx] < min_samples_split:
+            if slot_id >= 0:
+                free_slots.append(slot_id)
             continue
 
-        # Get / build histogram for this node.
-        if parent_hist is None:
-            hD = np.zeros((n_features, max_bins), dtype=np.float64)
-            hC = np.zeros((n_features, max_bins), dtype=np.float64)
-            hO = np.zeros((n_features, max_bins), dtype=np.int64)
-            hD_v = hD
-            hC_v = hC
-            hO_v = hO
+        # Get / build histogram for this node into a pool slot.
+        if slot_id < 0:
+            slot_id = free_slots.pop()
+            # Zero the slot's three arrays before accumulating.
+            hD_pool[slot_id, :, :] = 0.0
+            hC_pool[slot_id, :, :] = 0.0
+            hO_pool[slot_id, :, :] = 0
             _accumulate_hist_slice(
                 X_v, D_v, C_v, idx_v, start, end,
-                cand_v, hD_v, hC_v, hO_v,
+                cand_v,
+                hD_pool_v[slot_id], hC_pool_v[slot_id], hO_pool_v[slot_id],
                 &total_D_local, &total_C_local, &total_orig_local,
             )
+            slot_D_v[slot_id] = total_D_local
+            slot_C_v[slot_id] = total_C_local
+            slot_orig_v[slot_id] = total_orig_local
         else:
-            hD = parent_hist[0]
-            hC = parent_hist[1]
-            hO = parent_hist[2]
-            hD_v = hD
-            hC_v = hC
-            hO_v = hO
-            total_D_local = parent_hist[3]
-            total_C_local = parent_hist[4]
-            total_orig_local = parent_hist[5]
+            total_D_local = slot_D_v[slot_id]
+            total_C_local = slot_C_v[slot_id]
+            total_orig_local = slot_orig_v[slot_id]
 
         # Find best split.
         result = _find_best_split(
-            hD_v, hC_v, hO_v, total_D_local, total_C_local, total_orig_local,
+            hD_pool_v[slot_id], hC_pool_v[slot_id], hO_pool_v[slot_id],
+            total_D_local, total_C_local, total_orig_local,
             cand_v, nbins_v, loss_kind, bounded_lo, bounded_hi, min_orig_leaf,
         )
         if result is None:
+            free_slots.append(slot_id)
             continue
         best_feat = result[0]
         best_bin = result[1]
         gain_v = result[2]
         if gain_v <= min_impurity_decrease:
+            free_slots.append(slot_id)
             continue
 
         # Partition idx_buf[start:end] in place on (best_feat, best_bin).
@@ -397,7 +423,7 @@ def grow_depthwise_hist_c(
         n_left = mid - start
         n_right = end - mid
         if n_left == 0 or n_right == 0:
-            # Defensive: shouldn't happen if find_best chose a valid bin.
+            free_slots.append(slot_id)
             continue
 
         # Compute child leaf payloads (D, C, n_orig) by summing the
@@ -411,9 +437,9 @@ def grow_depthwise_hist_c(
         left_C = 0.0
         left_orig = 0
         for b in range(best_bin + 1):
-            left_D += hD_v[feat_idx_in_hist, b]
-            left_C += hC_v[feat_idx_in_hist, b]
-            left_orig += hO_v[feat_idx_in_hist, b]
+            left_D += hD_pool_v[slot_id, feat_idx_in_hist, b]
+            left_C += hC_pool_v[slot_id, feat_idx_in_hist, b]
+            left_orig += hO_pool_v[slot_id, feat_idx_in_hist, b]
         right_D = total_D_local - left_D
         right_C = total_C_local - left_C
         right_orig = total_orig_local - left_orig
@@ -430,52 +456,63 @@ def grow_depthwise_hist_c(
         n_smaller = n_left if n_left <= n_right else n_right
         pms_worth_it = (n_smaller * 4) > (n_features * max_bins)
 
+        # parent_slot is the current slot_id; it'll either be reused for the
+        # larger child (PMS) or freed (PMS-skip).
+        parent_slot = slot_id
+
         if not pms_worth_it:
-            left_hist_t = None
-            right_hist_t = None
+            # Free parent's slot, allocate two fresh slots for the children.
+            free_slots.append(parent_slot)
+            # Children use slot_id == -1 to signal "accumulate fresh on pop".
+            worklist.append((right_idx, mid, end, depth_v + 1, -1))
+            worklist.append((left_idx, start, mid, depth_v + 1, -1))
         elif n_left <= n_right:
-            smaller_hD = np.zeros((n_features, max_bins), dtype=np.float64)
-            smaller_hC = np.zeros((n_features, max_bins), dtype=np.float64)
-            smaller_hO = np.zeros((n_features, max_bins), dtype=np.int64)
-            smaller_hD_v = smaller_hD
-            smaller_hC_v = smaller_hC
-            smaller_hO_v = smaller_hO
+            # Smaller = left. Get a new slot, accumulate left, then subtract
+            # in place from parent_slot to get right's hist.
+            smaller_slot_id = free_slots.pop()
+            hD_pool[smaller_slot_id, :, :] = 0.0
+            hC_pool[smaller_slot_id, :, :] = 0.0
+            hO_pool[smaller_slot_id, :, :] = 0
             _accumulate_hist_slice(
                 X_v, D_v, C_v, idx_v, start, mid,
-                cand_v, smaller_hD_v, smaller_hC_v, smaller_hO_v,
+                cand_v,
+                hD_pool_v[smaller_slot_id], hC_pool_v[smaller_slot_id], hO_pool_v[smaller_slot_id],
                 &sm_tD, &sm_tC, &sm_tO,
             )
-            np.subtract(hD, smaller_hD, out=hD)
-            np.subtract(hC, smaller_hC, out=hC)
-            np.subtract(hO, smaller_hO, out=hO)
-            left_hist_t = (smaller_hD, smaller_hC, smaller_hO, sm_tD, sm_tC, sm_tO)
-            right_hist_t = (hD, hC, hO,
-                            total_D_local - sm_tD,
-                            total_C_local - sm_tC,
-                            total_orig_local - sm_tO)
+            slot_D_v[smaller_slot_id] = sm_tD
+            slot_C_v[smaller_slot_id] = sm_tC
+            slot_orig_v[smaller_slot_id] = sm_tO
+            # Subtract in place: parent_slot now holds larger (= right) child's hist.
+            np.subtract(hD_pool[parent_slot], hD_pool[smaller_slot_id], out=hD_pool[parent_slot])
+            np.subtract(hC_pool[parent_slot], hC_pool[smaller_slot_id], out=hC_pool[parent_slot])
+            np.subtract(hO_pool[parent_slot], hO_pool[smaller_slot_id], out=hO_pool[parent_slot])
+            slot_D_v[parent_slot] = total_D_local - sm_tD
+            slot_C_v[parent_slot] = total_C_local - sm_tC
+            slot_orig_v[parent_slot] = total_orig_local - sm_tO
+            worklist.append((right_idx, mid, end, depth_v + 1, parent_slot))
+            worklist.append((left_idx, start, mid, depth_v + 1, smaller_slot_id))
         else:
-            smaller_hD = np.zeros((n_features, max_bins), dtype=np.float64)
-            smaller_hC = np.zeros((n_features, max_bins), dtype=np.float64)
-            smaller_hO = np.zeros((n_features, max_bins), dtype=np.int64)
-            smaller_hD_v = smaller_hD
-            smaller_hC_v = smaller_hC
-            smaller_hO_v = smaller_hO
+            # Smaller = right; mirror.
+            smaller_slot_id = free_slots.pop()
+            hD_pool[smaller_slot_id, :, :] = 0.0
+            hC_pool[smaller_slot_id, :, :] = 0.0
+            hO_pool[smaller_slot_id, :, :] = 0
             _accumulate_hist_slice(
                 X_v, D_v, C_v, idx_v, mid, end,
-                cand_v, smaller_hD_v, smaller_hC_v, smaller_hO_v,
+                cand_v,
+                hD_pool_v[smaller_slot_id], hC_pool_v[smaller_slot_id], hO_pool_v[smaller_slot_id],
                 &sm_tD, &sm_tC, &sm_tO,
             )
-            np.subtract(hD, smaller_hD, out=hD)
-            np.subtract(hC, smaller_hC, out=hC)
-            np.subtract(hO, smaller_hO, out=hO)
-            right_hist_t = (smaller_hD, smaller_hC, smaller_hO, sm_tD, sm_tC, sm_tO)
-            left_hist_t = (hD, hC, hO,
-                           total_D_local - sm_tD,
-                           total_C_local - sm_tC,
-                           total_orig_local - sm_tO)
-
-        # Push children to the worklist (right first so left is popped first).
-        worklist.append((right_idx, mid, end, depth_v + 1, right_hist_t))
-        worklist.append((left_idx, start, mid, depth_v + 1, left_hist_t))
+            slot_D_v[smaller_slot_id] = sm_tD
+            slot_C_v[smaller_slot_id] = sm_tC
+            slot_orig_v[smaller_slot_id] = sm_tO
+            np.subtract(hD_pool[parent_slot], hD_pool[smaller_slot_id], out=hD_pool[parent_slot])
+            np.subtract(hC_pool[parent_slot], hC_pool[smaller_slot_id], out=hC_pool[parent_slot])
+            np.subtract(hO_pool[parent_slot], hO_pool[smaller_slot_id], out=hO_pool[parent_slot])
+            slot_D_v[parent_slot] = total_D_local - sm_tD
+            slot_C_v[parent_slot] = total_C_local - sm_tC
+            slot_orig_v[parent_slot] = total_orig_local - sm_tO
+            worklist.append((right_idx, mid, end, depth_v + 1, smaller_slot_id))
+            worklist.append((left_idx, start, mid, depth_v + 1, parent_slot))
 
     return tree
