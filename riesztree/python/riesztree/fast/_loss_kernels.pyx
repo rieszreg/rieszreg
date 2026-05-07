@@ -119,21 +119,32 @@ cdef inline double kl_alpha_at_opt(double D, double C) noexcept nogil:
 
 
 cdef inline double bernoulli_alpha_at_opt(double D, double C) noexcept nogil:
+    """Match Python ``_leaf_alpha_bernoulli`` exactly: project into
+    the open interval (0, 1) using a 1e-6 epsilon. The αs at the
+    open boundary are link-domain-invalid so the leaf would predict
+    ±∞ in η-space; we clip into the interior instead."""
     if D <= 0.0:
-        return 0.0
-    return -C / D
+        return 0.5
+    cdef double a = -C / D
+    if a <= 0.0:
+        return 1e-6
+    if a >= 1.0:
+        return 1.0 - 1e-6
+    return a
 
 
 cdef inline double bounded_squared_alpha_at_opt(
     double D, double C, double lo, double hi
 ) noexcept nogil:
+    """Match Python ``_leaf_alpha_bounded_squared`` exactly: project
+    into [lo, hi]; D=0 → midpoint."""
     if D <= 0.0:
-        return 0.0
+        return 0.5 * (lo + hi)
     cdef double a = -C / D
     if a < lo:
-        a = lo
-    elif a > hi:
-        a = hi
+        return lo
+    if a > hi:
+        return hi
     return a
 
 

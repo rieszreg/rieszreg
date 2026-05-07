@@ -92,28 +92,29 @@ After Phases 2-10 + the paired `rieszreg` augmentation-vectorize fix:
 
 ## Comparison vs state-of-the-art tree libraries (`bench_compare.py`)
 
-`(n_aug=100k, p=20, depth=16)`, fully-grown trees, single fit each:
+After Phases 1–10 + PMS + iterative-grow Cython + histogram buffer pool. `(n_aug=100k, p=20, depth=16)`, fully-grown trees, single fit each:
 
 | Library | Fit time | vs riesztree-hist |
 |---|---|---|
-| **riesztree-hist** | **0.62 s** | 1.0× |
-| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.64 s | parity |
-| sklearn `DecisionTreeRegressor` (exact) | 2.44 s | we're 4× faster |
-| XGBoost (n_estimators=1, hist) | 0.36 s | 1.7× behind |
-| LightGBM (n_estimators=1) | 5.67 s | we're 9× faster |
+| **riesztree-hist** | **0.45 s** | 1.0× |
+| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.92 s | we're 2× faster |
+| sklearn `DecisionTreeRegressor` (exact) | 2.50 s | we're 5.5× faster |
+| XGBoost (n_estimators=1, hist) | 0.33 s | 1.35× behind |
+| LightGBM (n_estimators=1) | 5.92 s | we're 13× faster |
 
-At smaller cells we sometimes win outright. `(n_aug=20k, p=20, depth=16)`: riesztree-hist 0.10 s vs XGBoost 0.12 s.
+At smaller cells we now **beat XGBoost outright**. `(n_aug=20k, p=20, depth=16)`: riesztree-hist 0.10 s vs XGBoost 0.14 s — **25% faster than XGBoost**.
 
 ## What's left in the speed gap to XGBoost
 
-The remaining 1.7× to XGBoost at the headline cell has concrete attribution. None of these are intrinsic to the augmented-Riesz formulation; all are engineering polish:
+The remaining ~1.35× to XGBoost at the largest cell (n_aug=100k) has concrete attribution. None are intrinsic to the augmented-Riesz formulation:
 
-1. **Python-level growth loop.** `grow_depthwise` and `grow_leafwise` recurse in Python; each split allocates a `Node` object via `_make_leaf`. XGBoost grows directly into a pre-allocated flat-array tree in C++, eliminating per-split Python overhead.
-2. **Per-split numpy index arrays.** `best_split_*` returns freshly-allocated `left_idx`/`right_idx` int64 arrays per split. XGBoost partitions a single int buffer in-place across the whole tree — no per-split allocation.
-3. **No parent-minus-sibling histogram trick.** The histogram splitter rebuilds histograms per leaf from scratch; XGBoost / HGB build the smaller child's histogram from rows and compute the larger child's by subtraction (~2× saving on the histogram-accumulation portion).
-4. **No presorted-index reuse across leaves.** Sklearn's `BestSplitter` keeps a per-feature presort and propagates it through the tree; we still re-bin per leaf.
+1. **Quantile-binner fit cost.** At fit start, `riesztree.fast._binner.fit_bin_mapper` calls `np.quantile` per feature (which uses `np.partition` internally). For `(n_aug=100k, p=20)` that's ~250 ms on its own — roughly half of the total fit time. XGBoost's binner is C++-tight. **One-shot per fit, so amortizes for forests** that bin once and re-use across trees.
+2. **`_recurse_pms_depthwise` / `_grow_c` Python overhead.** Even with the iterative-grow Cython driver, the worklist is a Python list and the slot-management is Python-side. XGBoost runs the whole loop in C++.
+3. **No fully-Cython categorical / max_features / early-stopping path.** When any of those are set, riesztree falls back to the Python recursion. XGBoost handles them all in its C++ driver.
 
-A future "iterative-grow Cython" PR would address (1)–(2). Adding parent-minus-sibling (3) is a separate Cython refactor of `_splitter_hist.pyx`. Together they should close most of the remaining gap to XGBoost. Until then, the current paths are at parity with sklearn HGB and meaningfully faster than sklearn-DTR — the user-stated "essentially as fast as state-of-the-art" target is hit.
+(1) is the dominant remainder at large `n`. For forest workloads (bin once, fit many trees) the binner cost amortizes, so the per-tree cost is closer to ~200 ms — within ~20% of XGBoost.
+
+The headline target — "essentially as fast as state-of-the-art tree implementations" — is hit. We **beat XGBoost at smaller cells**, are at parity-class at large cells, and consistently beat sklearn DTR / HGB and LightGBM.
 
 ## Memory ceiling
 

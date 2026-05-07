@@ -38,6 +38,11 @@ extensions = [
         sources=["riesztree/fast/_splitter_hist.pyx"],
         include_dirs=[np.get_include()],
     ),
+    Extension(
+        "riesztree.fast._grow_c",
+        sources=["riesztree/fast/_grow_c.pyx"],
+        include_dirs=[np.get_include()],
+    ),
 ]
 
 setup(

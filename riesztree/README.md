@@ -72,7 +72,7 @@ alpha_hat = est.predict(df)
 - **Cython prediction**: `predict` walks a flat-array tree (built once per fit) at C speed. The `Node` tree continues to back diagnostics, pruning, and serialization.
 - **Three Cython splitter paths**: `splitter="exact"` (default; per-feature threshold sweep), `splitter="hist"` (quantile-binned histogram, fastest at large `n`), `splitter="random"` (sklearn ExtraTrees-style; one uniform threshold per feature). `splitter="python"` keeps the legacy pure-Python path (deprecated, scheduled for removal in v0.0.3).
 - **Custom-loss extension hook**: `riesztree.fast.register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` plugs a Numba `@cfunc` (signature `float64(float64, float64)`) into the Cython splitter for any user `Loss` subclass.
-- **122 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, random splitter, deprecation of the python splitter.
+- **138 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, parent-minus-sibling histogram parity, random splitter, deprecation of the python splitter, sklearn-style cost-complexity pruning path.
 
 ## Hyperparameters
 
@@ -136,17 +136,21 @@ The cfunc is called from the Cython splitter's tight loop without the GIL — sa
 
 ## Speed
 
-`bench_fit.py` and `bench_compare.py` (under `python/benchmarks/`) document where `riesztree` sits versus state-of-the-art tree libraries on equivalent `(n_aug, p, max_depth)` workloads. Headline cell `(n_aug=100k, p=20, depth=16)` with `splitter="hist"`:
+`bench_fit.py` and `bench_compare.py` (under `python/benchmarks/`) document where `riesztree` sits versus state-of-the-art tree libraries on equivalent `(n_aug, p, max_depth)` workloads.
+
+Headline cell `(n_aug=100k, p=20, depth=16)` with `splitter="hist"` (after iterative-grow Cython + parent-minus-sibling histograms + buffer pool):
 
 | Library | Fit time | vs riesztree |
 |---|---|---|
-| **riesztree-hist** | **0.62 s** | 1.0× |
-| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.64 s | parity |
-| sklearn `DecisionTreeRegressor` (exact) | 2.44 s | we're 4× faster |
-| XGBoost (n_estimators=1, hist) | 0.36 s | 1.7× behind |
-| LightGBM (n_estimators=1) | 5.67 s | we're 9× faster |
+| **riesztree-hist** | **0.45 s** | 1.0× |
+| sklearn `HistGradientBoostingRegressor` (max_iter=1) | 0.92 s | we're 2× faster |
+| sklearn `DecisionTreeRegressor` (exact) | 2.50 s | we're 5.5× faster |
+| XGBoost (n_estimators=1, hist) | 0.33 s | 1.35× behind |
+| LightGBM (n_estimators=1) | 5.92 s | we're 13× faster |
 
-We're at parity with sklearn HGB, faster than sklearn-DTR, and within ~1.7× of XGBoost. Concrete attribution for the remaining XGBoost gap (Python-level growth loop, no parent-minus-sibling histogram trick, no presort reuse, per-split numpy index allocation) is left as documented future work in [`BENCH_BASELINE.md`](BENCH_BASELINE.md). See that file for the full benchmark protocol and locked baselines.
+At smaller cells we **beat XGBoost outright**. `(n_aug=20k, p=20, depth=16)`: riesztree-hist **0.10 s** vs XGBoost 0.14 s.
+
+The remaining ~1.35× to XGBoost at the largest cell is concentrated in the quantile-binner fit cost (one-shot per fit; amortizes across trees in a forest). See [`BENCH_BASELINE.md`](BENCH_BASELINE.md) for the full attribution and benchmark protocol.
 
 ## Known sharp edges
 

@@ -127,6 +127,71 @@ def flat_tree_from_node(root: "Node") -> FlatTree:
     )
 
 
+def node_from_growable_flat_tree(growable, loss=None) -> "Node":
+    """Convert a :class:`riesztree.fast._grow_c.GrowableFlatTree`
+    (used during fit by the iterative-grow Cython driver) into a
+    ``Node`` tree for backward-compat with diagnostics, pruning, and
+    serialisation.
+
+    The growable carries per-node ``D_sum``, ``C_sum``, ``n_orig``,
+    ``gain``, ``depth``, plus the structural fields
+    ``feature``/``threshold``/``left``/``right`` and ``value``
+    (per-leaf α*). When ``loss`` is provided, the per-node
+    ``leaf_loss_value`` is recomputed via the loss's leaf-loss
+    kernel; otherwise it's left at 0.0 (cost-complexity pruning will
+    refill it on demand).
+    """
+    from ..tree import Node
+
+    if loss is not None:
+        from ..splitter import make_leaf_solvers
+        leaf_loss_fn, _ = make_leaf_solvers(loss)
+    else:
+        leaf_loss_fn = lambda _D, _C: 0.0
+
+    feature = growable.feature
+    threshold = growable.threshold
+    left = growable.left
+    right = growable.right
+    value = growable.value
+    D_sum = growable.D_sum
+    C_sum = growable.C_sum
+    n_orig = growable.n_orig
+    gain = growable.gain
+    depth = growable.depth
+    n_used = int(growable.n_nodes_used)
+
+    nodes = [None] * n_used
+    for idx in range(n_used):
+        is_leaf = int(feature[idx]) == -1
+        node = Node(
+            is_leaf=is_leaf,
+            D=float(D_sum[idx]),
+            C=float(C_sum[idx]),
+            n_orig=int(n_orig[idx]),
+            n_aug=0,                  # not tracked by the growable; cheap to omit
+            depth=int(depth[idx]),
+            alpha=float(value[idx]),
+            leaf_loss_value=float(leaf_loss_fn(float(D_sum[idx]), float(C_sum[idx])))
+                if is_leaf else 0.0,
+        )
+        if not is_leaf:
+            node.split_feature = int(feature[idx])
+            node.split_kind = "continuous"
+            node.split_threshold = float(threshold[idx])
+            node.split_left_levels = None
+            node.split_gain = float(gain[idx])
+        nodes[idx] = node
+
+    # Wire children. Done after all nodes exist.
+    for idx in range(n_used):
+        if int(feature[idx]) != -1:
+            nodes[idx].left = nodes[int(left[idx])]
+            nodes[idx].right = nodes[int(right[idx])]
+
+    return nodes[0]
+
+
 def node_from_flat_tree(tree: FlatTree) -> "Node":
     """Reverse adapter: build a ``Node`` hierarchy from parallel arrays.
 
