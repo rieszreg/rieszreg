@@ -1,0 +1,20 @@
+Package: krrr
+Type: Package
+Title: Kernel Ridge Riesz Regression
+Version: 0.0.1
+Authors@R: person("Alejandro", "Schuler", role = c("aut", "cre"), email = "alejandro.schuler@gmail.com")
+Description: R wrapper around the Python 'krrr' package — kernel ridge
+    regression for the Riesz representer of a linear functional. Sister
+    package to 'rieszboost'. Reuses 'rieszboost' for estimand specification
+    and the augmentation engine; swaps in a kernel solver for the actual fit.
+License: file LICENSE
+Encoding: UTF-8
+Imports:
+    R6,
+    reticulate (>= 1.30),
+    rieszreg (>= 0.0.1)
+Suggests:
+    testthat (>= 3.0.0),
+    pkgload
+Config/testthat/edition: 3
+RoxygenNote: 7.3.2
