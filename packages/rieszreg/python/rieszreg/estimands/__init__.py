@@ -7,6 +7,7 @@ from .base import (
     Estimand,
     FiniteEvalEstimand,
     LocalShift,
+    OutcomeRegNormSq,
     TSM,
     estimand_from_spec,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "FiniteEvalEstimand",
     "LinearForm",
     "LocalShift",
+    "OutcomeRegNormSq",
     "TSM",
     "Tracer",
     "estimand_from_spec",

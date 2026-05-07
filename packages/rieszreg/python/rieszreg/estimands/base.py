@@ -459,6 +459,48 @@ class LocalShift(FiniteEvalEstimand):
         )
 
 
+class OutcomeRegNormSq(FiniteEvalEstimand):
+    """Squared L² norm of the outcome regression: θ_0 = E[μ_0(X)²].
+
+    Moment functional `m(α)(z, y) = α(x) · y` has Riesz representer μ_0(x) =
+    E[Y | X=x]. Under the squared Bregman-Riesz loss the empirical objective
+    collapses to ∑ (α(x_i) − y_i)², so Riesz training reproduces standard MSE
+    regression — a parity check against stock sklearn/xgboost/torch regressors.
+    """
+
+    name = "OutcomeRegNormSq"
+    # m_bar = E[m(α=1)(Z, Y)] = E[Y]; data-dependent, fall back to empirical mean.
+    m_bar = None
+
+    def __init__(self, covariates: Sequence[str] = ("x",)):
+        cov = tuple(covariates)
+        self.covariates = cov
+
+        def m(alpha):
+            def inner(z, y):
+                return alpha(**{k: z[k] for k in cov}) * y
+            return inner
+
+        super().__init__(
+            feature_keys=cov, m=m,
+            factory_spec={"factory": "OutcomeRegNormSq",
+                          "args": {"covariates": list(cov)}},
+        )
+
+    def augment(self, features, ys=None):
+        features, n = self._normalise_features(features, ys)
+        if ys is None:
+            raise ValueError("OutcomeRegNormSq.augment requires ys (per-row y).")
+        y = np.asarray(ys, dtype=float)
+        return AugmentedDataset(
+            features=features.copy(),
+            is_original=np.ones(n, dtype=float),
+            potential_deriv_coef=-y,
+            origin_index=np.arange(n, dtype=np.int64),
+            n_rows=n,
+        )
+
+
 def StochasticIntervention(
     samples_key: str = "shift_samples",
     treatment: str = "a",
@@ -483,6 +525,7 @@ _FACTORY_REGISTRY: dict[str, type] = {
     "TSM": TSM,
     "AdditiveShift": AdditiveShift,
     "LocalShift": LocalShift,
+    "OutcomeRegNormSq": OutcomeRegNormSq,
 }
 
 

@@ -12,6 +12,7 @@ from rieszreg import (
     AdditiveShift,
     FiniteEvalEstimand,
     LocalShift,
+    OutcomeRegNormSq,
     TSM,
     estimand_from_spec,
     trace,
@@ -27,6 +28,7 @@ from rieszreg.estimands.base import StochasticIntervention
         (TSM(level=1), ("a", "x")),
         (AdditiveShift(delta=0.5), ("a", "x")),
         (LocalShift(delta=0.3, threshold=0.7), ("a", "x")),
+        (OutcomeRegNormSq(), ("x",)),
     ],
 )
 def test_factory_feature_keys(estimand, expected_keys):
@@ -41,7 +43,7 @@ def test_stochastic_intervention_stub_raises():
 @pytest.mark.parametrize(
     "estimand",
     [ATE(), ATT(), TSM(level=1), AdditiveShift(delta=0.5),
-     LocalShift(delta=0.3, threshold=0.7)],
+     LocalShift(delta=0.3, threshold=0.7), OutcomeRegNormSq()],
 )
 def test_factory_spec_round_trip(estimand):
     rebuilt = estimand_from_spec(estimand.factory_spec)
