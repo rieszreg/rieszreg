@@ -152,7 +152,7 @@ rieszreg/
 
 - Move arXiv-paper index to `RieszReg/reference/` (top level). Each package's existing `reference/` is removed.
 - Shared `.github/workflows/` templates for testing and docs build live in the meta-package.
-- Shared `.githooks/pre-commit` template (living-doc rule + doc-tone rules) sourced from the meta-package.
+- The monorepo root carries a single `.githooks/pre-commit` (living-doc rule + doc-tone rules); the same lint logic runs in CI via `.github/workflows/test.yml`.
 
 ## A.8 Dependency graph
 
@@ -392,9 +392,10 @@ This is the contract every implementation package must meet. Section structure f
 - R: `DESCRIPTION` with Roxygen2; `Imports: R6, reticulate, rieszreg`.
 
 ### 8.2 Pre-commit hooks (`.githooks/pre-commit`)
-- **[from rieszreg]** Use the shared pre-commit hook template from the meta-project. Activate with `git config core.hooksPath .githooks` once per clone.
+- The monorepo carries a single `.githooks/pre-commit` at its root. It auto-detects which `packages/<pkg>/` the staged paths belong to, applies the API-vs-docs rule per-package, and calls the shared `.githooks/lint-docs.sh` for doc-tone enforcement.
+- Activate per clone with `bash scripts/setup-hooks.sh` (which runs `git config core.hooksPath .githooks`). One-time.
 - The hook blocks commits that touch public-API modules without updating docs / README, and greps for the doc-tone rule violations in §6.4.
-- Bypass with `--no-verify` only for genuinely doc-irrelevant changes (internal refactor, tests, comments).
+- Bypass with `--no-verify` only for genuinely doc-irrelevant changes (internal refactor, tests, comments). The CI `lint-docs` job re-runs the doc-tone check on every push and PR, so bypassing locally still gets caught.
 
 ### 8.3 CI / GitHub Actions
 - **[from rieszreg]** Use the shared workflow templates: `docs.yml` (render meta-site, deploy to gh-pages), `test.yml` (per-package pytest + R parity).

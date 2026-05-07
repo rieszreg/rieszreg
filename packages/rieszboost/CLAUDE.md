@@ -21,7 +21,7 @@ The shared `python/rieszboost/{estimand,losses,tracer,augmentation,diagnostics}.
 
 The user guide moved to the unified Quarto site at [`../docs/`](../docs/). The boosting-specific page is [`../docs/backends/boosting.qmd`](../docs/backends/boosting.qmd). Any change to the boosting backend that affects user-facing behavior must update that page in the same edit. On bilingual pages, update BOTH the `{python}` and `{r}` tabs.
 
-The pre-commit hook at `.githooks/pre-commit` enforces this — a public-API change with no `README.md` or `docs/*.qmd` change in the same commit is rejected. Activate the hook once per clone with `git config core.hooksPath .githooks`. Bypass only for genuinely doc-irrelevant changes (internal refactor, tests, comments) with `--no-verify`.
+The pre-commit hook at the monorepo root (`../../.githooks/pre-commit`) enforces this — a public-API change with no `README.md` or `docs/*.qmd` change in the same commit is rejected. Activate the hook once per clone with `bash ../../scripts/setup-hooks.sh`. Bypass only for genuinely doc-irrelevant changes (internal refactor, tests, comments) with `--no-verify`. The same lint runs in CI via the `lint-docs` job.
 
 The original `docs/` directory in this package is deprecated; see `docs/DEPRECATED.md`.
 
@@ -66,7 +66,6 @@ R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df
 - `r/rieszboost/` — R6 wrapper via reticulate. `RieszBooster` subclasses `rieszreg::RieszEstimatorR6` (~50 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE. Run R tests by dev-loading both packages: `pkgload::load_all("../rieszreg/r/rieszreg"); pkgload::load_all("r/rieszboost"); testthat::test_dir(...)`.
 - `reference/` — moved to the meta-project top level at `../reference/` (the local copy is deprecated; will be removed).
 - `docs/` — deprecated; see `docs/DEPRECATED.md`. The unified Quarto site lives at `../docs/`.
-- `.githooks/pre-commit` — copy of the meta-project canonical hook (`../.githooks/pre-commit`). Activate per clone.
 - `.venv/` — local Python venv (gitignored).
 
 ## Run tests

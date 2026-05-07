@@ -1,92 +1,103 @@
 #!/usr/bin/env bash
-# Shared pre-commit hook for the RieszReg family.
+# Pre-commit hook for the rieszreg monorepo.
 #
-# Auto-detects the package from `git rev-parse --show-toplevel` and applies:
-#   1. Public-API change without README / docs update.
-#   2. Doc-tone-rule lint on staged docs/*.qmd and README.md (added lines):
-#        - design-decision metacommentary
-#        - AI-flavored hedge phrases
+# Two checks:
+#   1. Per-package API change without README / docs update.
+#   2. Doc-tone lint on staged docs/*.qmd and README.md (added lines).
 #
-# Each implementation package keeps a copy of this file at .githooks/pre-commit.
-# Activate per clone: `git config core.hooksPath .githooks`.
-# Bypass with: `git commit --no-verify`.
+# Activate per clone with:  git config core.hooksPath .githooks
+# Or run scripts/setup-hooks.sh.
+# Bypass with:               git commit --no-verify
+#
+# The doc-tone lint is factored into .githooks/lint-docs.sh so CI runs the
+# same check against the diff against base.
 
 set -euo pipefail
 
 repo_root=$(git rev-parse --show-toplevel)
-pkg=$(basename "$repo_root")
+cd "$repo_root"
 
 staged=$(git diff --cached --name-only)
 
 # ----------------------------------------------------------------------
-# Check 1: public-API change without README/docs update.
+# Check 1: per-package API change without README / docs update.
+#
+# For each `packages/<pkg>/...` path in the staged diff, classify it as
+# either "API code", "package-local docs/README", or "neither". If any
+# package has API code changes but no README or docs update (locally OR
+# in the unified docs/ site), block the commit.
 # ----------------------------------------------------------------------
-api_re="^(python/${pkg}/(__init__|estimator|estimand|augmentation|losses|diagnostics|tracer)\\.py"
-api_re+="|python/${pkg}/(estimands|losses|backends|testing)/.*\\.py"
-api_re+="|r/${pkg}/R/.*\\.R"
-api_re+="|r/${pkg}/NAMESPACE"
-api_re+=")$"
 
-# Docs may live in the local docs/ (rieszboost legacy) or in the parent
-# RieszReg/docs/ (unified meta site, when this hook runs from a checkout
-# that contains it). README.md changes always satisfy the requirement.
-docs_re='^(docs/.*\.qmd|docs/_quarto\.yml|README\.md|\.\./docs/.*\.qmd)$'
+pkgs_api_changed=()
+pkgs_docs_changed=()
+unified_docs_changed=0
 
-api_changed=$(echo "$staged" | grep -E "$api_re" || true)
-docs_changed=$(echo "$staged" | grep -E "$docs_re" || true)
+# Track which packages are touched at all.
+touched_pkgs=$(echo "$staged" \
+  | { grep -E '^packages/[^/]+/' || true; } \
+  | cut -d/ -f2 \
+  | sort -u)
 
-if [[ -n "$api_changed" && -z "$docs_changed" ]]; then
-  echo "ERROR: public-API change in '${pkg}' without a README or docs update."
-  echo ""
-  echo "Changed:"
-  echo "$api_changed" | sed 's/^/  - /'
-  echo ""
-  echo "Update README.md and the relevant page in the meta-project Quarto"
-  echo "site (RieszReg/docs/), then re-stage and re-commit. On bilingual"
-  echo "pages, update BOTH the {python} and {r} tabs."
-  echo ""
+for path in $staged; do
+  case "$path" in
+    docs/*.qmd|docs/_quarto.yml)
+      unified_docs_changed=1
+      ;;
+  esac
+done
+
+for pkg in $touched_pkgs; do
+  api_re="^packages/${pkg}/(python/${pkg}/(__init__|estimator|estimand|augmentation|losses|diagnostics|tracer)\\.py"
+  api_re+="|python/${pkg}/(estimands|losses|backends|testing)/.*\\.py"
+  api_re+="|r/${pkg}/R/.*\\.R"
+  api_re+="|r/${pkg}/NAMESPACE"
+  api_re+=")$"
+
+  pkg_docs_re="^packages/${pkg}/(README\\.md|docs/.*\\.qmd)$"
+
+  api_hits=$(echo "$staged" | grep -E "$api_re" || true)
+  pkg_docs_hits=$(echo "$staged" | grep -E "$pkg_docs_re" || true)
+
+  if [[ -n "$api_hits" ]]; then
+    pkgs_api_changed+=("$pkg")
+    if [[ -n "$pkg_docs_hits" || $unified_docs_changed -eq 1 ]]; then
+      pkgs_docs_changed+=("$pkg")
+    fi
+  fi
+done
+
+missing=()
+for pkg in "${pkgs_api_changed[@]:-}"; do
+  [[ -z "$pkg" ]] && continue
+  found=0
+  for done_pkg in "${pkgs_docs_changed[@]:-}"; do
+    [[ "$pkg" == "$done_pkg" ]] && found=1 && break
+  done
+  if [[ $found -eq 0 ]]; then
+    missing+=("$pkg")
+  fi
+done
+
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "ERROR: public-API change(s) without a README / docs update."
+  echo
+  echo "Affected package(s):"
+  for pkg in "${missing[@]}"; do
+    echo "  - $pkg"
+  done
+  echo
+  echo "Update either docs/*.qmd (unified site) or"
+  echo "packages/<pkg>/README.md / packages/<pkg>/docs/*.qmd, then"
+  echo "re-stage and re-commit. On bilingual pages, update BOTH the"
+  echo "{python} and {r} tabs."
+  echo
   echo "If this change genuinely cannot affect docs (internal refactor,"
   echo "test-only, comment fix), bypass with: git commit --no-verify"
   exit 1
 fi
 
 # ----------------------------------------------------------------------
-# Check 2: forbidden phrases in staged docs/*.qmd or README.md.
+# Check 2: doc-tone lint on staged qmd / README.md.
 # ----------------------------------------------------------------------
-docs_for_lint=$(echo "$staged" | grep -E '^(docs/.*\.qmd|README\.md|\.\./docs/.*\.qmd)$' || true)
 
-if [[ -n "$docs_for_lint" ]]; then
-  forbidden_regex='(intentionally (no|absent|out of scope|not)|by design|the design rule|design rule (is|says)|no bespoke|no separate [a-z_]+= ?argument|almost (every|never)|right (choice|for almost)|the workhorse|the natural (api|way|approach|choice)|don'\''t reinvent|rather than reinvent|reinvent it|we chose [a-z]+ over)'
-
-  hits=$(git diff --cached --unified=0 -- $docs_for_lint \
-         | grep -E '^\+[^+]' \
-         | grep -iE "$forbidden_regex" \
-         || true)
-
-  if [[ -n "$hits" ]]; then
-    echo "ERROR: doc tone violations in staged changes."
-    echo ""
-    echo "Lines being added contain phrases that read as design-decision"
-    echo "metacommentary or AI-flavored hedges. Rewrite to describe what"
-    echo "the API IS, not what it isn't or why we chose this design."
-    echo ""
-    echo "Offending lines:"
-    echo "$hits" | sed 's/^/  /'
-    echo ""
-    echo "Examples to avoid:"
-    echo "  BAD : 'There is intentionally no bespoke crossfit() function'"
-    echo "  GOOD: 'Cross-fit with sklearn.model_selection.cross_val_predict'"
-    echo ""
-    echo "  BAD : 'XGBoostBackend is right for almost every problem'"
-    echo "  GOOD: 'XGBoostBackend is the default. Use SklearnBackend for non-tree base learners.'"
-    echo ""
-    echo "  BAD : 'The estimand owns its input schema, so no separate"
-    echo "         feature_keys= argument'"
-    echo "  GOOD: (delete the sentence)"
-    echo ""
-    echo "Tone target: the ngboost user guide. Direct, instructive, short."
-    echo ""
-    echo "Bypass for false positives with: git commit --no-verify"
-    exit 1
-  fi
-fi
+exec "$repo_root/.githooks/lint-docs.sh" --cached

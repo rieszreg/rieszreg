@@ -142,13 +142,17 @@ A new implementation package (e.g. `rieszneural`) follows the [contract in riesz
 
 Public-API changes update both `README.md` and the relevant `docs/*.qmd` page in the same commit. On bilingual pages, update both the Python and R tabs.
 
-The pre-commit hook at `.githooks/pre-commit` (currently per-package; a meta-project version is on the roadmap) enforces this. Activate per clone:
+The pre-commit hook at `.githooks/pre-commit` (monorepo-wide, auto-detects which `packages/<pkg>/` is touched) enforces this. Activate per clone:
 
 ```sh
-git config core.hooksPath .githooks
+bash scripts/setup-hooks.sh
 ```
 
+That runs `git config core.hooksPath .githooks` once. After activation, every commit runs the hook automatically.
+
 The hook also greps the staged diff for two doc anti-patterns and blocks if it finds them: design-decision metacommentary (sentences describing the API's negative space, e.g. what's omitted, deferred, or rejected) and AI-flavored hedges (editorial framing, sweeping qualifiers, ornamental noun phrases). Match the [ngboost user guide](https://stanfordmlgroup.github.io/ngboost/intro.html) tone: direct, instructive, short.
+
+The same doc-tone logic lives in `.githooks/lint-docs.sh` and runs in CI via the `lint-docs` job in `.github/workflows/test.yml`, so bypassing the local hook with `--no-verify` does not bypass enforcement.
 
 For internal refactors that don't touch any signature, test additions, or comment fixes: `git commit --no-verify`.
 

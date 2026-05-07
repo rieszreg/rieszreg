@@ -113,7 +113,7 @@ Don't use Greek letters (e.g. $\phi$, $\psi$) for the potential or its derivativ
 
 ## 14. Doc-tone (banned phrases and patterns)
 
-User-facing docs describe what's currently in the package, in plain instructive prose matching the [ngboost user guide](https://stanfordmlgroup.github.io/ngboost/intro.html). The pre-commit hook (`.githooks/pre-commit`) checks for two failure modes; this section is what it enforces.
+User-facing docs describe what's currently in the package, in plain instructive prose matching the [ngboost user guide](https://stanfordmlgroup.github.io/ngboost/intro.html). The shared linter `.githooks/lint-docs.sh` checks for two failure modes (this section is what it enforces); the pre-commit hook runs it on staged changes (activate with `bash scripts/setup-hooks.sh`) and the `lint-docs` job in `.github/workflows/test.yml` re-runs it against the PR diff in CI, so `--no-verify` does not bypass enforcement.
 
 1. **No design-decision metacommentary.** Don't explain the API's negative space — what we removed, intentionally didn't build, or chose between. Just describe what the function does and how to use it. "Defaults to early stopping with a 10% validation split" is good. "We chose 10% rather than 20% because…" is not. "Originally `feature_keys` was used, but…" is not.
 2. **No AI-flavored hedge or editorial framing.** Banned phrases (non-exhaustive, but indicative): "the workhorse", "the right choice for almost every", "almost never needs tuning", "the natural way/API", "rather than reinvent", "out-of-the-box", "best-in-class", "a common pattern". Avoid em-dashes peppered through prose. Sentences should be short (8–15 words on average), active voice. "X computes Y" beats "X is the function that computes Y".
