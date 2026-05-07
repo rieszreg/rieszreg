@@ -1,6 +1,6 @@
 ---
 name: rieszreg-notation
-description: Notation and terminology conventions for the rieszreg family of packages. Use whenever editing user guide pages (`docs/**/*.qmd`), READMEs, docstrings, code comments, and example scripts that mention an estimand, a Riesz representer, an outcome regression, a learner, or treatment / outcome variables. Triggers on edits inside `/Users/aschuler/Desktop/RieszReg/` (any sub-package) that touch math notation, prose explanations of Riesz regression, or naming conventions for parameters and functions.
+description: Notation, prose style, and doc-tone for the rieszreg family — math symbols ($\mu$, $\alpha$, $\psi$, $m$), code identifiers ($Z = (A, X)$), terminology ("estimand" not "target", "learner" not "model"), audience expectations for `docs/*.qmd`, and the doc-tone rules enforced by `.githooks/pre-commit` (no design-decision metacommentary, no AI-flavored hedging). Use whenever editing user-facing prose — Quarto pages (`docs/**/*.qmd`), READMEs, docstrings, code comments, and example scripts — that mentions an estimand, a Riesz representer, an outcome regression, a learner, or treatment / outcome variables.
 ---
 
 # Notation conventions for the rieszreg family
@@ -65,13 +65,25 @@ Concretely:
 - **Pace.** When introducing a math concept, lead with a concrete example (often the ATE), then state the general rule. A new technical idea gets its own paragraph; do not stack two new ideas in one sentence.
 - **Plain-language equivalents** are required wherever a technical term shows up. Technical terms in parentheticals are fine when the prose works without them.
 
-## 9. Where this lives
+## 9. Doc-tone rules (enforced by .githooks/pre-commit)
 
-- This skill (canonical reference). Update here first if the conventions ever change.
-- [`CLAUDE.md`](../../CLAUDE.md) (cross-reference at the top, so anyone working in the repo is reminded).
-- [`rieszreg/DESIGN.md`](../../rieszreg/DESIGN.md) (cross-reference under a "Notation" section).
+User-facing prose describes what's currently in the package, in plain instructive prose matching the [ngboost user guide](https://stanfordmlgroup.github.io/ngboost/intro.html). Two failure modes the pre-commit hook checks for:
 
-## 10. Drift handling
+1. **No design-decision metacommentary.** Don't explain the API's negative space — what we removed, intentionally didn't build, or chose between. The user only cares what they can call. Just describe what the function does and how to use it. No "intentionally no X", "by design", "we chose Y over Z", "the rationale is...".
+2. **No AI-flavored hedge or editorial framing.** Avoid phrases like "the workhorse", "the right choice for almost every", "almost never needs tuning", "the natural way / API", "rather than reinvent". Avoid em-dashes peppered through prose. Sentences should be short (8–15 words on average), active voice.
+
+Also: don't add backend-specific framing to tier-1 docs ("the booster does X", "the kernel matrix is Y"). Use neutral language ("the backend produces η").
+
+## 10. Docstrings
+
+- Module-level docstrings on every `.py` file explaining semantics.
+- Class/function docstrings on all public types.
+
+## 11. Where this lives
+
+This skill is canonical. Update here first if the conventions ever change.
+
+## 12. Drift handling
 
 A non-trivial fraction of existing files still uses the old notation ($g$, $\theta$, $m(z, g)$). When you edit a paragraph that uses old notation, update that paragraph fully to the new convention. Do not bulk-rewrite untouched files — drift gets fixed on touch. The exceptions are user guide pages explicitly being polished in a notation-pass PR.
 
