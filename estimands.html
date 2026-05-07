@@ -504,6 +504,12 @@ window.Quarto = {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./extending.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Extending: wrap your own learner</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./developing.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Developing</span></a>
   </div>
@@ -746,17 +752,17 @@ window.Quarto = {
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ATE</span>(<span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x7fd1cbd7b830&gt;
+<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x7f7496fc86e0&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>, <span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x7fd1cc5138c0&gt;
+<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x7f7496fc92b0&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">LocalShift</span>(<span class="at">delta =</span> <span class="fl">0.3</span>, <span class="at">threshold =</span> <span class="fl">0.7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x7fd1cbd8bfe0&gt;
+<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x7f7496fc9cd0&gt;
  signature: (alpha)</code></pre>
 </div>
 </div>
@@ -1036,7 +1042,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(est)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x7fd1ccd5fc20&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x7f7496fc69f0&gt;</code></pre>
 </div>
 </div>
 <p>The inner function takes <code>(z, y)</code> even when <code>y</code> is unused — that signature is the contract every custom <code>m</code> follows. Pass the estimand to any backend’s estimator class:</p>

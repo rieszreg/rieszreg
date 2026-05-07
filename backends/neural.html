@@ -504,6 +504,12 @@ window.Quarto = {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../extending.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Extending: wrap your own learner</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../developing.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Developing</span></a>
   </div>
@@ -1023,9 +1029,9 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f75676c3aa0&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f3f4f663fb0&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f75676c3aa0&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f3f4f663fb0&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
@@ -1506,13 +1512,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f755b884650&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f3f442d3d70&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f755bb88230&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f3f43f13f20&gt;,
          validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f755b884650&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f3f442d3d70&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f755bb88230&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f3f43f13f20&gt;,
          validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
@@ -1982,7 +1988,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f756723a840&gt;,
+</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f3f4f752840&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -1993,7 +1999,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
                                     snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f755b811bb0&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f756723a840&gt;,
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f3f43d7ee40&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f3f4f752840&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -2004,7 +2010,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
                                     snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f755b811bb0&gt;)</pre></div> </div></div></div></div>
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f3f43d7ee40&gt;)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> est.predict(df)</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"α̂ range: [</span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
