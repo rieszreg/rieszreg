@@ -5,8 +5,12 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      - 'rieszreg/python/**'
-      - 'rieszreg/r/**'
+      - 'packages/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'packages/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -17,60 +21,14 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout rieszreg (this repo)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Checkout rieszboost (sibling repo)
-        uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
         with:
-          repository: rieszreg/rieszboost
-          path: rieszboost
-          # Optional: pin to a tag/sha if you want reproducible doc builds.
-        continue-on-error: true
+          enable-cache: true
 
-      - name: Checkout krrr (sibling repo)
-        uses: actions/checkout@v4
-        with:
-          repository: rieszreg/krrr
-          path: krrr
-        continue-on-error: true
-
-      - name: Checkout forestriesz (sibling repo)
-        uses: actions/checkout@v4
-        with:
-          repository: rieszreg/forestriesz
-          path: forestriesz
-        continue-on-error: true
-
-      - name: Checkout riesznet (sibling repo)
-        uses: actions/checkout@v4
-        with:
-          repository: rieszreg/riesznet
-          path: riesznet
-        continue-on-error: true
-
-      - name: Checkout riesztree (sibling repo)
-        uses: actions/checkout@v4
-        with:
-          repository: rieszreg/riesztree
-          path: riesztree
-        continue-on-error: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-
-      - name: Install rieszreg + impl packages + doc deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e rieszreg/python
-          if [ -d rieszboost/python ]; then pip install -e rieszboost/python; fi
-          if [ -d krrr/python ]; then pip install -e krrr/python; fi
-          if [ -d forestriesz/python ]; then pip install -e forestriesz/python; fi
-          if [ -d riesznet/python ]; then pip install -e riesznet/python; fi
-          if [ -d riesztree/python ]; then pip install -e riesztree/python; fi
-          pip install matplotlib pandas causaldata
+      - name: Sync workspace + docs deps (one venv covers all six packages)
+        run: uv sync --all-packages --all-extras --group docs
 
       - uses: r-lib/actions/setup-r@v2
         with:
@@ -86,10 +44,10 @@ jobs:
             any::pkgload
             any::xgboost
             any::rsample
-          working-directory: rieszreg/r/rieszreg
+          working-directory: packages/rieszreg/r/rieszreg
 
-      - name: Point reticulate at the project Python
-        run: echo "RETICULATE_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> $GITHUB_ENV
+      - name: Point reticulate at the workspace venv
+        run: echo "RETICULATE_PYTHON=$(uv run python -c 'import sys; print(sys.executable)')" >> $GITHUB_ENV
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
@@ -99,6 +57,7 @@ jobs:
           path: docs
 
       - name: Publish to gh-pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: quarto-dev/quarto-actions/publish@v2
         with:
           target: gh-pages

@@ -1,0 +1,59 @@
+name: Release a workspace package to PyPI
+
+# Trigger on tags like rieszreg-v0.1.2, rieszboost-v0.1.0, etc.
+# The package name is derived from the tag prefix.
+
+on:
+  push:
+    tags:
+      - 'rieszreg-v*'
+      - 'rieszboost-v*'
+      - 'krrr-v*'
+      - 'forestriesz-v*'
+      - 'riesznet-v*'
+      - 'riesztree-v*'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Workspace package to publish'
+        required: true
+        type: choice
+        options:
+          - rieszreg
+          - rieszboost
+          - krrr
+          - forestriesz
+          - riesznet
+          - riesztree
+
+permissions:
+  contents: read
+  id-token: write   # for trusted PyPI publishing (no API token in repo)
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    environment: pypi-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Resolve package name from tag (or workflow_dispatch input)
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            pkg="${{ github.event.inputs.package }}"
+          else
+            # tag is like 'refs/tags/rieszboost-v0.1.0'; strip prefix and version suffix
+            tag="${GITHUB_REF#refs/tags/}"
+            pkg="${tag%-v*}"
+          fi
+          echo "package=$pkg" >> $GITHUB_OUTPUT
+          echo "Publishing: $pkg"
+
+      - name: Build sdist + wheel for the package
+        run: uv build --package ${{ steps.resolve.outputs.package }}
+
+      - name: Publish to PyPI (trusted publishing via OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
