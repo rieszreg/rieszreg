@@ -14,7 +14,7 @@ import numpy as np
 
 from rieszreg.estimands.base import Estimand
 from rieszreg.estimator import RieszEstimator, _features_from_rows, _rows_from_Z
-from rieszreg.losses import LossSpec
+from rieszreg.losses import Loss
 
 from .backends import Backend, XGBoostBackend
 
@@ -30,7 +30,7 @@ class RieszBooster(RieszEstimator):
     backend : Backend, default=XGBoostBackend()
         Where the actual tree fitting happens. Swap to `SklearnBackend(...)`
         to use a non-tree base learner (KernelRidge, MLPs, etc.).
-    loss : LossSpec, default=SquaredLoss()
+    loss : Loss, default=SquaredLoss()
         The Bregman-Riesz loss to minimize. `KLLoss()` is the alternative.
     n_estimators : int, default=200
     learning_rate : float, default=0.05
@@ -51,7 +51,7 @@ class RieszBooster(RieszEstimator):
         self,
         estimand: Estimand,
         backend: Backend | None = None,
-        loss: LossSpec | None = None,
+        loss: Loss | None = None,
         n_estimators: int = 200,
         learning_rate: float = 0.05,
         max_depth: int = 4,

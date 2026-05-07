@@ -12,8 +12,8 @@ rieszboost/
 │   │   ├── estimator.py           # RieszBooster (sklearn BaseEstimator)
 │   │   ├── estimand.py            # ATE, ATT, TSM, AdditiveShift,
 │   │   │                          # LocalShift, StochasticIntervention, Estimand
-│   │   ├── augmentation.py        # build_augmented + AugmentedDataset
-│   │   ├── losses.py              # LossSpec protocol + four losses
+│   │   ├── augmentation.py        # AugmentedDataset re-export
+│   │   ├── losses.py              # Loss base class + four built-in losses
 │   │   ├── diagnostics.py         # diagnose() + Diagnostics dataclass
 │   │   ├── tracer.py              # LinearForm, Tracer, trace
 │   │   └── backends/
@@ -47,7 +47,7 @@ Rscript -e '
 
 ## Tracer
 
-The user writes `m(z, alpha)` with `+`, `-`, scalar `*`, and calls to `alpha(...)`. The library passes a `Tracer` in as `alpha`; each call returns a single-term `LinearForm`, and Python's operator overloading composes them. The result has `.as_pairs()` returning `[(coef, point), ...]`, which `build_augmented` consumes to construct the augmented dataset. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time. See [`python/rieszboost/tracer.py`](https://github.com/rieszreg/rieszboost/blob/main/python/rieszboost/tracer.py).
+The user writes `m(z, alpha)` with `+`, `-`, scalar `*`, and calls to `alpha(...)`. The library passes a `Tracer` in as `alpha`; each call returns a single-term `LinearForm`, and Python's operator overloading composes them. The result has `.as_pairs()` returning `[(coef, point), ...]`, which the default `FiniteEvalEstimand.augment` consumes to construct the augmented dataset. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time. See [`python/rieszboost/tracer.py`](https://github.com/rieszreg/rieszboost/blob/main/python/rieszboost/tracer.py).
 
 ## Adding an estimand factory
 
@@ -72,9 +72,9 @@ Then:
 
 The pre-commit hook blocks step (1)/(2) without step (3).
 
-## Adding a `LossSpec`
+## Adding a `Loss`
 
-Implement the `LossSpec` protocol from `losses.py`. `SquaredLoss` is the shortest template; `KLLoss` shows how to handle a non-identity link.
+Subclass `Loss` from `losses.py`. `SquaredLoss` is the shortest template; `KLLoss` shows how to handle a non-identity link.
 
 1. Add the class to `python/rieszboost/losses.py`.
 2. Export from `__init__.py`.
@@ -86,7 +86,7 @@ Implement the `LossSpec` protocol from `losses.py`. `SquaredLoss` is the shortes
 
 Implement the `Backend` protocol from `python/rieszboost/backends/base.py`. One method, `fit_augmented(...)`, returning a `FitResult` whose `predictor` implements `predict_eta` and `predict_alpha`. `XGBoostBackend` and `SklearnBackend` are reference implementations.
 
-The backend sees an `AugmentedDataset` and a `LossSpec`. It does not need to know about the estimand or the tracer.
+The backend sees an `AugmentedDataset` and a `Loss`. It does not need to know about the estimand or the tracer.
 
 ## Living-doc rule
 

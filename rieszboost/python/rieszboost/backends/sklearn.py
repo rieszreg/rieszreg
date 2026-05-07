@@ -13,14 +13,9 @@ from typing import Any, Callable
 
 import numpy as np
 
-from rieszreg.augmentation import (
-    AugmentedDataset,
-    aug_grad_eta,
-    aug_hess_eta,
-    aug_loss_alpha,
-)
+from rieszreg.augmentation import AugmentedDataset
 from rieszreg.backends.base import FitResult, Predictor, register_predictor_loader
-from rieszreg.losses import LossSpec
+from rieszreg.losses import Loss
 
 
 @dataclass
@@ -28,7 +23,7 @@ class SklearnPredictor:
     learners: list
     steps: list[float]
     base_score: float
-    loss: LossSpec
+    loss: Loss
     best_iteration: int | None = None
 
     kind = "sklearn"
@@ -66,7 +61,7 @@ class SklearnPredictor:
         )
 
     @classmethod
-    def load(cls, dir_path, base_score: float, loss: LossSpec,
+    def load(cls, dir_path, base_score: float, loss: Loss,
              best_iteration: int | None) -> "SklearnPredictor":
         from pathlib import Path
         import joblib
@@ -81,7 +76,7 @@ class SklearnPredictor:
 
 
 def _line_search(
-    loss: LossSpec,
+    loss: Loss,
     is_original: np.ndarray,
     potential_deriv_coef: np.ndarray,
     F: np.ndarray,
@@ -90,8 +85,8 @@ def _line_search(
     """Closed-form γ minimizing the augmented loss along the direction `h` under
     the second-order quadratic surrogate (correct for SquaredLoss; approximate
     but well-behaved for general convex losses)."""
-    grad_F = aug_grad_eta(loss, is_original, potential_deriv_coef, F)
-    hess_F = aug_hess_eta(loss, is_original, potential_deriv_coef, F, hessian_floor=1e-6)
+    grad_F = loss.aug_grad_eta(is_original, potential_deriv_coef, F)
+    hess_F = loss.aug_hess_eta(is_original, potential_deriv_coef, F, hessian_floor=1e-6)
     # numerator = -∇·h, denom = h·H·h (diagonal-Hessian surrogate)
     num = -float(np.sum(h * grad_F))
     denom = float(np.sum(h * h * hess_F))
@@ -115,7 +110,7 @@ class SklearnBackend:
         self,
         aug_train: AugmentedDataset,
         aug_valid: AugmentedDataset | None,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,
@@ -146,7 +141,7 @@ class SklearnBackend:
         no_improve = 0
 
         for it in range(self.n_estimators):
-            grad_train = aug_grad_eta(loss, is_original, potential_deriv_coef, F_train)
+            grad_train = loss.aug_grad_eta(is_original, potential_deriv_coef, F_train)
             residual = -grad_train
 
             learner = self.base_learner_factory()
@@ -165,8 +160,7 @@ class SklearnBackend:
                 F_val = F_val + step * h_val
                 alpha_val = loss.link_to_alpha(F_val)
                 val_loss = float(
-                    np.sum(aug_loss_alpha(
-                        loss,
+                    np.sum(loss.aug_loss_alpha(
                         aug_valid.is_original,
                         aug_valid.potential_deriv_coef,
                         alpha_val,

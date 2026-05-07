@@ -5,7 +5,6 @@ import pandas as pd
 
 import rieszboost
 from rieszboost import RieszBooster
-from rieszboost.augmentation import build_augmented
 from rieszboost.tracer import trace
 
 
@@ -54,8 +53,8 @@ def test_local_shift_recovers_truth_on_continuous_dgp():
 
 
 def test_local_shift_augmentation_skips_above_threshold():
-    rows = [{"a": -0.5, "x": 0.0}, {"a": 0.5, "x": 0.0}]
-    aug = build_augmented(rows, rieszboost.LocalShift(delta=1.0, threshold=0.0))
+    features = np.array([[-0.5, 0.0], [0.5, 0.0]])
+    aug = rieszboost.LocalShift(delta=1.0, threshold=0.0).augment(features)
     assert aug.features.shape == (3, 2)
     above_idx = np.where(aug.origin_index == 1)[0]
     assert aug.is_original[above_idx].sum() == 1.0

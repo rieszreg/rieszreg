@@ -7,7 +7,7 @@
 
 Gradient-boosting backend for the [RieszReg meta-package](../README.md), implementing Lee & Schuler ([arXiv:2501.04871](https://arxiv.org/abs/2501.04871)).
 
-This package depends on `rieszreg` for the shared abstractions (`Estimand`, `LossSpec`, `AugmentedDataset`, `build_augmented`, `Diagnostics`, `Backend` Protocol, `RieszEstimator` orchestrator). `rieszboost` contributes:
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `AugmentedDataset`, `Diagnostics`, `Backend` Protocol, `RieszEstimator` orchestrator). `rieszboost` contributes:
 
 - `XGBoostBackend` (default) and `SklearnBackend` — concrete `Backend` Protocol implementations.
 - `RieszBooster` — convenience subclass of `rieszreg.RieszEstimator` with `XGBoostBackend` defaulted and boosting hyperparameters (`max_depth`, `reg_lambda`, `subsample`) on the constructor.
@@ -56,7 +56,7 @@ The public API should feel like **ngboost / sklearn**:
 - Cross-fitting is `sklearn.model_selection.cross_val_predict`. Don't reintroduce a bespoke `crossfit()` function.
 - Hyperparameter tuning is `sklearn.model_selection.GridSearchCV` (or `HalvingGridSearchCV`, etc.). Don't introduce a `tune_riesz()`.
 
-**Apply this rule to every new feature, not just the public API surface.** Before writing any new code — especially anything procedural with a loop, a split, a grid, or a fold — ask: *is there an sklearn way to do this?* If yes, use it. The answer is yes more often than feels intuitive: cross-fitting (`cross_val_predict`), CV scoring (`cross_validate`), splits (`KFold`, `train_test_split`, `StratifiedKFold`), tuning (`GridSearchCV`, `HalvingGridSearchCV`, `RandomizedSearchCV`), composition (`Pipeline`, `ColumnTransformer`, `FunctionTransformer`), scoring (`make_scorer`), parallelism (`n_jobs=`). This applies to library code, examples, docs, and tests. A hand-rolled `for tr_idx, te_idx in KFold(...).split(X):` loop is a code smell — when you find one (yours or pre-existing), replace it with `cross_val_predict` unless you can articulate why sklearn's version is wrong for the task. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `LossSpec`).
+**Apply this rule to every new feature, not just the public API surface.** Before writing any new code — especially anything procedural with a loop, a split, a grid, or a fold — ask: *is there an sklearn way to do this?* If yes, use it. The answer is yes more often than feels intuitive: cross-fitting (`cross_val_predict`), CV scoring (`cross_validate`), splits (`KFold`, `train_test_split`, `StratifiedKFold`), tuning (`GridSearchCV`, `HalvingGridSearchCV`, `RandomizedSearchCV`), composition (`Pipeline`, `ColumnTransformer`, `FunctionTransformer`), scoring (`make_scorer`), parallelism (`n_jobs=`). This applies to library code, examples, docs, and tests. A hand-rolled `for tr_idx, te_idx in KFold(...).split(X):` loop is a code smell — when you find one (yours or pre-existing), replace it with `cross_val_predict` unless you can articulate why sklearn's version is wrong for the task. Bespoke is reserved for things sklearn genuinely doesn't cover (the `LinearForm` tracer, the custom xgboost objective, the Bregman `Loss`).
 
 R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df)$predict(df)`) rather than functional `fit_riesz()` shims.
 
@@ -80,7 +80,7 @@ R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df
 ## Architecture notes
 
 - **m() is opaque, JAX-style.** Users write `m(alpha)` as an operator that returns a function of `z`, built with `+`, `-`, scalar `*`, and calls to `alpha(**kwargs)`. The `Tracer` (`rieszboost/tracer.py`) records each call as a `LinearTerm` and composes them into a `LinearForm`. Anything that leaves the linear-form algebra raises (signal to dispatch to slow path, when the slow path lands).
-- **Fast path = data augmentation + xgboost custom objective.** `engine.build_augmented` traces m on each row and assembles per-row (a, b) coefficients so the loss is `Σ a_j α(z̃_j)² + b_j α(z̃_j)`. xgboost's custom objective consumes gradient `2aF + b` and Hessian `2a` directly. Augmented rows with `a=0` get a small `eps` floor in the Hessian to keep leaf-weight optimization stable.
+- **Fast path = data augmentation + xgboost custom objective.** `Estimand.augment` emits per-row (a, b) coefficients so the loss is `Σ a_j α(z̃_j)² + b_j α(z̃_j)`. xgboost's custom objective consumes gradient `2aF + b` and Hessian `2a` directly. Augmented rows with `a=0` get a small `eps` floor in the Hessian to keep leaf-weight optimization stable.
 - **Slow general path** (not yet implemented): Friedman-style gradient boosting against arbitrary base learners (sklearn, JAX, etc.) for non-finite-point m (integrals, derivatives).
 - **xgboost is lazy-imported** so the rest of the rieszboost / rieszreg API is usable without xgboost or libomp.
 
@@ -88,7 +88,7 @@ R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df
 
 - **`RieszBooster`** subclasses `rieszreg.RieszEstimator`, defaulting backend to `XGBoostBackend()` and adding `max_depth`, `reg_lambda`, `subsample` constructor args. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`.
 - **Backends**: `XGBoostBackend(hessian_floor=2.0, gradient_only=False)` and `SklearnBackend(base_learner_factory)`. Both register their `Predictor` loader for the registry-based save/load path on import.
-- All shared abstractions (`Estimand`, `LossSpec`, `LinearForm`, `build_augmented`, `Diagnostics`) live in `rieszreg`; this package re-exports them.
+- All shared abstractions (`Estimand`, `Loss`, `LinearForm`, `AugmentedDataset`, `Diagnostics`) live in `rieszreg`; this package re-exports them.
 - 109 Python tests + 11 R parity tests passing. Includes acceptance gates for `clone`, `GridSearchCV`, `cross_val_predict`.
 
 ## Longitudinal / LMTP
@@ -99,7 +99,7 @@ Full LMTP support requires multi-stage orchestration (one Riesz fit per time-sta
 
 - Boosting can extrapolate aggressively in low-overlap regions of α̂. Use shallow trees (`max_depth=3`), early stopping, and look at `diagnose(...)` warnings — it flags when max |α̂| dwarfs the 99th percentile (a sign of a single outlier extrapolating).
 - `_make_objective` floors the Hessian at `hessian_floor=2.0` (matching the natural Hessian of original a=1 rows). Earlier we used `eps=1e-6`, which made counterfactual leaves degenerate in xgboost's leaf-weight Newton step (`-G/(H+λ)` with H≈0) and required `reg_lambda=100` to stabilize. The new floor mimics the row-uniform weighting that first-order gradient boosting (Friedman 2001) uses by construction; standard xgboost-style hyperparameters now work without sledgehammer regularization.
-- `gradient_only=True` on `fit(...)` short-circuits the LossSpec hessian and sends `hess=ones_like(grad)` to xgboost — exactly first-order gradient boosting (Lee-Schuler Algorithm 2). Empirically on the binary-DGP example it's *worse* than the floored second-order path at matched hyperparameters (ATE α-RMSE ~2.0 vs ~1.2; ATT ~1.0 vs ~0.8). Even though the second-order Hessian is artificial (it's just our floor), the leaf-weight balancing seems to help relative to first-order.
+- `gradient_only=True` on `fit(...)` short-circuits the Loss hessian and sends `hess=ones_like(grad)` to xgboost — exactly first-order gradient boosting (Lee-Schuler Algorithm 2). Empirically on the binary-DGP example it's *worse* than the floored second-order path at matched hyperparameters (ATE α-RMSE ~2.0 vs ~1.2; ATT ~1.0 vs ~0.8). Even though the second-order Hessian is artificial (it's just our floor), the leaf-weight balancing seems to help relative to first-order.
 - Cross-check vs Kaitlyn Lee's reference implementation (`kaitlynjlee/boosting_for_rr`): our `gradient_only=True, learning_rate=lr_ref/2, reg_lambda=0` reproduces `ATE_ES_stochastic` / `ATT_ES_stochastic` to Pearson 0.998 / 0.986 on identical data. The factor of 2 is real: their per-row residual is `f - (2a-1)` (drops a factor of 2 from the natural Riesz loss gradient `2(2aF + b)`), ours is `2aF + b`. Their `fit_internal` (no early stopping path) has a shape bug — `A.reshape(-1,1)` then `A == 1` for indexing 1D arrays — only `fit_internal_early_stopping` works.
 
 ## What's next

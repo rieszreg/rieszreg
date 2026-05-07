@@ -9,7 +9,7 @@ estimand / loss / backend objects baked in at construction.
     alpha_hat = booster.predict(Z)
 """
 
-from .augmentation import AugmentedDataset, build_augmented
+from .augmentation import AugmentedDataset
 from .diagnostics import Diagnostics, diagnose
 from .estimand import (
     ATE,
@@ -19,7 +19,7 @@ from .estimand import (
     LocalShift,
     TSM,
 )
-from .losses import BernoulliLoss, BoundedSquaredLoss, KLLoss, LossSpec, SquaredLoss
+from .losses import BernoulliLoss, BoundedSquaredLoss, KLLoss, Loss, SquaredLoss
 from .tracer import LinearForm, Tracer, trace
 
 __all__ = [
@@ -34,14 +34,13 @@ __all__ = [
     "KLLoss",
     "LinearForm",
     "LocalShift",
-    "LossSpec",
+    "Loss",
     "RieszBooster",
     "SklearnBackend",
     "SquaredLoss",
     "TSM",
     "Tracer",
     "XGBoostBackend",
-    "build_augmented",
     "diagnose",
     "trace",
 ]

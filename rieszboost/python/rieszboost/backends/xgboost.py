@@ -1,7 +1,7 @@
 """xgboost backend: data augmentation + custom objective.
 
-Per-row gradient and hessian are sourced from the LossSpec, so this backend
-works for any LossSpec (squared, KL, …) so long as the loss/link can produce
+Per-row gradient and hessian are sourced from the Loss, so this backend
+works for any Loss (squared, KL, …) so long as the loss/link can produce
 finite grad/hess values from the predicted η. xgboost boosts in η-space; the
 predictor applies `loss.link_to_alpha` to convert to α space.
 """
@@ -14,21 +14,16 @@ from typing import Any, Sequence
 import numpy as np
 import xgboost as xgb
 
-from rieszreg.augmentation import (
-    AugmentedDataset,
-    aug_grad_eta,
-    aug_hess_eta,
-    aug_loss_alpha,
-)
+from rieszreg.augmentation import AugmentedDataset
 from rieszreg.backends.base import FitResult, Predictor, register_predictor_loader
-from rieszreg.losses import LossSpec
+from rieszreg.losses import Loss
 
 
 @dataclass
 class XGBoostPredictor:
     booster: xgb.Booster
     base_score: float
-    loss: LossSpec
+    loss: Loss
     best_iteration: int | None = None
 
     kind = "xgboost"
@@ -84,7 +79,7 @@ class XGBoostPredictor:
         self.booster.save_model(str(dir_path / "booster.ubj"))
 
     @classmethod
-    def load(cls, dir_path, base_score: float, loss: LossSpec,
+    def load(cls, dir_path, base_score: float, loss: Loss,
              best_iteration: int | None) -> "XGBoostPredictor":
         from pathlib import Path
         bst = xgb.Booster()
@@ -96,17 +91,17 @@ class XGBoostPredictor:
 def _make_objective(
     is_original: np.ndarray,
     potential_deriv_coef: np.ndarray,
-    loss: LossSpec,
+    loss: Loss,
     hessian_floor: float,
     gradient_only: bool,
 ):
     def obj(preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
         del dtrain
-        grad = aug_grad_eta(loss, is_original, potential_deriv_coef, preds)
+        grad = loss.aug_grad_eta(is_original, potential_deriv_coef, preds)
         if gradient_only:
             hess = np.ones_like(grad)
         else:
-            hess = aug_hess_eta(loss, is_original, potential_deriv_coef, preds, hessian_floor)
+            hess = loss.aug_hess_eta(is_original, potential_deriv_coef, preds, hessian_floor)
         return grad, hess
     return obj
 
@@ -115,12 +110,12 @@ def _make_metric(
     is_original_val: np.ndarray,
     potential_deriv_coef_val: np.ndarray,
     n_val_rows: int,
-    loss: LossSpec,
+    loss: Loss,
 ):
     def metric(predt: np.ndarray, dval) -> tuple[str, float]:
         del dval
         alpha = loss.link_to_alpha(predt)
-        per_row = aug_loss_alpha(loss, is_original_val, potential_deriv_coef_val, alpha)
+        per_row = loss.aug_loss_alpha(is_original_val, potential_deriv_coef_val, alpha)
         return "riesz_loss", float(np.sum(per_row) / n_val_rows)
     return metric
 
@@ -145,7 +140,7 @@ class XGBoostBackend:
         self,
         aug_train: AugmentedDataset,
         aug_valid: AugmentedDataset | None,
-        loss: LossSpec,
+        loss: Loss,
         *,
         base_score: float,
         random_state: int,

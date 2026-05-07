@@ -5,7 +5,6 @@ import pandas as pd
 
 import rieszboost
 from rieszboost import RieszBooster
-from rieszboost.augmentation import build_augmented
 from rieszboost.tracer import trace
 
 
@@ -17,8 +16,8 @@ def test_att_traces_to_zero_for_controls():
 
 
 def test_att_augmentation_skips_controls():
-    rows = [{"a": 1, "x": 0.5}, {"a": 0, "x": 0.7}]
-    aug = build_augmented(rows, rieszboost.ATT())
+    features = np.array([[1.0, 0.5], [0.0, 0.7]])
+    aug = rieszboost.ATT().augment(features)
     assert aug.features.shape == (3, 2)
     ctrl_idx = np.where(aug.origin_index == 1)[0]
     assert aug.is_original[ctrl_idx].sum() == 1.0

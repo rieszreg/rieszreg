@@ -203,13 +203,13 @@ Generous bounds make the sigmoid link saturate over most of $\eta$, so boosting 
 ## Custom losses
 
 ::: {.callout-note title="Python-only"}
-Custom `LossSpec` subclasses are Python-only. From R, define the subclass in Python via `reticulate::py_run_string` and pass the instance to `RieszBooster$new(loss=...)`.
+Custom `Loss` subclasses are Python-only. From R, define the subclass in Python via `reticulate::py_run_string` and pass the instance to `RieszBooster$new(loss=...)`.
 :::
 
-Implement the `LossSpec` protocol:
+Subclass `Loss`:
 
 ```python
-class LossSpec(Protocol):
+class Loss:
     name: str
 
     def link_to_alpha(self, eta: np.ndarray) -> np.ndarray:

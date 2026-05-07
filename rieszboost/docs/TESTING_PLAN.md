@@ -48,7 +48,7 @@ Use `hypothesis` to generate random valid data and assert invariants:
 - **Linearity in m**: tracing `c1*m1 + c2*m2` matches `c1*trace(m1) + c2*trace(m2)` term-wise. Catches bugs in the tracer arithmetic.
 - **Augmentation invariance**: shuffling row order in input should produce a permuted but otherwise identical augmented dataset.
 - **Reproducibility**: same `random_state`, same data, same predictions to floating-point identity.
-- **Estimand round-trip**: `Estimand(feature_keys=keys, m=m)` followed by `build_augmented` produces rows whose features match `keys` exactly.
+- **Estimand round-trip**: `FiniteEvalEstimand(feature_keys=keys, m=m).augment(features)` produces rows whose features match `keys` exactly.
 - **Score monotonicity (smoke)**: more boosting rounds → lower training Riesz loss (within reason).
 
 ### 5. ✓ sklearn `check_estimator` conformance

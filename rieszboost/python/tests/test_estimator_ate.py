@@ -6,7 +6,6 @@ import pytest
 
 import rieszboost
 from rieszboost import RieszBooster
-from rieszboost.augmentation import build_augmented
 
 
 def _logit(z):
@@ -27,10 +26,10 @@ def _df(x, a):
 
 def test_augmentation_shape_for_ate():
     x, a, _ = _simulate(50, seed=1)
-    rows = [{"a": float(ai), "x": float(xi)} for ai, xi in zip(a, x)]
-    aug = build_augmented(rows, rieszboost.ATE())
-    assert aug.features.shape == (2 * len(rows), 2)
-    for i in range(len(rows)):
+    features = np.column_stack([a.astype(float), x.astype(float)])
+    aug = rieszboost.ATE().augment(features)
+    assert aug.features.shape == (2 * len(features), 2)
+    for i in range(len(features)):
         idx = np.where(aug.origin_index == i)[0]
         assert pytest.approx(aug.potential_deriv_coef[idx].sum()) == 0.0
         assert pytest.approx(aug.is_original[idx].sum()) == 1.0

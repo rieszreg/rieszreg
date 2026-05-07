@@ -26,7 +26,6 @@ from rieszboost import (
     SquaredLoss,
     TSM,
 )
-from rieszboost.augmentation import build_augmented
 from rieszboost.estimand import estimand_from_spec
 from rieszboost.losses import loss_from_spec
 from rieszboost.tracer import trace
@@ -75,11 +74,13 @@ def test_tracer_is_linear_in_m(c1: float, c2: float, x_val: float):
 def test_augmentation_invariant_under_row_permutation(n: int, seed: int):
     """Shuffling rows produces the same multiset of augmented (D, C) coefficients."""
     rng = np.random.default_rng(seed)
-    rows = [{"a": float(rng.integers(0, 2)), "x": float(rng.uniform())} for _ in range(n)]
+    a = rng.integers(0, 2, size=n).astype(float)
+    x = rng.uniform(size=n)
+    features = np.column_stack([a, x])
 
-    aug1 = build_augmented(rows, ATE())
+    aug1 = ATE().augment(features)
     perm = list(rng.permutation(n))
-    aug2 = build_augmented([rows[i] for i in perm], ATE())
+    aug2 = ATE().augment(features[perm])
 
     # Compare the multiset of (D, C) coefficients — independent of order.
     sig1 = sorted(zip(aug1.is_original.tolist(), aug1.potential_deriv_coef.tolist()))
@@ -103,7 +104,11 @@ def test_fit_is_reproducible_given_random_state(seed: int):
 
 
 @given(
-    delta=st.floats(min_value=-2.0, max_value=2.0, allow_nan=False),
+    # AdditiveShift / LocalShift reject delta=0 as a degenerate estimand;
+    # filter it out of the property's input space.
+    delta=st.floats(min_value=-2.0, max_value=2.0, allow_nan=False).filter(
+        lambda d: d != 0.0
+    ),
     threshold=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False),
     level=st.integers(min_value=0, max_value=10),
 )
@@ -121,7 +126,7 @@ def test_estimand_factory_spec_round_trip(delta: float, threshold: float, level:
         assert roundtrip.factory_spec == est.factory_spec
 
 
-# ---------- LossSpec link round-trip ----------
+# ---------- Loss link round-trip ----------
 
 @given(
     eta=st.floats(min_value=-25.0, max_value=25.0, allow_nan=False, allow_infinity=False),
@@ -197,14 +202,13 @@ def test_squared_loss_gradient_matches_finite_diff(
     eta: float, is_original_val: float, pdc_val: float
 ):
     """Analytic gradient should match numerical finite-difference of aug_loss_alpha(α(η))."""
-    from rieszreg import aug_loss_alpha
     loss = SquaredLoss()
     is_original = np.array([is_original_val])
     pdc = np.array([pdc_val])
     e = np.array([eta])
     h = 1e-5
-    L_plus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(e + h))[0]
-    L_minus = aug_loss_alpha(loss, is_original, pdc, loss.link_to_alpha(e - h))[0]
+    L_plus = loss.aug_loss_alpha(is_original, pdc, loss.link_to_alpha(e + h))[0]
+    L_minus = loss.aug_loss_alpha(is_original, pdc, loss.link_to_alpha(e - h))[0]
     fd = (L_plus - L_minus) / (2 * h)
     analytic = loss.aug_grad_eta(is_original, pdc, e)[0]
     assert analytic == pytest.approx(fd, abs=1e-3)

@@ -4,7 +4,7 @@ from rieszreg.losses import (  # noqa: F401
     BernoulliLoss,
     BoundedSquaredLoss,
     KLLoss,
-    LossSpec,
+    Loss,
     SquaredLoss,
     loss_from_spec,
 )
@@ -13,7 +13,7 @@ __all__ = [
     "BernoulliLoss",
     "BoundedSquaredLoss",
     "KLLoss",
-    "LossSpec",
+    "Loss",
     "SquaredLoss",
     "loss_from_spec",
 ]

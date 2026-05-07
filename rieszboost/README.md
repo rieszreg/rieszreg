@@ -204,7 +204,7 @@ Four built-in losses cover the common cases:
 | `BernoulliLoss` | (0, 1) | α₀ known to be a probability by problem structure. |
 | `BoundedSquaredLoss(lo, hi)` | (lo, hi) | Squared loss with hard prior bounds (e.g. trimmed propensities). |
 
-Plug in your own by implementing the `LossSpec` protocol. The framework follows Hines & Miles ([2510.16127](https://arxiv.org/abs/2510.16127)) and Kato ([2601.07752](https://arxiv.org/abs/2601.07752)).
+Plug in your own by subclassing `Loss`. The framework follows Hines & Miles ([2510.16127](https://arxiv.org/abs/2510.16127)) and Kato ([2601.07752](https://arxiv.org/abs/2601.07752)).
 
 ## Examples
 
