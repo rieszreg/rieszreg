@@ -16,7 +16,7 @@ This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Los
 
 The user guide is the unified Quarto site at [`../docs/`](../docs/). The forest-specific page is [`../docs/backends/forest.qmd`](../docs/backends/forest.qmd). Any change to the forest backend that affects user-facing behavior must update that page in the same edit. On bilingual pages, update BOTH the `{python}` and `{r}` tabs.
 
-The pre-commit hook at `.githooks/pre-commit` enforces this. Activate per clone with `git config core.hooksPath .githooks`.
+The pre-commit hook at the monorepo root (`../../.githooks/pre-commit`) enforces this; activate it once per clone with `bash ../../scripts/setup-hooks.sh`. The same lint runs in CI via the `lint-docs` job.
 
 ## Per-estimand example rule
 
@@ -42,7 +42,6 @@ R-side mirrors this: R6 classes (`ForestRieszRegressor$new(estimand=, n_estimato
 - `python/forestriesz/` — `ForestRieszBackend`, `_RieszGRF` (BaseGRF subclass), `ForestRieszRegressor` convenience class, `ForestPredictor`, `default_riesz_features`. `pyproject.toml` declares `econml>=0.15`, `rieszreg>=0.0.1` as dependencies.
 - `r/forestriesz/` — R6 wrapper via reticulate. `ForestRieszRegressor` subclasses `rieszreg::RieszEstimatorR6` (~80 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE.
 - `examples/` — runnable demonstrations of each feature (ATE, TSM with intervals).
-- `.githooks/pre-commit` — copy of the meta-project canonical hook (`../.githooks/pre-commit`). Activate per clone.
 
 ## Run tests
 

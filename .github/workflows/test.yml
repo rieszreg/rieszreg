@@ -7,6 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve base ref
+        id: base
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            git fetch --no-tags --depth=2 origin "${{ github.event.before }}" || true
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Doc-tone lint on changed prose
+        run: bash .githooks/lint-docs.sh --base "${{ steps.base.outputs.ref }}"
+
   pytest:
     runs-on: ${{ matrix.os }}
     strategy:

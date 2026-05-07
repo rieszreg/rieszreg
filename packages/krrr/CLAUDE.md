@@ -22,7 +22,7 @@ This package depends only on `rieszreg`.
 
 The user guide is the unified Quarto site at [`../docs/`](../docs/). The kernel-specific page is [`../docs/backends/kernel.qmd`](../docs/backends/kernel.qmd). Any change to the kernel backend that affects user-facing behavior must update that page in the same edit. On bilingual pages, update BOTH the `{python}` and `{r}` tabs.
 
-The pre-commit hook at `.githooks/pre-commit` enforces this. Activate per clone with `git config core.hooksPath .githooks`.
+The pre-commit hook at the monorepo root (`../../.githooks/pre-commit`) enforces this; activate it once per clone with `bash ../../scripts/setup-hooks.sh`. The same lint runs in CI via the `lint-docs` job.
 
 ## Per-estimand example rule
 
@@ -48,7 +48,6 @@ R-side mirrors this: R6 classes (`KernelRieszRegressor$new(estimand=, kernel=, .
 - `python/krrr/` — `KernelRidgeBackend`, kernels, solvers, and the `KernelRieszRegressor` convenience class. `pyproject.toml` declares `rieszreg>=0.0.1` as the dependency.
 - `r/krrr/` — R6 wrapper via reticulate. `KernelRieszRegressor` subclasses `rieszreg::RieszEstimatorR6` (~50 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE.
 - `examples/` — runnable demonstrations of each feature.
-- `.githooks/pre-commit` — copy of the meta-project canonical hook (`../.githooks/pre-commit`). Activate per clone.
 - `.venv/` — local Python venv (gitignored).
 
 ## Run tests
