@@ -69,7 +69,7 @@ Concretely:
 
 - This skill (canonical reference). Update here first if the conventions ever change.
 - [`CLAUDE.md`](../../CLAUDE.md) (cross-reference at the top, so anyone working in the repo is reminded).
-- [`rieszreg/DESIGN.md`](../../rieszreg/DESIGN.md) (cross-reference under a "Notation" section).
+- [`DESIGN.md`](../../DESIGN.md) (cross-reference under a "Notation" section).
 
 ## 10. Drift handling
 
@@ -110,3 +110,18 @@ In code, the same three concepts are spelled out as descriptive method names on 
 - `tilde_potential(alpha)` ↔ $\tilde h(\alpha)$
 
 Don't use Greek letters (e.g. $\phi$, $\psi$) for the potential or its derivatives anywhere — Greek letters in this codebase denote functionals of distributions ($\mu$ for the conditional mean, $\alpha$ for the Riesz representer, $\psi$ for the estimand), not arbitrary scalar functions.
+
+## 14. Doc-tone (banned phrases and patterns)
+
+User-facing docs describe what's currently in the package, in plain instructive prose matching the [ngboost user guide](https://stanfordmlgroup.github.io/ngboost/intro.html). The pre-commit hook (`.githooks/pre-commit`) checks for two failure modes; this section is what it enforces.
+
+1. **No design-decision metacommentary.** Don't explain the API's negative space — what we removed, intentionally didn't build, or chose between. Just describe what the function does and how to use it. "Defaults to early stopping with a 10% validation split" is good. "We chose 10% rather than 20% because…" is not. "Originally `feature_keys` was used, but…" is not.
+2. **No AI-flavored hedge or editorial framing.** Banned phrases (non-exhaustive, but indicative): "the workhorse", "the right choice for almost every", "almost never needs tuning", "the natural way/API", "rather than reinvent", "out-of-the-box", "best-in-class", "a common pattern". Avoid em-dashes peppered through prose. Sentences should be short (8–15 words on average), active voice. "X computes Y" beats "X is the function that computes Y".
+
+These rules apply to `docs/*.qmd`, every `README.md`, all docstrings, and code comments. They do *not* apply to `DESIGN.md`, this skill, or other contributor-facing internal docs — those can have whatever tone makes the architectural decisions clear.
+
+## 15. Living-doc rule
+
+Every public-API change updates `README.md` and the relevant `docs/*.qmd` page **in the same commit**. A new estimand, a new hyperparameter, a new diagnostic, a new loss — the user-facing pages must reflect the change at the moment of the change, not in a follow-up "doc update" PR.
+
+The pre-commit hook does not enforce this directly (it can't know what counts as "public-API"), but it *is* enforced by code review and by the [`rieszreg-cross-package-change`](../rieszreg-cross-package-change/SKILL.md) skill's sweep. Do not split docs and code into separate commits for the same logical change.
