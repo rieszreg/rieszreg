@@ -1,0 +1,12 @@
+.venv/
+python/tests/regression/bench_results.csv
+__pycache__/
+*.egg-info/
+.pytest_cache/
+*.pyc
+.DS_Store
+
+# Quarto
+docs/.quarto/
+docs/_site/
+# NOTE: docs/_freeze/ is intentionally NOT ignored — committing it makes CI fast.

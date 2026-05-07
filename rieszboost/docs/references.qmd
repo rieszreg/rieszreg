@@ -1,0 +1,30 @@
+---
+title: "References"
+---
+
+## Core method
+
+- **Lee & Schuler (2025).** *RieszBoost: Gradient Boosting for Riesz Regression.* [arXiv:2501.04871](https://arxiv.org/abs/2501.04871) — the algorithm this library implements.
+
+## Riesz regression background
+
+- **Chernozhukov, Newey, Quintas-Martínez & Syrgkanis (2021).** *RieszNet and ForestRiesz: Automatic Debiased Machine Learning of Causal and Structural Effects.* [arXiv:2110.03031](https://arxiv.org/abs/2110.03031) — neural-net and random-forest Riesz regression.
+- **Chernozhukov, Newey, Quintas-Martínez & Syrgkanis (2022).* *Automatic Debiased Machine Learning via Riesz Regression.* [arXiv:2104.14737](https://arxiv.org/abs/2104.14737) — origin of the squared Riesz loss.
+- **Singh (2021).** *Kernel Methods for Unobserved Confounding: Negative Controls, Proxies, and Instruments.* [arXiv:2102.11076](https://arxiv.org/abs/2102.11076) — closed-form RKHS estimator.
+
+## Bregman generalization
+
+- **Hines & Miles (2025).** *Bregman-divergence Riesz Regression.* [arXiv:2510.16127](https://arxiv.org/abs/2510.16127).
+- **Kato (2026).** *Generalized Riesz Loss via Bregman Divergence.* [arXiv:2601.07752](https://arxiv.org/abs/2601.07752).
+
+## Beyond linear functionals
+
+- **van der Laan, Luedtke & van der Laan (2025).** *Automatic Doubly-Robust Estimation for Smooth Functionals of the Outcome Mechanism.* [arXiv:2501.11868](https://arxiv.org/abs/2501.11868) — auto-DML for smooth functionals beyond linear.
+
+## Semiparametric estimation context
+
+- **Hubbard, van der Laan & Robins (2011).** *Estimation of the Causal Effects of Time-Varying Exposures.* The delta-method-EIF reference for partial-parameter estimands like ATT and LASE.
+
+## Software
+
+- **Lee's reference implementation.** [github.com/kaitlynjlee/boosting_for_rr](https://github.com/kaitlynjlee/boosting_for_rr) — the implementation against which `rieszboost` is cross-checked. See [`examples/lee_schuler/COMPARISON.md`](https://github.com/rieszreg/rieszboost/blob/main/examples/lee_schuler/COMPARISON.md) for the parity report.

@@ -1,0 +1,131 @@
+---
+title: "R interface"
+---
+
+{{< include _setup.qmd >}}
+
+The R wrapper is an [R6](https://r6.r-lib.org/) class that calls the Python `RieszBooster` through [reticulate](https://rstudio.github.io/reticulate/). Predictions are bitwise-identical to the Python results on the same input.
+
+The R API is covered throughout the guide via the bilingual tabsets: see [install](install.qmd) for setup, [quickstart](quickstart.qmd) for the standard fit pattern, and [estimands](estimands.qmd) for the full estimand inventory. This page is the focused R reference.
+
+## Setup
+
+After installing `rieszboost` into a Python venv (see [install](install.qmd)):
+
+```r
+# Option A: env var, set before R starts
+Sys.setenv(RETICULATE_PYTHON = "/path/to/rieszboost/.venv/bin/python")
+
+# Option B: explicit, after R has started
+use_python_rieszboost("/path/to/rieszboost/.venv/bin/python")
+```
+
+`use_python_rieszboost()` accepts a path to a Python interpreter or a virtualenv directory and forwards to the appropriate reticulate function. It also imports the Python `rieszboost` module so subsequent calls have no per-call import overhead.
+
+## API surface
+
+| R | Python equivalent |
+|---|---|
+| `ATE(treatment, covariates)` | `rieszboost.ATE(treatment, covariates)` |
+| `ATT(treatment, covariates)` | `rieszboost.ATT(treatment, covariates)` |
+| `TSM(level, treatment, covariates)` | `rieszboost.TSM(level, treatment, covariates)` |
+| `AdditiveShift(delta, treatment, covariates)` | `rieszboost.AdditiveShift(delta, treatment, covariates)` |
+| `LocalShift(delta, threshold, treatment, covariates)` | `rieszboost.LocalShift(delta, threshold, ...)` |
+| `StochasticIntervention(samples_key, treatment, covariates)` | `rieszboost.StochasticIntervention(...)` |
+| `SquaredLoss()` | `rieszboost.SquaredLoss()` |
+| `KLLoss(max_eta)` | `rieszboost.KLLoss(max_eta)` |
+| `BernoulliLoss(max_abs_eta)` | `rieszboost.BernoulliLoss(...)` |
+| `BoundedSquaredLoss(lo, hi, max_abs_eta)` | `rieszboost.BoundedSquaredLoss(...)` |
+| `XGBoostBackend(hessian_floor, gradient_only)` | `rieszboost.XGBoostBackend(...)` |
+| `SklearnBackend(base_learner_factory)` | `rieszboost.SklearnBackend(...)` |
+| `RieszBooster$new(estimand, ...)` | `rieszboost.RieszBooster(estimand, ...)` |
+| &nbsp;&nbsp;`$fit(df, eval_set=)` | `.fit(X, eval_set=)` |
+| &nbsp;&nbsp;`$predict(df)` | `.predict(X)` |
+| &nbsp;&nbsp;`$score(df)` | `.score(X)` |
+| &nbsp;&nbsp;`$riesz_loss(df)` | `.riesz_loss(X)` |
+| &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(X)` (returns a list with `$summary` as a string) |
+| &nbsp;&nbsp;`$save(path)` | `.save(path)` |
+| `load_riesz_booster(path)` | `RieszBooster.load(path)` |
+| &nbsp;&nbsp;`$py` | the underlying Python object |
+
+R6's `$method()` syntax maps to Python's `.method()`. Integer-typed kwargs (`n_estimators`, `max_depth`, `random_state`, `early_stopping_rounds`) take an `L` suffix in R: `n_estimators = 200L`. Other kwargs are auto-converted by reticulate.
+
+## Parity
+
+The same fit produces the same predictions in both languages. The R test suite verifies this with `tolerance = 1e-12`.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+import numpy as np, pandas as pd
+from rieszboost import RieszBooster, ATE
+
+rng = np.random.default_rng(0)
+n = 500
+x = rng.uniform(0, 1, n)
+a = rng.binomial(1, 1 / (1 + np.exp(-(2 * x - 1))))
+df_py = pd.DataFrame({"a": a.astype(float), "x": x})
+
+booster_py = RieszBooster(estimand=ATE(), n_estimators=50, learning_rate=0.05,
+                          max_depth=3, random_state=42).fit(df_py)
+alpha_py = booster_py.predict(df_py)
+alpha_py[:5]
+```
+
+## R
+
+```{r}
+set.seed(0)
+n  <- 500
+x  <- runif(n)
+a  <- rbinom(n, 1, 1 / (1 + exp(-(2 * x - 1))))
+df_r <- data.frame(a = as.numeric(a), x = x)
+
+booster_r <- RieszBooster$new(
+  estimand = ATE(), n_estimators = 50L, learning_rate = 0.05,
+  max_depth = 3L, random_state = 42L
+)
+booster_r$fit(df_r)
+alpha_r <- booster_r$predict(df_r)
+head(alpha_r, 5)
+```
+
+:::
+
+The two columns above use different RNGs (`default_rng(0)` versus `set.seed(0)`), so the `df` and the predictions differ between tabs. To verify parity end-to-end, fit on the same data in both languages and compare predictions row-by-row.
+
+## Custom Python objects from R
+
+The `LinearForm` tracer is Python-only. To use a custom estimand or `Loss` subclass from R, define it in Python via reticulate:
+
+```r
+reticulate::py_run_string("
+def m_my_thing(z, alpha):
+    return 2.0 * (alpha(a=2, x=z['x']) - alpha(a=0, x=z['x']))
+
+from rieszboost import Estimand
+my_estimand = Estimand(feature_keys=('a', 'x'), m=m_my_thing, name='MyThing')
+")
+
+est <- reticulate::py$my_estimand
+booster <- RieszBooster$new(estimand = est, n_estimators = 100L, max_depth = 3L)
+booster$fit(df_r)
+booster$predict(df_r)[1:5]
+```
+
+The same pattern works for custom `Loss` subclasses: subclass in Python and pass the instance via `loss=`.
+
+## Reaching the Python object directly
+
+`booster$py` is the underlying Python `RieszBooster`. Use it for attributes the R6 wrapper doesn't expose:
+
+```r
+booster <- RieszBooster$new(estimand = ATE(), n_estimators = 50L)
+booster$fit(df_r)
+
+reticulate::py_to_r(booster$py$best_iteration_)
+reticulate::py_to_r(booster$py$best_score_)
+reticulate::py_to_r(booster$py$base_score_)
+```

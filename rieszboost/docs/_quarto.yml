@@ -1,0 +1,57 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "*.qmd"        # internal .md notes (e.g. TESTING_PLAN.md) are not part of the user guide
+
+website:
+  title: "rieszboost"
+  description: "Gradient boosting for Riesz representers — user guide."
+  search: true
+  repo-url: https://github.com/rieszreg/rieszboost
+  repo-branch: main
+  repo-actions: [edit, issue]
+  page-navigation: true
+  navbar:
+    right:
+      - icon: github
+        href: https://github.com/rieszreg/rieszboost
+        aria-label: GitHub
+  sidebar:
+    style: floating
+    contents:
+      - index.qmd
+      - intro.qmd
+      - install.qmd
+      - quickstart.qmd
+      - estimands.qmd
+      - sklearn-integration.qmd
+      - save-and-load.qmd
+      - diagnostics-and-tuning.qmd
+      - backends-and-losses.qmd
+      - r-interface.qmd
+      - developing.qmd
+      - references.qmd
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    css: styles.css
+    code-copy: true
+    code-overflow: wrap
+    code-link: true
+    toc: true
+    toc-depth: 3
+    fig-width: 7
+    fig-height: 4.5
+
+# knitr is the default — it executes both {r} chunks natively and {python}
+# chunks via reticulate. Each .qmd that has executable code starts with a
+# hidden setup chunk that points reticulate at the project venv and dev-loads
+# the R wrapper.
+execute:
+  freeze: auto
+  echo: true
+  warning: false

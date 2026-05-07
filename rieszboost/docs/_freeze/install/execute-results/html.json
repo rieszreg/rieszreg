@@ -1,0 +1,17 @@
+{
+  "hash": "37ac3d959966f9bd3596c011405a6977",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Install\"\n---\n\n\n\n\n\n\n\n## Python\n\n```sh\ngit clone https://github.com/alejandroschuler/rieszboost.git\ncd rieszboost\npython3 -m venv .venv\n.venv/bin/pip install -e python/\n```\n\n`xgboost` requires OpenMP. On macOS:\n\n```sh\nbrew install libomp\n```\n\nLinux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed.\n\n### Verify\n\n::: {.panel-tabset group=\"lang\"}\n\n## Python\n\n\n\n\n::: {.cell}\n\n```{.python .cell-code}\nimport rieszboost\nfrom rieszboost import RieszBooster, ATE\nprint(\"rieszboost\", \"OK\")\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\nrieszboost OK\n```\n\n\n:::\n:::\n\n\n\n\n## R\n\n\n\n\n::: {.cell}\n\n```{.r .cell-code}\nprint(\"rieszboost (R wrapper) OK\")\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\n[1] \"rieszboost (R wrapper) OK\"\n```\n\n\n:::\n:::\n\n\n\n\n:::\n\n## R wrapper (optional)\n\nThe R package is an R6 wrapper that calls the Python implementation through [reticulate](https://rstudio.github.io/reticulate/). It does not require any separate algorithmic dependency.\n\nFirst-time setup:\n\n1. Install the R package dependencies:\n   ```r\n   install.packages(c(\"reticulate\", \"R6\"))\n   ```\n2. Load the R wrapper. For this guide we dev-load it from the source tree:\n   ```r\n   pkgload::load_all(\"r/rieszboost\")\n   ```\n3. Point reticulate at the Python venv:\n   ```r\n   use_python_rieszboost(\".venv/bin/python\")\n   ```\n   Or set the environment variable before R starts:\n   ```sh\n   export RETICULATE_PYTHON=/path/to/rieszboost/.venv/bin/python\n   ```\n\nThe R API exposes every built-in estimand, both losses, both backends, and the full `RieszBooster` interface. The symbolic tracer for custom `m()` is Python-only; see [r-interface](r-interface.qmd) for how to call it from R.\n\n## Tests\n\n```{.bash}\n.venv/bin/python -m pytest python/tests -v\n\nRscript -e '\n  Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), \".venv/bin/python\"))\n  pkgload::load_all(\"r/rieszboost\")\n  testthat::test_dir(\"r/rieszboost/tests/testthat\")\n'\n```\n",
+    "supporting": [
+      "install_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

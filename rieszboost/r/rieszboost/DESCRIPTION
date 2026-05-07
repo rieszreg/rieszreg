@@ -1,0 +1,23 @@
+Package: rieszboost
+Type: Package
+Title: Gradient Boosting for Riesz Representers
+Version: 0.0.1
+Authors@R: c(person("Alejandro", "Schuler", role = c("aut", "cre"),
+                    email = "aschuler@berkeley.edu"))
+Description: R wrapper around the Python rieszboost library implementing
+    Lee & Schuler (2025) RieszBoost. Provides direct estimation of Riesz
+    representers for linear functionals of conditional expectations, used
+    in semiparametric estimation (ATE, ATT, treatment-specific means,
+    shift interventions). Computation is delegated to the Python package
+    via reticulate.
+License: TBD
+Encoding: UTF-8
+Imports:
+    R6,
+    reticulate (>= 1.30),
+    rieszreg (>= 0.0.1)
+Suggests:
+    testthat (>= 3.0.0),
+    pkgload
+SystemRequirements: Python (>= 3.10), the Python package 'rieszboost'
+RoxygenNote: 7.3.0

@@ -1,0 +1,172 @@
+---
+title: "Quickstart — ATE in 30 lines"
+---
+
+{{< include _setup.qmd >}}
+
+This page fits a Riesz representer for the average treatment effect on a synthetic dataset. Pick the language tab on any code block; your choice persists across the site.
+
+## Simulate
+
+Binary treatment with known propensity $\pi(x)$. We will recover $\alpha_0(a, x) = a/\pi(x) - (1-a)/(1-\pi(x))$ without estimating $\pi$.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+import numpy as np
+import pandas as pd
+from rieszboost import RieszBooster, ATE
+
+rng = np.random.default_rng(0)
+n = 4000
+x = rng.uniform(0, 1, n)
+pi = 1 / (1 + np.exp(-(-0.02 * x - x**2 + 4 * np.log(x + 0.3) + 1.5)))
+a = rng.binomial(1, pi)
+df = pd.DataFrame({"a": a.astype(float), "x": x})
+df.head()
+```
+
+## R
+
+```{r}
+set.seed(0)
+n  <- 4000
+x  <- runif(n)
+pi <- 1 / (1 + exp(-(-0.02 * x - x^2 + 4 * log(x + 0.3) + 1.5)))
+a  <- rbinom(n, 1, pi)
+df <- data.frame(a = as.numeric(a), x = x)
+head(df)
+```
+
+:::
+
+## Fit
+
+Configure the booster on the constructor, then call `.fit(df)`. Early stopping uses an internal validation split sized by `validation_fraction`.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+booster = RieszBooster(
+    estimand=ATE(treatment="a", covariates=("x",)),
+    n_estimators=2000,
+    learning_rate=0.05,
+    max_depth=4,
+    early_stopping_rounds=20,
+    validation_fraction=0.2,
+)
+booster.fit(df)
+print(f"stopped at iteration {booster.best_iteration_}, "
+      f"best held-out Riesz loss = {booster.best_score_:.4f}")
+```
+
+## R
+
+```{r}
+booster <- RieszBooster$new(
+  estimand = ATE(treatment = "a", covariates = "x"),
+  n_estimators = 2000L,
+  learning_rate = 0.05,
+  max_depth = 4L,
+  early_stopping_rounds = 20L,
+  validation_fraction = 0.2
+)
+booster$fit(df)
+cat(sprintf(
+  "stopped at iteration %d, best held-out Riesz loss = %.4f\n",
+  reticulate::py_to_r(booster$py$best_iteration_),
+  reticulate::py_to_r(booster$py$best_score_)
+))
+```
+
+:::
+
+## Predict and compare to the closed form
+
+We know $\alpha_0$ here, so we can score the fit directly.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+alpha_hat  = booster.predict(df)
+true_alpha = a / pi - (1 - a) / (1 - pi)
+print(f"corr(α̂, α₀) = {np.corrcoef(alpha_hat, true_alpha)[0, 1]:.3f}")
+print(f"RMSE         = {np.sqrt(np.mean((alpha_hat - true_alpha)**2)):.3f}")
+```
+
+## R
+
+```{r}
+alpha_hat  <- booster$predict(df)
+true_alpha <- a / pi - (1 - a) / (1 - pi)
+cat(sprintf("corr(alpha_hat, alpha_0) = %.3f\n",
+            cor(alpha_hat, true_alpha)))
+cat(sprintf("RMSE                     = %.3f\n",
+            sqrt(mean((alpha_hat - true_alpha)^2))))
+```
+
+:::
+
+## Visual sanity check
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+#| fig-cap: "Estimated Riesz representer vs. the closed-form ground truth on the synthetic ATE DGP."
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots()
+ax.scatter(true_alpha, alpha_hat, s=4, alpha=0.4)
+lim = max(abs(true_alpha).max(), abs(alpha_hat).max())
+ax.plot([-lim, lim], [-lim, lim], "k--", lw=1)
+ax.set_xlabel(r"$\alpha_0$ (closed-form)")
+ax.set_ylabel(r"$\hat\alpha$ (rieszboost)")
+plt.show()
+```
+
+## R
+
+```{r}
+#| fig-cap: "Estimated Riesz representer vs. the closed-form ground truth (R)."
+lim <- max(abs(c(true_alpha, alpha_hat)))
+plot(true_alpha, alpha_hat, pch = 16, cex = 0.4, col = adjustcolor("black", 0.4),
+     xlim = c(-lim, lim), ylim = c(-lim, lim),
+     xlab = expression(alpha[0]~"(closed-form)"),
+     ylab = expression(hat(alpha)~"(rieszboost)"))
+abline(0, 1, lty = 2)
+```
+
+:::
+
+## Diagnostics
+
+Inspect the fit before using $\hat\alpha$ downstream. `.diagnose()` reports the magnitude distribution, positivity warnings, and the held-out Riesz loss.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+print(booster.diagnose(df).summary())
+```
+
+## R
+
+```{r}
+cat(booster$diagnose(df)$summary)
+```
+
+:::
+
+## Next
+
+- [scikit-learn integration](sklearn-integration.qmd) for out-of-fold predictions used in TMLE / one-step / DML.
+- [Estimands](estimands.qmd) for the other built-ins and custom $m$.
+- [Diagnostics and tuning](diagnostics-and-tuning.qmd) for reading `.diagnose()` and choosing hyperparameters.

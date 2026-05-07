@@ -1,0 +1,11 @@
+```{r}
+#| include: false
+# Point reticulate at the project venv (one level up from docs/) unless the
+# environment already specifies a Python interpreter (e.g. RETICULATE_PYTHON
+# in CI). Then dev-load the R wrapper from the source tree.
+if (Sys.getenv("RETICULATE_PYTHON") == "") {
+  venv <- normalizePath("../.venv", mustWork = FALSE)
+  if (dir.exists(venv)) reticulate::use_virtualenv(venv, required = TRUE)
+}
+suppressMessages(pkgload::load_all("../r/rieszboost", quiet = TRUE))
+```

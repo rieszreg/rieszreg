@@ -1,0 +1,79 @@
+---
+title: "What's a Riesz representer, and why boost it?"
+---
+
+## The setup
+
+In semiparametric inference, you often want to estimate a functional of an unknown nuisance:
+
+$$
+\theta(P) \;=\; \mathbb{E}\!\left[m(Z, g_0)\right]
+$$
+
+where $g_0(z) = \mathbb{E}[Y \mid Z = z]$ is an outcome regression and $m(z, g)$ is a linear functional of $g$. Examples:
+
+| Target | $m(z, g)$ |
+|---|---|
+| Average treatment effect | $g(1, x) - g(0, x)$ |
+| Treatment-specific mean at $a^\star$ | $g(a^\star, x)$ |
+| Additive shift effect $a \mapsto a + \delta$ | $g(a + \delta, x) - g(a, x)$ |
+| Stochastic intervention $a \sim h(\cdot \mid x)$ | $\int g(a', x)\,h(a' \mid x)\,da'$ |
+
+The plug-in estimator $\hat\theta = n^{-1} \sum_i m(Z_i, \hat g)$ is biased because $\hat g$ is itself estimated. Modern semiparametric estimators (one-step, TMLE, DML) correct that bias by adding a term involving the Riesz representer $\alpha_0$ of $m$:
+
+$$
+\hat\theta_{\text{corrected}} \;=\; n^{-1} \sum_i \Big[\,m(Z_i, \hat g) + \alpha_0(Z_i)\,\big(Y_i - \hat g(Z_i)\big)\,\Big].
+$$
+
+## What is $\alpha_0$?
+
+By the Riesz representation theorem, since $m(z, \cdot)$ is bounded and linear in $g$, there exists a function $\alpha_0(z)$ satisfying
+
+$$
+\mathbb{E}[m(Z, g)] \;=\; \mathbb{E}\!\left[\alpha_0(Z) \cdot g(Z)\right]
+\quad \text{for all } g.
+$$
+
+For ATE, $\alpha_0(a, x) = a/\pi(x) - (1-a)/(1-\pi(x))$ is the inverse-propensity weight. For TSM, $\alpha_0$ is the density ratio $\mathbb{1}\{a = a^\star\}/\pi(a^\star \mid x)$. In general, $\alpha_0$ has a closed form involving the generalized propensity score.
+
+## Why not estimate the propensity directly?
+
+For ATE you can: estimate $\hat\pi(x)$, plug in, get $\hat\alpha(a, x) = a/\hat\pi(x) - (1-a)/(1-\hat\pi(x))$.
+
+This breaks down when:
+
+1. **Positivity is borderline.** If $\hat\pi(x)$ approaches 0 or 1, $\hat\alpha$ explodes. Truncation patches the symptom but introduces its own bias.
+
+2. **The estimand is non-standard.** For continuous shifts, stochastic interventions, and longitudinal LMTPs, the closed form involves derivatives of the conditional density of $A$ given $X$. Those are harder to estimate than $\alpha_0$ itself.
+
+3. **Misspecification compounds.** Plug-in error in $\hat\pi$ propagates nonlinearly through $1/\hat\pi$.
+
+## Riesz regression
+
+Chernozhukov et al. ([2021](https://arxiv.org/abs/2104.14737)) observed that $\alpha_0$ is the unique minimizer of the Riesz loss
+
+$$
+L(\alpha) \;=\; \mathbb{E}\!\left[\alpha(Z)^2 - 2\,m(Z, \alpha)\right]
+$$
+
+over all square-integrable $\alpha$. The Gateaux derivative at $\alpha_0$ vanishes by the Riesz identity. Estimating $\alpha_0$ becomes a regression problem with a custom loss: no propensity, no density derivative, no truncation.
+
+The minimizer is well-defined regardless of the closed-form tails. Where $\pi(x)$ is small, the squared-loss penalty shrinks $\hat\alpha$ toward zero in low-overlap regions, which controls downstream variance.
+
+## Why boost it?
+
+Lee & Schuler ([2025](https://arxiv.org/abs/2501.04871)) show gradient boosting fits the Riesz loss well:
+
+- **Tabular data.** Boosting is the standard tool for tabular regression. Hyperparameters that work for outcome models transfer to Riesz regression.
+- **Direct gradient and Hessian.** When $m$ is a finite linear combination of point evaluations of $\alpha$ (ATE, ATT, TSM, AdditiveShift, Monte-Carlo'd stochastic interventions), the per-row gradient and Hessian have closed forms. xgboost's custom objective consumes them directly.
+- **Standard regularization.** `max_depth`, `learning_rate`, `early_stopping_rounds`, and `reg_lambda` work as they do in regression. See [diagnostics and tuning](diagnostics-and-tuning.qmd) for $\hat\alpha$-specific tuning advice.
+
+## What `rieszboost` provides
+
+A scikit-learn estimator (and an R6 mirror) that:
+
+- Boosts $\hat\alpha$ for `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`, `StochasticIntervention`, or [your own estimand](estimands.qmd).
+- Composes with `cross_val_predict`, `GridSearchCV`, `Pipeline`.
+- Surfaces near-positivity and outlier-extrapolation warnings via `.diagnose(X)`.
+
+Next: [install](install.qmd) and the [quickstart](quickstart.qmd).

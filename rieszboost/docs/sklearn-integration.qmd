@@ -1,0 +1,143 @@
+---
+title: "scikit-learn integration"
+---
+
+{{< include _setup.qmd >}}
+
+`RieszBooster` is an `sklearn.base.BaseEstimator`. It composes with `cross_val_predict`, `GridSearchCV`, `Pipeline`, `clone`, and the rest of `sklearn.model_selection`.
+
+## Cross-fitting
+
+Plug-in $\hat\alpha$ in a one-step / TMLE / DML estimator must be out-of-fold. Use `cross_val_predict`:
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+import numpy as np, pandas as pd
+from sklearn.model_selection import cross_val_predict
+from rieszboost import RieszBooster, ATE
+
+rng = np.random.default_rng(0)
+n = 2000
+x = rng.uniform(0, 1, n)
+pi = 1 / (1 + np.exp(-(-0.02 * x - x**2 + 4 * np.log(x + 0.3) + 1.5)))
+a = rng.binomial(1, pi)
+df = pd.DataFrame({"a": a.astype(float), "x": x})
+
+booster = RieszBooster(
+    estimand=ATE(),
+    n_estimators=2000,
+    early_stopping_rounds=20,
+    validation_fraction=0.2,
+    learning_rate=0.05,
+    max_depth=4,
+)
+
+alpha_oof = cross_val_predict(booster, df, cv=5)
+alpha_oof.shape, alpha_oof[:5]
+```
+
+## R
+
+```{r}
+set.seed(0)
+n  <- 2000
+x  <- runif(n)
+pi <- 1 / (1 + exp(-(-0.02 * x - x^2 + 4 * log(x + 0.3) + 1.5)))
+a  <- rbinom(n, 1, pi)
+df <- data.frame(a = as.numeric(a), x = x)
+
+# Call sklearn directly via reticulate, passing the underlying Python
+# estimator from `booster$py`.
+sk_ms <- reticulate::import("sklearn.model_selection", convert = FALSE)
+booster <- RieszBooster$new(
+  estimand = ATE(),
+  n_estimators = 2000L,
+  early_stopping_rounds = 20L,
+  validation_fraction = 0.2,
+  learning_rate = 0.05,
+  max_depth = 4L
+)
+alpha_oof <- as.numeric(reticulate::py_to_r(
+  sk_ms$cross_val_predict(booster$py, reticulate::r_to_py(df), cv = 5L)
+))
+length(alpha_oof); head(alpha_oof)
+```
+
+:::
+
+Each fold runs its own internal early-stopping split.
+
+## Hyperparameter search
+
+`RieszBooster.score(X)` returns negative held-out Riesz loss, so `GridSearchCV` selects the configuration with the lowest loss.
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+from sklearn.model_selection import GridSearchCV
+
+grid = GridSearchCV(
+    RieszBooster(
+        estimand=ATE(),
+        n_estimators=300,
+        early_stopping_rounds=20,
+        validation_fraction=0.2,
+    ),
+    param_grid={"learning_rate": [0.03, 0.05, 0.1], "max_depth": [3, 4, 5]},
+    cv=3,
+    n_jobs=1,
+).fit(df)
+
+print("best params:", grid.best_params_)
+print(f"best score (neg Riesz loss): {grid.best_score_:.4f}")
+
+best = grid.best_estimator_
+alpha_hat = best.predict(df)
+alpha_hat[:5]
+```
+
+## R
+
+```{r}
+sk_ms <- reticulate::import("sklearn.model_selection", convert = FALSE)
+base  <- RieszBooster$new(
+  estimand = ATE(),
+  n_estimators = 300L,
+  early_stopping_rounds = 20L,
+  validation_fraction = 0.2
+)
+grid <- sk_ms$GridSearchCV(
+  base$py,
+  param_grid = reticulate::dict(
+    learning_rate = c(0.03, 0.05, 0.1),
+    max_depth = list(3L, 4L, 5L)
+  ),
+  cv = 3L,
+  n_jobs = 1L
+)
+grid$fit(reticulate::r_to_py(df))
+cat("best params:\n"); print(reticulate::py_to_r(grid$best_params_))
+cat(sprintf("best score (neg Riesz loss): %.4f\n",
+            reticulate::py_to_r(grid$best_score_)))
+```
+
+:::
+
+## Other sklearn integrations
+
+`RieszBooster` exposes the standard `BaseEstimator` interface:
+
+- `clone(booster)` returns a fresh unfitted copy with the same hyperparameters.
+- `Pipeline` wraps a feature-engineering step in front of the booster.
+- `HalvingGridSearchCV`, `RandomizedSearchCV`, `BayesSearchCV` (skopt) work without modification.
+- `get_params()` / `set_params()` are used by the search classes to introspect and mutate the configuration.
+
+## See also
+
+- [`examples/lee_schuler/binary_dgp.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/lee_schuler/binary_dgp.py) builds an EEE estimator using `cross_val_predict` to produce out-of-fold $\hat\alpha$.
+- [Diagnostics and tuning](diagnostics-and-tuning.qmd) covers which hyperparameters to vary in a grid search.

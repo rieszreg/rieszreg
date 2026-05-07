@@ -1,0 +1,79 @@
+---
+title: "Install"
+---
+
+{{< include _setup.qmd >}}
+
+## Python
+
+```sh
+git clone https://github.com/rieszreg/rieszboost.git
+cd rieszboost
+python3 -m venv .venv
+.venv/bin/pip install -e python/
+```
+
+`xgboost` requires OpenMP. On macOS:
+
+```sh
+brew install libomp
+```
+
+Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed.
+
+### Verify
+
+::: {.panel-tabset group="lang"}
+
+## Python
+
+```{python}
+import rieszboost
+from rieszboost import RieszBooster, ATE
+print("rieszboost", "OK")
+```
+
+## R
+
+```{r}
+print("rieszboost (R wrapper) OK")
+```
+
+:::
+
+## R wrapper (optional)
+
+The R package is an R6 wrapper that calls the Python implementation through [reticulate](https://rstudio.github.io/reticulate/). It does not require any separate algorithmic dependency.
+
+First-time setup:
+
+1. Install the R package dependencies:
+   ```r
+   install.packages(c("reticulate", "R6"))
+   ```
+2. Load the R wrapper. For this guide we dev-load it from the source tree:
+   ```r
+   pkgload::load_all("r/rieszboost")
+   ```
+3. Point reticulate at the Python venv:
+   ```r
+   use_python_rieszboost(".venv/bin/python")
+   ```
+   Or set the environment variable before R starts:
+   ```sh
+   export RETICULATE_PYTHON=/path/to/rieszboost/.venv/bin/python
+   ```
+
+The R API exposes every built-in estimand, both losses, both backends, and the full `RieszBooster` interface. The symbolic tracer for custom `m()` is Python-only; see [r-interface](r-interface.qmd) for how to call it from R.
+
+## Tests
+
+```{.bash}
+.venv/bin/python -m pytest python/tests -v
+
+Rscript -e '
+  Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), ".venv/bin/python"))
+  pkgload::load_all("r/rieszboost")
+  testthat::test_dir("r/rieszboost/tests/testthat")
+'
+```

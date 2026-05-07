@@ -1,0 +1,26 @@
+---
+title: "rieszboost"
+subtitle: "Gradient boosting for Riesz representers"
+---
+
+`rieszboost` estimates the Riesz representer $\alpha_0$ of a linear functional $\theta(P) = \mathbb{E}[m(Z, g_0)]$, the building block of one-step, TMLE, and DML estimators in semiparametric inference. It implements [Lee & Schuler, *RieszBoost* (arXiv:2501.04871)](https://arxiv.org/abs/2501.04871) with an sklearn-style API in Python and an R6 mirror in R.
+
+R and Python predictions are bitwise-identical on the same input. This guide presents every code example in both languages; pick a tab and your choice persists across the site.
+
+## Pages
+
+- [What is a Riesz representer](intro.qmd) — concepts and motivation.
+- [Install](install.qmd) — Python install, optional R wrapper.
+- [Quickstart](quickstart.qmd) — end-to-end ATE on a synthetic dataset.
+- [Estimands](estimands.qmd) — built-in factories (`ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`, `StochasticIntervention`) and custom `m(z, alpha)`.
+- [scikit-learn integration](sklearn-integration.qmd) — `cross_val_predict`, `GridSearchCV`, `Pipeline`, `clone`.
+- [Diagnostics and tuning](diagnostics-and-tuning.qmd) — reading `.diagnose()` and choosing hyperparameters.
+- [Backends and losses](backends-and-losses.qmd) — `XGBoostBackend`, `SklearnBackend`; `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`.
+- [Save and load](save-and-load.qmd) — serialize fitted boosters across Python and R.
+- [R interface](r-interface.qmd) — reticulate setup, R-side API, what's currently Python-only.
+- [Developing rieszboost](developing.qmd) — repo layout, tests, how to contribute.
+- [References](references.qmd).
+
+::: {.callout-tip title="Code execution"}
+Every code block in this guide ran at build time. The numbers and figures came from the version of `rieszboost` that produced this page.
+:::
