@@ -839,7 +839,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="custom-python-objects-from-r" class="level2">
 <h2 class="anchored" data-anchor-id="custom-python-objects-from-r">Custom Python objects from R</h2>
-<p>The <code>LinearForm</code> tracer is Python-only. To use a custom estimand or <code>LossSpec</code> subclass from R, define it in Python via reticulate:</p>
+<p>The <code>LinearForm</code> tracer is Python-only. To use a custom estimand or <code>Loss</code> subclass from R, define it in Python via reticulate:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">py_run_string</span>(<span class="st">"</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="st">def m_my_thing(alpha):</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="st">    def inner(z, y=None):</span></span>
@@ -854,7 +854,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>booster <span class="ot">&lt;-</span> RieszBooster<span class="sc">$</span><span class="fu">new</span>(<span class="at">estimand =</span> est, <span class="at">n_estimators =</span> <span class="dv">100</span>L, <span class="at">max_depth =</span> <span class="dv">3</span>L)</span>
 <span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>booster<span class="sc">$</span><span class="fu">fit</span>(df_r)</span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>booster<span class="sc">$</span><span class="fu">predict</span>(df_r)[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The same pattern works for custom <code>LossSpec</code> subclasses: subclass in Python and pass the instance via <code>loss=</code>.</p>
+<p>The same pattern works for custom <code>Loss</code> subclasses: subclass in Python and pass the instance via <code>loss=</code>.</p>
 </section>
 <section id="reaching-the-python-object-directly" class="level2">
 <h2 class="anchored" data-anchor-id="reaching-the-python-object-directly">Reaching the Python object directly</h2>

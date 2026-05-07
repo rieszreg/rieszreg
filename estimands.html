@@ -634,7 +634,7 @@ window.Quarto = {
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>booster.diagnose(Z).summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>'Riesz representer diagnostics (n=16177):\n  RMS magnitude   : 1.2396\n  mean            : -0.9387\n  min / max       : -2.2424 / 14.9131\n  |alpha| quantiles:\n     0.50: 0.9998\n     0.90: 1.0280\n     0.99: 2.1239\n     1.00: 14.9131\n  extreme rows    : 0/16177 (0.00%) with |alpha| &gt; 30.0\n  held-out Riesz  : -29.2830'</code></pre>
+<pre><code>'Riesz representer diagnostics (n=16177):\n  RMS magnitude   : 1.2395\n  mean            : -0.9387\n  min / max       : -2.2424 / 14.9131\n  |alpha| quantiles:\n     0.50: 1.0001\n     0.90: 1.0278\n     0.99: 2.1239\n     1.00: 14.9131\n  extreme rows    : 0/16177 (0.00%) with |alpha| &gt; 30.0\n  held-out Riesz  : -29.2830'</code></pre>
 </div>
 </div>
 <p>To turn <span class="math inline">\(\hat\alpha\)</span> and a separately fit outcome regression <span class="math inline">\(\hat\mu\)</span> into a one-step or DML estimate of <span class="math inline">\(\psi\)</span>, see the <a href="./estimation/custom.html">DML / TMLE recipe</a>.</p>
@@ -676,7 +676,7 @@ window.Quarto = {
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>booster<span class="sc">$</span><span class="fu">diagnose</span>(Z)<span class="sc">$</span>summary</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] "Riesz representer diagnostics (n=16177):\n  RMS magnitude   : 1.2396\n  mean            : -0.9387\n  min / max       : -2.2424 / 14.9131\n  |alpha| quantiles:\n     0.50: 0.9998\n     0.90: 1.0280\n     0.99: 2.1239\n     1.00: 14.9131\n  extreme rows    : 0/16177 (0.00%) with |alpha| &gt; 30.0\n  held-out Riesz  : -29.2830"</code></pre>
+<pre><code>[1] "Riesz representer diagnostics (n=16177):\n  RMS magnitude   : 1.2395\n  mean            : -0.9387\n  min / max       : -2.2424 / 14.9131\n  |alpha| quantiles:\n     0.50: 1.0001\n     0.90: 1.0278\n     0.99: 2.1239\n     1.00: 14.9131\n  extreme rows    : 0/16177 (0.00%) with |alpha| &gt; 30.0\n  held-out Riesz  : -29.2830"</code></pre>
 </div>
 </div>
 </div>
@@ -746,17 +746,17 @@ window.Quarto = {
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ATE</span>(<span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>FiniteEvalEstimand(feature_keys=('a', 'x'), m=&lt;function ATE.&lt;locals&gt;.m at 0x164778680&gt;, name='ATE', factory_spec={'factory': 'ATE', 'args': {'treatment': 'a', 'covariates': ['x']}})
+<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x7f9cac631290&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>, <span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>FiniteEvalEstimand(feature_keys=('a', 'x'), m=&lt;function TSM.&lt;locals&gt;.m at 0x1642ecae0&gt;, name='TSM(level=1.0)', factory_spec={'factory': 'TSM', 'args': {'level': 1.0, 'treatment': 'a', 'covariates': ['x']}})
+<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x7f9cb9dd5590&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">LocalShift</span>(<span class="at">delta =</span> <span class="fl">0.3</span>, <span class="at">threshold =</span> <span class="fl">0.7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>FiniteEvalEstimand(feature_keys=('a', 'x'), m=&lt;function LocalShift.&lt;locals&gt;.m at 0x1647858a0&gt;, name='LocalShift(delta=0.3, threshold=0.7)', factory_spec={'factory': 'LocalShift', 'args': {'delta': 0.3, 'threshold': 0.7, 'treatment': 'a', 'covariates': ['x']}})
+<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x7f9cb97a2d50&gt;
  signature: (alpha)</code></pre>
 </div>
 </div>
@@ -824,7 +824,7 @@ m(\mu)(z, y) = c(z, y)^\top \vec\mu(a(z, y)),
 <p>Some pseudo-datapoints coincide with the original observation. For ATE, <span class="math inline">\(Z_{i1} = (1, x_i)\)</span> and <span class="math inline">\(Z_{i2} = (0, x_i)\)</span>. A treated unit (<span class="math inline">\(a_i = 1\)</span>) has <span class="math inline">\(Z_{i1} = Z_i\)</span>, so two of the three evaluation points are the same. Let <span class="math inline">\(D_{ij} = \mathbf{1}[Z_{ij} = Z_i]\)</span> indicate overlap. Splitting the <span class="math inline">\(h'\)</span> sum into overlapping and non-overlapping terms: <span class="math display">\[
 \mathcal L_{h,n}(\alpha) = \sum_{i=1}^n \left[\tilde h(\alpha(Z_i)) - \sum_{j:\, D_{ij}=1} C_{ij}\, h'(\alpha(Z_i))\right] - \sum_{i=1}^n \sum_{j:\, D_{ij}=0} C_{ij}\, h'(\alpha(Z_{ij})).
 \]</span></p>
-<p>At each distinct evaluation point, the loss combines a <span class="math inline">\(\tilde h\)</span>-weight and an <span class="math inline">\(h'\)</span>-weight into one term. <code>build_augmented</code> collects these distinct points for each row and stores their coefficients. Let <span class="math inline">\(r\)</span> index an enumeration of the augmented data points. Each augmented row <span class="math inline">\(r\)</span> corresponds to either a <span class="math inline">\(Z_{ij}\)</span> or a <span class="math inline">\(Z_i\)</span> for some original row <span class="math inline">\(i\)</span>; write <span class="math inline">\(i_r\)</span> for that origin row. The two weights are <span class="math display">\[
+<p>At each distinct evaluation point, the loss combines a <span class="math inline">\(\tilde h\)</span>-weight and an <span class="math inline">\(h'\)</span>-weight into one term. <code>Estimand.augment</code> collects these distinct points for each row and stores their coefficients. Let <span class="math inline">\(r\)</span> index an enumeration of the augmented data points. Each augmented row <span class="math inline">\(r\)</span> corresponds to either a <span class="math inline">\(Z_{ij}\)</span> or a <span class="math inline">\(Z_i\)</span> for some original row <span class="math inline">\(i\)</span>; write <span class="math inline">\(i_r\)</span> for that origin row. The two weights are <span class="math display">\[
 D_r = \mathbf{1}[Z_r = Z_{i_r}],
 \qquad
 C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
@@ -933,11 +933,11 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <p>Rows <span class="math inline">\(i=2\)</span> and <span class="math inline">\(i=3\)</span> are treated, so the merging happens on the <span class="math inline">\((1, X_i)\)</span> pseudo-datapoint instead of <span class="math inline">\((0, X_i)\)</span>, flipping which row carries the <span class="math inline">\(\tilde h\)</span>-weight. Summing the <span class="math inline">\(L_r\)</span> column recovers the empirical loss: <span class="math display">\[
 \mathcal L_{h,n}(\alpha) = \sum_{r=1}^{6} L_r = \sum_{i=1}^{3} \big[\tilde h(\alpha(Z_i)) - h'(\alpha(1, X_i)) + h'(\alpha(0, X_i))\big].
 \]</span></p>
-<p><code>build_augmented</code> produces this table directly: it stores the two coefficients as <code>is_original</code> (the <span class="math inline">\(\tilde h\)</span>-weight <span class="math inline">\(D_r\)</span>) and <code>potential_deriv_coef</code> (the <span class="math inline">\(h'\)</span>-weight <span class="math inline">\(C_r\)</span>) on the returned <code>AugmentedDataset</code>.</p>
+<p><code>Estimand.augment</code> produces this table directly: it stores the two coefficients as <code>is_original</code> (the <span class="math inline">\(\tilde h\)</span>-weight <span class="math inline">\(D_r\)</span>) and <code>potential_deriv_coef</code> (the <span class="math inline">\(h'\)</span>-weight <span class="math inline">\(C_r\)</span>) on the returned <code>AugmentedDataset</code>.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> ATE, build_augmented</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> ATE</span>
 <span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">"a"</span>: [<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>], <span class="st">"x"</span>: [<span class="fl">0.2</span>, <span class="fl">0.5</span>, <span class="fl">0.8</span>]})</span>
 <span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>df</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -950,7 +950,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>estimand <span class="op">=</span> ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,))</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>aug <span class="op">=</span> build_augmented(df.to_dict(<span class="st">"records"</span>), estimand)</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>aug <span class="op">=</span> estimand.augment(df[[<span class="st">"a"</span>, <span class="st">"x"</span>]].to_numpy(dtype<span class="op">=</span><span class="bu">float</span>))</span>
 <span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>aug_df <span class="op">=</span> pd.DataFrame({</span>
 <span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"i"</span>: aug.origin_index <span class="op">+</span> <span class="dv">1</span>,</span>
@@ -962,11 +962,11 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>aug_df</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   i    A    X    D    C
-0  1  0.0  0.2  1.0  1.0
-1  1  1.0  0.2  0.0 -1.0
-2  2  1.0  0.5  1.0 -1.0
-3  2  0.0  0.5  0.0  1.0
-4  3  1.0  0.8  1.0 -1.0
+0  1  1.0  0.2  0.0 -1.0
+1  2  1.0  0.5  1.0 -1.0
+2  3  1.0  0.8  1.0 -1.0
+3  1  0.0  0.2  1.0  1.0
+4  2  0.0  0.5  0.0  1.0
 5  3  0.0  0.8  0.0  1.0</code></pre>
 </div>
 </div>
@@ -977,11 +977,11 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>aug_df</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   i    A    X    D    C   L_r
-0  1  0.0  0.2  1.0  1.0  0.44
-1  1  1.0  0.2  0.0 -1.0 -2.40
-2  2  1.0  0.5  1.0 -1.0 -0.75
-3  2  0.0  0.5  0.0  1.0  1.00
-4  3  1.0  0.8  1.0 -1.0 -0.36
+0  1  1.0  0.2  0.0 -1.0 -2.40
+1  2  1.0  0.5  1.0 -1.0 -0.75
+2  3  1.0  0.8  1.0 -1.0 -0.36
+3  1  0.0  0.2  1.0  1.0  0.44
+4  2  0.0  0.5  0.0  1.0  1.00
 5  3  0.0  0.8  0.0  1.0  1.60</code></pre>
 </div>
 </div>
@@ -1036,7 +1036,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(est)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>FiniteEvalEstimand(feature_keys=('a', 'x'), m=&lt;function m_weighted_contrast at 0x16477a480&gt;, name='WeightedContrast', factory_spec=None)</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x7f9cacfc0d50&gt;</code></pre>
 </div>
 </div>
 <p>The inner function takes <code>(z, y)</code> even when <code>y</code> is unused — that signature is the contract every custom <code>m</code> follows. Pass the estimand to any backend’s estimator class:</p>

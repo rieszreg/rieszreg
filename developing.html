@@ -504,8 +504,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#repo-layout" id="toc-repo-layout" class="nav-link active" data-scroll-target="#repo-layout">Repo layout</a></li>
   <li><a href="#run-tests" id="toc-run-tests" class="nav-link" data-scroll-target="#run-tests">Run tests</a></li>
   <li><a href="#tracer" id="toc-tracer" class="nav-link" data-scroll-target="#tracer">Tracer</a></li>
-  <li><a href="#adding-an-estimand-factory" id="toc-adding-an-estimand-factory" class="nav-link" data-scroll-target="#adding-an-estimand-factory">Adding an estimand factory</a></li>
-  <li><a href="#adding-a-lossspec" id="toc-adding-a-lossspec" class="nav-link" data-scroll-target="#adding-a-lossspec">Adding a <code>LossSpec</code></a></li>
+  <li><a href="#adding-an-estimand" id="toc-adding-an-estimand" class="nav-link" data-scroll-target="#adding-an-estimand">Adding an estimand</a></li>
+  <li><a href="#adding-a-loss" id="toc-adding-a-loss" class="nav-link" data-scroll-target="#adding-a-loss">Adding a <code>Loss</code></a></li>
   <li><a href="#adding-a-backend" id="toc-adding-a-backend" class="nav-link" data-scroll-target="#adding-a-backend">Adding a backend</a></li>
   <li><a href="#living-doc-rule" id="toc-living-doc-rule" class="nav-link" data-scroll-target="#living-doc-rule">Living-doc rule</a></li>
   <li><a href="#local-docs-render" id="toc-local-docs-render" class="nav-link" data-scroll-target="#local-docs-render">Local docs render</a></li>
@@ -541,9 +541,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 ├── rieszreg/                 # meta-package: shared abstractions
 │   ├── python/rieszreg/
 │   │   ├── __init__.py            # public API surface
-│   │   ├── estimands/             # Estimand + 6 factories + tracer
-│   │   ├── losses/                # LossSpec Protocol + 4 losses
-│   │   ├── augmentation.py        # build_augmented + AugmentedDataset
+│   │   ├── estimands/             # Estimand base + 5 built-in subclasses + tracer
+│   │   ├── losses/                # Loss base class + 4 built-in losses
+│   │   ├── augmentation.py        # AugmentedDataset packaging
 │   │   ├── backends/base.py       # Backend + MomentBackend Protocols, FitResult, Predictor + loader registry
 │   │   ├── diagnostics.py         # Diagnostics dataclass + diagnose()
 │   │   ├── estimator.py           # RieszEstimator (sklearn BaseEstimator); dispatches between fit_augmented / fit_rows
@@ -595,23 +595,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="tracer" class="level2">
 <h2 class="anchored" data-anchor-id="tracer">Tracer</h2>
-<p>The user writes the operator <code>m(alpha)(z)</code> with <code>+</code>, <code>-</code>, scalar <code>*</code>, and calls to <code>alpha(...)</code>. <code>rieszreg.estimands.tracer</code> passes a <code>Tracer</code> in as <code>alpha</code>; each call returns a single-term <code>LinearForm</code>, and Python’s operator overloading composes them. The result has <code>.as_pairs()</code> returning <code>[(coef, point), ...]</code>, which <code>build_augmented</code> consumes. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time.</p>
+<p>The user writes the operator <code>m(alpha)(z)</code> with <code>+</code>, <code>-</code>, scalar <code>*</code>, and calls to <code>alpha(...)</code>. <code>rieszreg.estimands.tracer</code> passes a <code>Tracer</code> in as <code>alpha</code>; each call returns a single-term <code>LinearForm</code>, and Python’s operator overloading composes them. The result has <code>.as_pairs()</code> returning <code>[(coef, point), ...]</code>, which the default <code>FiniteEvalEstimand.augment</code> consumes to build the augmented dataset. Operations outside the linear-form algebra (squaring, integrals, constants) raise at trace time.</p>
 </section>
-<section id="adding-an-estimand-factory" class="level2">
-<h2 class="anchored" data-anchor-id="adding-an-estimand-factory">Adding an estimand factory</h2>
-<p>Estimand factories belong in <code>rieszreg.estimands.base</code>, not in the implementation packages. A factory returns a <code>FiniteEvalEstimand</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> MyEstimand(param, treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)) <span class="op">-&gt;</span> FiniteEvalEstimand:</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    cov <span class="op">=</span> <span class="bu">tuple</span>(covariates)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> m(alpha):</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        <span class="kw">def</span> inner(z, y<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>            x_kwargs <span class="op">=</span> {k: z[k] <span class="cf">for</span> k <span class="kw">in</span> cov}</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> alpha(<span class="op">**</span>{treatment: param, <span class="op">**</span>x_kwargs})</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> inner</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> FiniteEvalEstimand(</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        feature_keys<span class="op">=</span>(treatment, <span class="op">*</span>cov), m<span class="op">=</span>m, name<span class="op">=</span><span class="ss">f"MyEstimand(</span><span class="sc">{</span>param<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        factory_spec<span class="op">=</span>{<span class="st">"factory"</span>: <span class="st">"MyEstimand"</span>, <span class="st">"args"</span>: {<span class="st">"param"</span>: param, ...}},</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Then:</p>
+<section id="adding-an-estimand" class="level2">
+<h2 class="anchored" data-anchor-id="adding-an-estimand">Adding an estimand</h2>
+<p>Estimands belong in <code>rieszreg.estimands.base</code>, not in the implementation packages. Built-ins subclass <code>FiniteEvalEstimand</code> and supply both an <code>m</code> operator and a vectorised <code>augment(features, ys=None)</code> override:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyEstimand(FiniteEvalEstimand):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    m_bar <span class="op">=</span> <span class="fl">0.0</span>  <span class="co"># closed-form E[m(alpha=1)(Z)]</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, param, treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        cov <span class="op">=</span> <span class="bu">tuple</span>(covariates)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.param <span class="op">=</span> param</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.treatment <span class="op">=</span> treatment</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.covariates <span class="op">=</span> cov</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        <span class="kw">def</span> m(alpha):</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>            <span class="kw">def</span> inner(z, y<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>                x_kwargs <span class="op">=</span> {k: z[k] <span class="cf">for</span> k <span class="kw">in</span> cov}</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> alpha(<span class="op">**</span>{treatment: param, <span class="op">**</span>x_kwargs})</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> inner</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>            feature_keys<span class="op">=</span>(treatment, <span class="op">*</span>cov), m<span class="op">=</span>m, name<span class="op">=</span><span class="ss">f"MyEstimand(</span><span class="sc">{</span>param<span class="sc">}</span><span class="ss">)"</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>            factory_spec<span class="op">=</span>{<span class="st">"factory"</span>: <span class="st">"MyEstimand"</span>, <span class="st">"args"</span>: {<span class="st">"param"</span>: param, <span class="st">"treatment"</span>: treatment, <span class="st">"covariates"</span>: <span class="bu">list</span>(cov)}},</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> augment(<span class="va">self</span>, features, ys<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>        <span class="co"># vectorised numpy emitter — return an AugmentedDataset</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>        ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Subclasses that don’t override <code>augment</code> inherit the per-row Tracer-based default — fine for prototyping but slow. Then:</p>
 <ol type="1">
 <li>Add to <code>_FACTORY_REGISTRY</code> in <code>rieszreg/python/rieszreg/estimands/base.py</code> so the round-trip serialization registry knows about it.</li>
 <li>Export from <code>rieszreg/python/rieszreg/__init__.py</code>.</li>
@@ -621,8 +633,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Add a worked example under one of the implementation packages’ <code>examples/</code>.</li>
 </ol>
 </section>
-<section id="adding-a-lossspec" class="level2">
-<h2 class="anchored" data-anchor-id="adding-a-lossspec">Adding a <code>LossSpec</code></h2>
+<section id="adding-a-loss" class="level2">
+<h2 class="anchored" data-anchor-id="adding-a-loss">Adding a <code>Loss</code></h2>
 <p>Losses also belong in <code>rieszreg</code>, not the backends.</p>
 <ol type="1">
 <li>Add the class to <code>rieszreg/python/rieszreg/losses/&lt;name&gt;.py</code>.</li>

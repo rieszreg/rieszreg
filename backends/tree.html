@@ -543,20 +543,22 @@ window.Quarto = {
   <li><a href="#sec-save-load" id="toc-sec-save-load" class="nav-link" data-scroll-target="#sec-save-load"><span class="header-section-number">6</span> Save / load</a></li>
   <li><a href="#sec-sklearn" id="toc-sec-sklearn" class="nav-link" data-scroll-target="#sec-sklearn"><span class="header-section-number">7</span> Sklearn integration</a></li>
   <li><a href="#hyperparameters" id="toc-hyperparameters" class="nav-link" data-scroll-target="#hyperparameters"><span class="header-section-number">8</span> Hyperparameters</a></li>
-  <li><a href="#sec-loss-aware" id="toc-sec-loss-aware" class="nav-link" data-scroll-target="#sec-loss-aware"><span class="header-section-number">9</span> Loss-aware splits</a></li>
-  <li><a href="#what-you-reach-for-instead" id="toc-what-you-reach-for-instead" class="nav-link" data-scroll-target="#what-you-reach-for-instead"><span class="header-section-number">10</span> What you reach for instead</a></li>
-  <li><a href="#custom-estimands" id="toc-custom-estimands" class="nav-link" data-scroll-target="#custom-estimands"><span class="header-section-number">11</span> Custom estimands</a></li>
-  <li><a href="#consistency" id="toc-consistency" class="nav-link" data-scroll-target="#consistency"><span class="header-section-number">12</span> Consistency</a>
+  <li><a href="#sec-splitters" id="toc-sec-splitters" class="nav-link" data-scroll-target="#sec-splitters"><span class="header-section-number">9</span> Splitter modes</a></li>
+  <li><a href="#sec-extension-hook" id="toc-sec-extension-hook" class="nav-link" data-scroll-target="#sec-extension-hook"><span class="header-section-number">10</span> Custom-loss extension hook</a></li>
+  <li><a href="#sec-loss-aware" id="toc-sec-loss-aware" class="nav-link" data-scroll-target="#sec-loss-aware"><span class="header-section-number">11</span> Loss-aware splits</a></li>
+  <li><a href="#what-you-reach-for-instead" id="toc-what-you-reach-for-instead" class="nav-link" data-scroll-target="#what-you-reach-for-instead"><span class="header-section-number">12</span> What you reach for instead</a></li>
+  <li><a href="#custom-estimands" id="toc-custom-estimands" class="nav-link" data-scroll-target="#custom-estimands"><span class="header-section-number">13</span> Custom estimands</a></li>
+  <li><a href="#consistency" id="toc-consistency" class="nav-link" data-scroll-target="#consistency"><span class="header-section-number">14</span> Consistency</a>
   <ul class="collapse">
-  <li><a href="#setting" id="toc-setting" class="nav-link" data-scroll-target="#setting"><span class="header-section-number">12.1</span> Setting</a></li>
-  <li><a href="#assumptions" id="toc-assumptions" class="nav-link" data-scroll-target="#assumptions"><span class="header-section-number">12.2</span> Assumptions</a></li>
-  <li><a href="#theorem" id="toc-theorem" class="nav-link" data-scroll-target="#theorem"><span class="header-section-number">12.3</span> Theorem</a></li>
-  <li><a href="#remarks-on-the-assumptions" id="toc-remarks-on-the-assumptions" class="nav-link" data-scroll-target="#remarks-on-the-assumptions"><span class="header-section-number">12.4</span> Remarks on the assumptions</a></li>
-  <li><a href="#greedy-versus-global-erm" id="toc-greedy-versus-global-erm" class="nav-link" data-scroll-target="#greedy-versus-global-erm"><span class="header-section-number">12.5</span> Greedy versus global ERM</a></li>
-  <li><a href="#in-practice" id="toc-in-practice" class="nav-link" data-scroll-target="#in-practice"><span class="header-section-number">12.6</span> In practice</a></li>
+  <li><a href="#setting" id="toc-setting" class="nav-link" data-scroll-target="#setting"><span class="header-section-number">14.1</span> Setting</a></li>
+  <li><a href="#assumptions" id="toc-assumptions" class="nav-link" data-scroll-target="#assumptions"><span class="header-section-number">14.2</span> Assumptions</a></li>
+  <li><a href="#theorem" id="toc-theorem" class="nav-link" data-scroll-target="#theorem"><span class="header-section-number">14.3</span> Theorem</a></li>
+  <li><a href="#remarks-on-the-assumptions" id="toc-remarks-on-the-assumptions" class="nav-link" data-scroll-target="#remarks-on-the-assumptions"><span class="header-section-number">14.4</span> Remarks on the assumptions</a></li>
+  <li><a href="#greedy-versus-global-erm" id="toc-greedy-versus-global-erm" class="nav-link" data-scroll-target="#greedy-versus-global-erm"><span class="header-section-number">14.5</span> Greedy versus global ERM</a></li>
+  <li><a href="#in-practice" id="toc-in-practice" class="nav-link" data-scroll-target="#in-practice"><span class="header-section-number">14.6</span> In practice</a></li>
   </ul></li>
-  <li><a href="#sec-sims" id="toc-sec-sims" class="nav-link" data-scroll-target="#sec-sims"><span class="header-section-number">13</span> Simulations: how does this stack up against IPW?</a></li>
-  <li><a href="#sharp-edges" id="toc-sharp-edges" class="nav-link" data-scroll-target="#sharp-edges"><span class="header-section-number">14</span> Sharp edges</a></li>
+  <li><a href="#sec-sims" id="toc-sec-sims" class="nav-link" data-scroll-target="#sec-sims"><span class="header-section-number">15</span> Simulations: how does this stack up against IPW?</a></li>
+  <li><a href="#sharp-edges" id="toc-sharp-edges" class="nav-link" data-scroll-target="#sharp-edges"><span class="header-section-number">16</span> Sharp edges</a></li>
   </ul>
 </nav>
     </div>
@@ -1119,18 +1121,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5faff47c40&gt;,
-                                               name='ATE',
-                                               factory_spec={'args': {'covariates': ['x'],
-                                                                      'treatment': 'a'},
-                                                             'factory': 'ATE'}),
-                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5faff47c40&gt;,
-                                               name='ATE',
-                                               factory_spec={'args': {'covariates': ['x'],
-                                                                      'treatment': 'a'},
-                                                             'factory': 'ATE'}),
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f45bded0&gt;,
+                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f45bded0&gt;,
                    max_depth=4)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> est.predict(df)</span>
@@ -1173,7 +1165,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <p>Two growth policies are supported:</p>
 <ul>
 <li><strong>Depthwise</strong> (<code>growth_policy="depthwise"</code>, default). Standard recursive depth-first growth. Stops at <code>max_depth</code> or when <code>min_samples_split</code> blocks the node.</li>
-<li><strong>Leafwise</strong> (<code>growth_policy="leafwise"</code>). Best-first growth: at each step split the leaf whose best candidate has the highest gain anywhere in the tree. Termination on <code>max_leaves</code> (the natural cap for this policy) or when no positive-gain split remains.</li>
+<li><strong>Leafwise</strong> (<code>growth_policy="leafwise"</code>). Best-first growth: at each step split the leaf whose best candidate has the highest gain anywhere in the tree. Termination on <code>max_leaf_nodes</code> (the natural cap for this policy) or when no positive-gain split remains.</li>
 </ul>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE, n_leaves</span>
@@ -1185,7 +1177,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>est_lw <span class="op">=</span> RieszTreeRegressor(</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    growth_policy<span class="op">=</span><span class="st">"leafwise"</span>, max_leaves<span class="op">=</span><span class="dv">16</span>, max_depth<span class="op">=</span><span class="dv">20</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    growth_policy<span class="op">=</span><span class="st">"leafwise"</span>, max_leaf_nodes<span class="op">=</span><span class="dv">16</span>, max_depth<span class="op">=</span><span class="dv">20</span>,</span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"depthwise leaves: </span><span class="sc">{</span>n_leaves(est_dw.predictor_.tree)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1202,14 +1194,14 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <h2 data-number="4" class="anchored" data-anchor-id="sec-pruning"><span class="header-section-number">4</span> Pruning</h2>
 <p>Two regularisation paths are available:</p>
 <ul>
-<li><strong>Cost-complexity pruning</strong> via <code>pruning_alpha &gt; 0</code>. Standard Breiman et al.&nbsp;weakest-link algorithm: walk the tree bottom-up, computing per-subtree <span class="math inline">\(R_\alpha(T) = R(T) + \alpha\, |\text{leaves}(T)|\)</span>, and collapse the weakest link until <span class="math inline">\(g_{\min} \geq \alpha\)</span>. <span class="math inline">\(R(T)\)</span> is the augmented Bregman training loss summed over leaves.</li>
+<li><strong>Cost-complexity pruning</strong> via <code>ccp_alpha &gt; 0</code>. Standard Breiman et al.&nbsp;weakest-link algorithm: walk the tree bottom-up, computing per-subtree <span class="math inline">\(R_\alpha(T) = R(T) + \alpha\, |\text{leaves}(T)|\)</span>, and collapse the weakest link until <span class="math inline">\(g_{\min} \geq \alpha\)</span>. <span class="math inline">\(R(T)\)</span> is the augmented Bregman training loss summed over leaves.</li>
 <li><strong>Early stopping</strong> via <code>early_stopping_rounds</code> + <code>validation_fraction</code>. Stops growing when the held-out augmented loss has not improved for that many consecutive accepted splits, mirroring <code>rieszboost</code> / <code>riesznet</code>.</li>
 </ul>
 <p>Both are off by default. Combine freely with either growth policy.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>est_pruned <span class="op">=</span> RieszTreeRegressor(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">10</span>, pruning_alpha<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">10</span>, ccp_alpha<span class="op">=</span><span class="fl">0.5</span>,</span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
 <span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>est_es <span class="op">=</span> RieszTreeRegressor(</span>
@@ -1701,33 +1693,11 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a',
-                                                                                    'x'),
-                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5faff46b60&gt;,
-                                                                      name='ATE',
-                                                                      factory_spec={'args': {'covariates': ['x'],
-                                                                                             'treatment': 'a'},
-                                                                                    'factory': 'ATE'})),
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f46128d0&gt;),
              n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox"><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>GridSearchCV</div></div><div><a class="sk-estimator-doc-link fitted" rel="noreferrer" target="_blank" href="https://scikit-learn.org/1.6/modules/generated/sklearn.model_selection.GridSearchCV.html">?<span>Documentation for GridSearchCV</span></a><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a',
-                                                                                    'x'),
-                                                                      m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5faff46b60&gt;,
-                                                                      name='ATE',
-                                                                      factory_spec={'args': {'covariates': ['x'],
-                                                                                             'treatment': 'a'},
-                                                                                    'factory': 'ATE'})),
-             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5fafdc7740&gt;,
-                                               name='ATE',
-                                               factory_spec={'args': {'covariates': ['x'],
-                                                                      'treatment': 'a'},
-                                                             'factory': 'ATE'}),
-                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=FiniteEvalEstimand(feature_keys=('a', 'x'),
-                                               m=&lt;function ATE.&lt;locals&gt;.m at 0x7f5fafdc7740&gt;,
-                                               name='ATE',
-                                               factory_spec={'args': {'covariates': ['x'],
-                                                                      'treatment': 'a'},
-                                                             'factory': 'ATE'}),
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f46128d0&gt;),
+             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f4610110&gt;,
+                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f69f4610110&gt;,
                    max_depth=4)</pre></div> </div></div></div></div></div></div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best max_depth = </span><span class="sc">{</span>gs<span class="sc">.</span>best_params_[<span class="st">'max_depth'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1738,6 +1708,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </section>
 <section id="hyperparameters" class="level2" data-number="8">
 <h2 data-number="8" class="anchored" data-anchor-id="hyperparameters"><span class="header-section-number">8</span> Hyperparameters</h2>
+<p>Mirrors <code>sklearn.tree.DecisionTreeRegressor</code> where the augmented Bregman-Riesz setting allows.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -1768,9 +1739,19 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <td>Minimum count of original rows in each child of a candidate split.</td>
 </tr>
 <tr class="even">
-<td><code>max_leaves</code></td>
+<td><code>min_weight_fraction_leaf</code></td>
+<td>0.0</td>
+<td>Sklearn parity. With unit weights, leaves must hold <span class="math inline">\(\geq \lceil \text{frac} \cdot n_{\text{orig}} \rceil\)</span> original rows (combined with <code>min_samples_leaf</code> via <code>max(...)</code>).</td>
+</tr>
+<tr class="odd">
+<td><code>max_leaf_nodes</code></td>
 <td>31</td>
 <td>Cap for leafwise growth. Ignored when <code>growth_policy="depthwise"</code>.</td>
+</tr>
+<tr class="even">
+<td><code>max_features</code></td>
+<td>None</td>
+<td>Per-split feature subsample. <code>None</code>, <code>"sqrt"</code>, <code>"log2"</code>, an int, or a float in <span class="math inline">\((0, 1]\)</span>. Critical for forest decorrelation.</td>
 </tr>
 <tr class="odd">
 <td><code>growth_policy</code></td>
@@ -1778,40 +1759,107 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <td>Or <code>"leafwise"</code>.</td>
 </tr>
 <tr class="even">
-<td><code>pruning_alpha</code></td>
+<td><code>min_impurity_decrease</code></td>
 <td>0.0</td>
-<td>Cost-complexity penalty.</td>
+<td>Reject splits with gain <span class="math inline">\(\leq\)</span> this threshold.</td>
 </tr>
 <tr class="odd">
+<td><code>ccp_alpha</code></td>
+<td>0.0</td>
+<td>Cost-complexity pruning penalty. Sklearn name.</td>
+</tr>
+<tr class="even">
 <td><code>early_stopping_rounds</code></td>
 <td>None</td>
 <td>Stop when held-out augmented loss has not improved for that many accepted splits.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>validation_fraction</code></td>
 <td>0.1</td>
 <td>Held-out fraction for early stopping. Ignored when not needed.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>categorical_features</code></td>
 <td>None</td>
 <td>Sequence of column indices treated as integer category labels.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>loss</code></td>
 <td><code>SquaredLoss()</code></td>
 <td>Bregman-Riesz loss.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>random_state</code></td>
 <td>0</td>
-<td>Reserved for tie-breaking.</td>
+<td>Seeds the per-split feature subsample (<code>max_features</code>) and the per-feature random threshold (<code>splitter='random'</code>).</td>
+</tr>
+<tr class="odd">
+<td><code>splitter</code></td>
+<td><code>"exact"</code></td>
+<td>One of <code>"exact"</code> (Cython per-feature sweep), <code>"hist"</code> (Cython quantile-binned histogram, fastest at large <span class="math inline">\(n\)</span>), <code>"random"</code> (sklearn ExtraTrees-style), <code>"python"</code> (legacy; deprecated, removed in v0.0.3).</td>
+</tr>
+<tr class="even">
+<td><code>max_bins</code></td>
+<td>255</td>
+<td>Quantile bins per feature when <code>splitter="hist"</code>. Sklearn HGB convention; fits in <code>uint8</code>.</td>
 </tr>
 </tbody>
 </table>
+<p>The v0.0.1 names <code>max_leaves</code> and <code>pruning_alpha</code> are accepted as deprecated aliases for <code>max_leaf_nodes</code> and <code>ccp_alpha</code>; passing them emits a <code>FutureWarning</code>.</p>
 </section>
-<section id="sec-loss-aware" class="level2" data-number="9">
-<h2 data-number="9" class="anchored" data-anchor-id="sec-loss-aware"><span class="header-section-number">9</span> Loss-aware splits</h2>
+<section id="sec-splitters" class="level2" data-number="9">
+<h2 data-number="9" class="anchored" data-anchor-id="sec-splitters"><span class="header-section-number">9</span> Splitter modes</h2>
+<p><code>riesztree</code> ships three Cython splitter paths plus a legacy Python fallback:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare splitter modes on the same data — predictions and timings.</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE, n_leaves</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>estimand <span class="op">=</span> ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,))</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> sp <span class="kw">in</span> [<span class="st">"exact"</span>, <span class="st">"hist"</span>, <span class="st">"random"</span>]:</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    est <span class="op">=</span> RieszTreeRegressor(estimand<span class="op">=</span>estimand, max_depth<span class="op">=</span><span class="dv">4</span>, splitter<span class="op">=</span>sp).fit(df)</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    fit_ms <span class="op">=</span> (time.perf_counter() <span class="op">-</span> t0) <span class="op">*</span> <span class="dv">1000</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"splitter=</span><span class="sc">{</span>sp<span class="sc">:6s}</span><span class="ss">  fit=</span><span class="sc">{</span>fit_ms<span class="sc">:6.1f}</span><span class="ss"> ms  leaves=</span><span class="sc">{</span>n_leaves(est.predictor_.tree)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>splitter=exact   fit=   2.7 ms  leaves=14
+splitter=hist    fit=   4.0 ms  leaves=14
+splitter=random  fit=   1.3 ms  leaves=12</code></pre>
+</div>
+</div>
+<ul>
+<li><code>"exact"</code> (default): per-feature linear scan over distinct values. Best partition; same byte-for-byte as the legacy Python splitter on the four built-in losses.</li>
+<li><code>"hist"</code>: pre-binned (default 255 quantile bins per feature). <code>O(n_{\text{leaf}} + \text{max\_bins})</code> per feature per leaf instead of <code>O(n_{\text{leaf}} \log n_{\text{leaf}})</code>. Fastest at large <span class="math inline">\(n\)</span>; threshold lands on a bin boundary so split-ranking is approximate but the leaf <span class="math inline">\(\alpha^\star\)</span> itself is exact.</li>
+<li><code>"random"</code>: sklearn ExtraTrees-style. One uniform threshold per feature per leaf; useful for forest decorrelation when combined with <code>max_features="sqrt"</code>.</li>
+</ul>
+<p>For losses outside the four built-ins (<code>SquaredLoss</code>, <code>KLLoss</code>, <code>BernoulliLoss</code>, <code>BoundedSquaredLoss</code>), the Cython splitter routes through a registered Numba <code>@cfunc</code> if one was registered via <code>riesztree.fast.register_fast_leaf_solver</code> — otherwise it falls back to the Python path with a one-time <code>UserWarning</code>.</p>
+</section>
+<section id="sec-extension-hook" class="level2" data-number="10">
+<h2 data-number="10" class="anchored" data-anchor-id="sec-extension-hook"><span class="header-section-number">10</span> Custom-loss extension hook</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numba</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> Loss</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree.fast <span class="im">import</span> register_fast_leaf_solver</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyLoss(Loss):</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    ...   <span class="co"># implement the Loss interface</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="at">@numba.cfunc</span>(<span class="st">"float64(float64, float64)"</span>, cache<span class="op">=</span><span class="va">True</span>, nopython<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> my_leaf_loss(D, C):</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> D <span class="op">&lt;=</span> <span class="fl">0.0</span>:</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.0</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span>C <span class="op">*</span> C <span class="op">/</span> D       <span class="co"># SquaredLoss-equivalent here</span></span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> my_alpha(D, C):</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.0</span> <span class="cf">if</span> D <span class="op">&lt;=</span> <span class="dv">0</span> <span class="cf">else</span> <span class="op">-</span>C <span class="op">/</span> D</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>register_fast_leaf_solver(MyLoss, my_leaf_loss, my_alpha)</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Subsequent fits with loss=MyLoss() use the C-speed Cython splitter.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The cfunc is called from the Cython splitter’s tight loop without the GIL — same per-evaluation cost as the four built-in losses. See <a href="https://github.com/rieszreg/riesztree/blob/main/BENCH_BASELINE.md">riesztree’s BENCH_BASELINE.md</a> for the locked baselines and a comparison vs sklearn / LightGBM / XGBoost.</p>
+</section>
+<section id="sec-loss-aware" class="level2" data-number="11">
+<h2 data-number="11" class="anchored" data-anchor-id="sec-loss-aware"><span class="header-section-number">11</span> Loss-aware splits</h2>
 <p>The splitter uses the analytic per-leaf-loss-at-optimum for each Bregman loss:</p>
 <table class="caption-top table">
 <colgroup>
@@ -1851,27 +1899,27 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </table>
 <p>Out-of-domain children are disqualified (<code>+∞</code> leaf loss). Pair <code>KLLoss</code> / <code>BernoulliLoss</code> with density-ratio-style estimands (<code>TSM</code>); difference-of-evaluations estimands (<code>ATE</code>, <code>ATT</code>) frequently produce out-of-domain leaves under those losses.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, TSM</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> KLLoss</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>est_kl <span class="op">=</span> RieszTreeRegressor(</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>TSM(level<span class="op">=</span><span class="fl">1.0</span>, treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    loss<span class="op">=</span>KLLoss(),</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">4</span>, random_state<span class="op">=</span><span class="dv">0</span>,</span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>alpha_kl <span class="op">=</span> est_kl.predict(df)</span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"all alpha_hat ≥ 0: </span><span class="sc">{</span><span class="bu">bool</span>((alpha_kl <span class="op">&gt;=</span> <span class="dv">0</span>).<span class="bu">all</span>())<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, TSM</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> KLLoss</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>est_kl <span class="op">=</span> RieszTreeRegressor(</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>TSM(level<span class="op">=</span><span class="fl">1.0</span>, treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    loss<span class="op">=</span>KLLoss(),</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">4</span>, random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>alpha_kl <span class="op">=</span> est_kl.predict(df)</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"all alpha_hat ≥ 0: </span><span class="sc">{</span><span class="bu">bool</span>((alpha_kl <span class="op">&gt;=</span> <span class="dv">0</span>).<span class="bu">all</span>())<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>all alpha_hat ≥ 0: True</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"alpha range      : [</span><span class="sc">{</span>alpha_kl<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>alpha_kl<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"alpha range      : [</span><span class="sc">{</span>alpha_kl<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>alpha_kl<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>alpha range      : [0.000, 14.167]</code></pre>
 </div>
 </div>
 </section>
-<section id="what-you-reach-for-instead" class="level2" data-number="10">
-<h2 data-number="10" class="anchored" data-anchor-id="what-you-reach-for-instead"><span class="header-section-number">10</span> What you reach for instead</h2>
+<section id="what-you-reach-for-instead" class="level2" data-number="12">
+<h2 data-number="12" class="anchored" data-anchor-id="what-you-reach-for-instead"><span class="header-section-number">12</span> What you reach for instead</h2>
 <p><code>riesztree</code> is intentionally a single tree. For higher-accuracy variants:</p>
 <ul>
 <li><strong>Single-tree augmentation in a forest</strong>: see <a href="../backends/forest.html#augmentation-style-augforestrieszregressor"><code>forestriesz/AugForestRieszRegressor</code></a> — the same augmentation-style splitter, ensembled.</li>
@@ -1879,29 +1927,29 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <li><strong>Treatment-dimension sieve</strong> (à la <code>forestriesz</code>’s <code>riesz_feature_fns="auto"</code>, which uses <span class="math inline">\([\mathbf 1\{T = 0\}, \mathbf 1\{T = 1\}]\)</span> as basis): not implemented in v1. The tree code generalises naturally.</li>
 </ul>
 </section>
-<section id="custom-estimands" class="level2" data-number="11">
-<h2 data-number="11" class="anchored" data-anchor-id="custom-estimands"><span class="header-section-number">11</span> Custom estimands</h2>
+<section id="custom-estimands" class="level2" data-number="13">
+<h2 data-number="13" class="anchored" data-anchor-id="custom-estimands"><span class="header-section-number">13</span> Custom estimands</h2>
 <p>Because <code>riesztree</code> implements the augmentation-style <code>Backend.fit_augmented</code>, any user-supplied <code>FiniteEvalEstimand</code> works without configuration: <span class="math inline">\(D_r\)</span> and <span class="math inline">\(C_r\)</span> vary across augmented rows even with no sieve. (Contrast <code>forestriesz</code>’s moment-style backend, which raises a row-constant degeneracy error on <code>AdditiveShift</code> / <code>LocalShift</code> / custom estimands.) Pass your custom estimand and fit normally:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> FiniteEvalEstimand, LinearForm</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> m_custom(alpha):</span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> inner(z, y<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> LinearForm.point(<span class="fl">1.0</span>, {<span class="st">"a"</span>: z[<span class="st">"a"</span>] <span class="op">+</span> <span class="fl">1.0</span>, <span class="st">"x"</span>: z[<span class="st">"x"</span>]}) <span class="op">\</span></span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>             <span class="op">-</span> LinearForm.point(<span class="fl">1.0</span>, {<span class="st">"a"</span>: z[<span class="st">"a"</span>], <span class="st">"x"</span>: z[<span class="st">"x"</span>]})</span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> inner</span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>custom <span class="op">=</span> FiniteEvalEstimand(feature_keys<span class="op">=</span>(<span class="st">"a"</span>, <span class="st">"x"</span>), m<span class="op">=</span>m_custom)</span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>est <span class="op">=</span> RieszTreeRegressor(estimand<span class="op">=</span>custom, max_depth<span class="op">=</span><span class="dv">4</span>).fit(df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> FiniteEvalEstimand, LinearForm</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> m_custom(alpha):</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> inner(z, y<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> LinearForm.point(<span class="fl">1.0</span>, {<span class="st">"a"</span>: z[<span class="st">"a"</span>] <span class="op">+</span> <span class="fl">1.0</span>, <span class="st">"x"</span>: z[<span class="st">"x"</span>]}) <span class="op">\</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>             <span class="op">-</span> LinearForm.point(<span class="fl">1.0</span>, {<span class="st">"a"</span>: z[<span class="st">"a"</span>], <span class="st">"x"</span>: z[<span class="st">"x"</span>]})</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> inner</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>custom <span class="op">=</span> FiniteEvalEstimand(feature_keys<span class="op">=</span>(<span class="st">"a"</span>, <span class="st">"x"</span>), m<span class="op">=</span>m_custom)</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>est <span class="op">=</span> RieszTreeRegressor(estimand<span class="op">=</span>custom, max_depth<span class="op">=</span><span class="dv">4</span>).fit(df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
-<section id="consistency" class="level2" data-number="12">
-<h2 data-number="12" class="anchored" data-anchor-id="consistency"><span class="header-section-number">12</span> Consistency</h2>
+<section id="consistency" class="level2" data-number="14">
+<h2 data-number="14" class="anchored" data-anchor-id="consistency"><span class="header-section-number">14</span> Consistency</h2>
 <p>For the squared Bregman-Riesz loss the population objective satisfies <span class="math display">\[
 L(\alpha) \;-\; L(\alpha_0) \;=\; \|\alpha - \alpha_0\|_{L^2(P)}^2,
 \]</span> so minimising <span class="math inline">\(L\)</span> is <span class="math inline">\(L^2\)</span>-regression onto the (unobserved) Riesz representer <span class="math inline">\(\alpha_0\)</span>. Theorem 1 below makes this rigorous for the empirical risk minimiser over piecewise-constant functions on tree partitions.</p>
-<section id="setting" class="level3" data-number="12.1">
-<h3 data-number="12.1" class="anchored" data-anchor-id="setting"><span class="header-section-number">12.1</span> Setting</h3>
+<section id="setting" class="level3" data-number="14.1">
+<h3 data-number="14.1" class="anchored" data-anchor-id="setting"><span class="header-section-number">14.1</span> Setting</h3>
 <p>Let <span class="math inline">\(Z_1, \ldots, Z_n \overset{\text{iid}}{\sim} P\)</span> on a measurable space <span class="math inline">\(\mathcal{Z} \subseteq \mathbb{R}^{d+1}\)</span> (treatment plus <span class="math inline">\(d\)</span> covariates). Let <span class="math inline">\(m\)</span> be a finite-evaluation linear functional with trace <span class="math display">\[
 m(g)(z) \;=\; \sum_{r=1}^{R(z)} c_r(z)\, g(z_r(z))
 \]</span> and Riesz representer <span class="math inline">\(\alpha_0 \in L^2(P)\)</span> defined by <span class="math inline">\(\mathbb{E}[m(g)(Z)] = \mathbb{E}[\alpha_0(Z)\, g(Z)]\)</span> for all <span class="math inline">\(g \in L^2(P)\)</span>. The squared Bregman-Riesz loss and its empirical analog are <span class="math display">\[
@@ -1915,8 +1963,8 @@ L(\alpha) \;=\; \mathbb{E}\!\left[\alpha(Z)^2 - 2\, m(\alpha)(Z)\right],
 \hat\alpha_n \;\in\; \arg\min_{\alpha \in \mathcal{F}_{K_n, M}} \hat L_n(\alpha).
 \]</span></p>
 </section>
-<section id="assumptions" class="level3" data-number="12.2">
-<h3 data-number="12.2" class="anchored" data-anchor-id="assumptions"><span class="header-section-number">12.2</span> Assumptions</h3>
+<section id="assumptions" class="level3" data-number="14.2">
+<h3 data-number="14.2" class="anchored" data-anchor-id="assumptions"><span class="header-section-number">14.2</span> Assumptions</h3>
 <ul>
 <li><strong>(A1) Bounded representer.</strong> <span class="math inline">\(\|\alpha_0\|_\infty \le M &lt; \infty\)</span>.</li>
 <li><strong>(A2) Bounded trace.</strong> There exist constants <span class="math inline">\(B, R &lt; \infty\)</span> such that <span class="math inline">\(R(z) \le R\)</span> and <span class="math inline">\(\sum_{r=1}^{R(z)} |c_r(z)| \le B\)</span> for <span class="math inline">\(P\)</span>-a.e.&nbsp;<span class="math inline">\(z\)</span>.</li>
@@ -1924,8 +1972,8 @@ L(\alpha) \;=\; \mathbb{E}\!\left[\alpha(Z)^2 - 2\, m(\alpha)(Z)\right],
 <li><strong>(A4) Capacity.</strong> <span class="math inline">\(K_n \to \infty\)</span> and <span class="math inline">\(K_n \log n / n \to 0\)</span> as <span class="math inline">\(n \to \infty\)</span>, with <span class="math inline">\(d\)</span> fixed.</li>
 </ul>
 </section>
-<section id="theorem" class="level3" data-number="12.3">
-<h3 data-number="12.3" class="anchored" data-anchor-id="theorem"><span class="header-section-number">12.3</span> Theorem</h3>
+<section id="theorem" class="level3" data-number="14.3">
+<h3 data-number="14.3" class="anchored" data-anchor-id="theorem"><span class="header-section-number">14.3</span> Theorem</h3>
 <p><strong>Theorem 1.</strong> <em>Under (A1)–(A4),</em> <span class="math display">\[
 \|\hat\alpha_n - \alpha_0\|_{L^2(P)} \;\xrightarrow{P}\; 0.
 \]</span></p>
@@ -1987,16 +2035,16 @@ K_n \log(dnR) + K_n \log(C/\epsilon) - n \epsilon^2 / C',
 </div>
 </div>
 </section>
-<section id="remarks-on-the-assumptions" class="level3" data-number="12.4">
-<h3 data-number="12.4" class="anchored" data-anchor-id="remarks-on-the-assumptions"><span class="header-section-number">12.4</span> Remarks on the assumptions</h3>
+<section id="remarks-on-the-assumptions" class="level3" data-number="14.4">
+<h3 data-number="14.4" class="anchored" data-anchor-id="remarks-on-the-assumptions"><span class="header-section-number">14.4</span> Remarks on the assumptions</h3>
 <ul>
 <li><strong>(A1) and (A3)</strong> are the standard assumptions in non-parametric regression-tree consistency proofs, transported to the Riesz target <span class="math inline">\(\alpha_0\)</span> in place of the regression function. (A3) is an assumption on the class of partitions and on the smoothness of <span class="math inline">\(\alpha_0\)</span>. It holds, for example, when <span class="math inline">\(\mathcal{Z}\)</span> is bounded, <span class="math inline">\(\alpha_0\)</span> is continuous, <span class="math inline">\(P\)</span> has no atoms, and <span class="math inline">\(\mathcal{T}_{K_n}\)</span> contains all axis-aligned tree partitions with <span class="math inline">\(\le K_n\)</span> leaves; the rate at which the infimum vanishes is governed by the smoothness of <span class="math inline">\(\alpha_0\)</span> and the dimension <span class="math inline">\(d\)</span> via standard approximation theory.</li>
 <li><strong>(A4)</strong> is the standard tree-complexity assumption: trees may grow with <span class="math inline">\(n\)</span>, but slowly enough that the log-covering complexity <span class="math inline">\(K_n \log n\)</span> of the partition class stays <span class="math inline">\(o(n)\)</span>.</li>
 <li><strong>(A2)</strong> is the only Riesz-specific assumption. The trace coefficient sum <span class="math inline">\(T(z) := \sum_r |c_r(z)|\)</span> controls the magnitude of the augmented loss residuals, and is the analog of “bounded response” in regression CART. For ATE the trace sum equals <span class="math inline">\(2\)</span> identically. For ATT, ATC, and weighted estimands, <span class="math inline">\(T\)</span> inherits inverse-propensity factors, and (A2) reduces to the standard positivity (overlap) assumption <span class="math inline">\(\pi(x) \in [\eta, 1 - \eta]\)</span> for some <span class="math inline">\(\eta &gt; 0\)</span>.</li>
 </ul>
 </section>
-<section id="greedy-versus-global-erm" class="level3" data-number="12.5">
-<h3 data-number="12.5" class="anchored" data-anchor-id="greedy-versus-global-erm"><span class="header-section-number">12.5</span> Greedy versus global ERM</h3>
+<section id="greedy-versus-global-erm" class="level3" data-number="14.5">
+<h3 data-number="14.5" class="anchored" data-anchor-id="greedy-versus-global-erm"><span class="header-section-number">14.5</span> Greedy versus global ERM</h3>
 <p>Theorem 1 applies to the <em>global</em> minimiser of <span class="math inline">\(\hat L_n\)</span> over <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span>. The riesztree splitter is greedy: it accepts a sequence of best-gain splits and need not return the global optimum. Greedy CART consistency for ordinary regression is established only under additional structural conditions on the partitions the rule produces (Nobel 1996; Scornet, Biau and Vert 2015 for additive regression). Corollary 1 imports those conditions into the Riesz setting.</p>
 <p>Let <span class="math inline">\(\hat\Pi_n \in \mathcal{T}_{K_n}\)</span> denote any data-dependent partition (in particular, the partition produced by greedy riesztree under any growth or pruning policy) and let <span class="math display">\[
 \hat\alpha_n(z) \;=\; \mathrm{clip}_{[-M, M]}\!\left( \frac{\sum_{i=1}^n m(\mathbf{1}_{\hat\Pi_n(z)})(Z_i)}{\#\{i : Z_i \in \hat\Pi_n(z)\}} \right)
@@ -2043,13 +2091,13 @@ L(\hat\alpha_n) - L(\bar\alpha_n) \;\xrightarrow{P}\; 0.
 <p><strong>On (B1).</strong> Whether greedy CART produces shrinking cells is a separate question that depends on the splitting rule and the DGP. Sufficient conditions in the regression-tree literature (Wager and Walther 2016; Klusowski 2021; Scornet, Biau and Vert 2015 for additive regression) carry over to the augmented Bregman setting under analogous structural conditions on the signal carried by <span class="math inline">\(\alpha_0\)</span>. (B1) holds automatically for “honest” splitters that allocate fresh data to leaf-value estimation, and for purely random forests.</p>
 <p><strong>Why (B2) of Nobel (1996) is not needed here.</strong> Nobel’s framework requires growing cell counts (<span class="math inline">\(\hat n_{\hat\Pi_n(Z_*)} \xrightarrow{P} \infty\)</span>) to control per-leaf variance of the histogram regression estimator. Here the leaf values are clipped to <span class="math inline">\([-M, M]\)</span> (since <span class="math inline">\(\alpha_0 \in [-M, M]\)</span>), and the uniform empirical-process bound from Step 3 of the proof of Theorem 1 controls the variance for the <em>whole</em> class <span class="math inline">\(\mathcal{F}_{K_n, M}\)</span> at once. Clipping plus uniform LLN replaces growing-leaf-counts.</p>
 </section>
-<section id="in-practice" class="level3" data-number="12.6">
-<h3 data-number="12.6" class="anchored" data-anchor-id="in-practice"><span class="header-section-number">12.6</span> In practice</h3>
+<section id="in-practice" class="level3" data-number="14.6">
+<h3 data-number="14.6" class="anchored" data-anchor-id="in-practice"><span class="header-section-number">14.6</span> In practice</h3>
 <p>RMSE on the canonical DGPs in <code>rieszreg.testing.dgps</code> shrinks as <span class="math inline">\(n\)</span> grows, with the noise floor close to what a comparable-depth CART achieves on the analogous <span class="math inline">\(L^2\)</span> regression problem. Single-tree variance dominates; use <code>forestriesz</code> or <code>rieszboost</code> for tighter rates.</p>
 </section>
 </section>
-<section id="sec-sims" class="level2" data-number="13">
-<h2 data-number="13" class="anchored" data-anchor-id="sec-sims"><span class="header-section-number">13</span> Simulations: how does this stack up against IPW?</h2>
+<section id="sec-sims" class="level2" data-number="15">
+<h2 data-number="15" class="anchored" data-anchor-id="sec-sims"><span class="header-section-number">15</span> Simulations: how does this stack up against IPW?</h2>
 <p>A common alternative for ATE-style estimands is two-step IPW: fit <span class="math inline">\(\hat\pi(x)\)</span> (a propensity model), then plug into</p>
 <p><span class="math display">\[
 \hat\alpha(a, x) \;=\; \frac{2a - 1}{a\,\hat\pi(x) + (1 - a)\,(1 - \hat\pi(x))}.
@@ -2061,105 +2109,105 @@ L(\hat\alpha_n) - L(\bar\alpha_n) \;\xrightarrow{P}\; 0.
 </ul>
 <p>Compare both against <code>riesztree</code> (depth tuned via held-out Riesz loss). Same training set; oracle RMSE measured on a fresh test set of size <span class="math inline">\(5n\)</span>. Faceted across training sizes <span class="math inline">\(n \in \{100, 200, 500, 2000, 8000\}\)</span>.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd, matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.tree <span class="im">import</span> DecisionTreeClassifier</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE</span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sample(n, seed):</span>
-<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
-<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> rng.normal(<span class="fl">0.0</span>, <span class="fl">1.0</span>, size<span class="op">=</span>(n, <span class="dv">5</span>))</span>
-<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    logit <span class="op">=</span> <span class="fl">0.7</span> <span class="op">*</span> x[:, <span class="dv">0</span>] <span class="op">-</span> <span class="fl">0.3</span> <span class="op">*</span> x[:, <span class="dv">1</span>]</span>
-<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    pi <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (<span class="fl">1.0</span> <span class="op">+</span> np.exp(<span class="op">-</span>logit))</span>
-<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> (rng.uniform(<span class="dv">0</span>, <span class="dv">1</span>, n) <span class="op">&lt;</span> pi).astype(<span class="bu">float</span>)</span>
-<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> pd.DataFrame(x, columns<span class="op">=</span>[<span class="ss">f"x</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>)])</span>
-<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>    df.insert(<span class="dv">0</span>, <span class="st">"a"</span>, a)</span>
-<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    df[<span class="st">"_pi"</span>] <span class="op">=</span> pi</span>
-<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> df</span>
-<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> truth_from(df):</span>
-<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>    pi <span class="op">=</span> df[<span class="st">"_pi"</span>].values</span>
-<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> df[<span class="st">"a"</span>].values</span>
-<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>    prob_a <span class="op">=</span> a <span class="op">*</span> pi <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> a) <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> pi)</span>
-<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="fl">2.0</span> <span class="op">*</span> a <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">/</span> prob_a</span>
-<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rmse(a, b):</span>
-<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.sqrt(np.mean((a <span class="op">-</span> b) <span class="op">**</span> <span class="dv">2</span>)))</span>
-<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ipw_with_estimator(clf, train, test):</span>
-<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>    feats <span class="op">=</span> [<span class="ss">f"x</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>)]</span>
-<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>    clf.fit(train[feats].values, train[<span class="st">"a"</span>].values.astype(<span class="bu">int</span>))</span>
-<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>    pi_hat <span class="op">=</span> np.clip(clf.predict_proba(test[feats].values)[:, <span class="dv">1</span>], <span class="fl">1e-3</span>, <span class="dv">1</span> <span class="op">-</span> <span class="fl">1e-3</span>)</span>
-<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> test[<span class="st">"a"</span>].values</span>
-<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>    prob_a <span class="op">=</span> a <span class="op">*</span> pi_hat <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> a) <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> pi_hat)</span>
-<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="fl">2.0</span> <span class="op">*</span> a <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">/</span> prob_a</span>
-<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>depths <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">6</span>, <span class="dv">8</span>, <span class="dv">12</span>]</span>
-<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>n_grid <span class="op">=</span> [<span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">500</span>, <span class="dv">2000</span>, <span class="dv">8000</span>]</span>
-<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>covariates <span class="op">=</span> (<span class="st">"x0"</span>, <span class="st">"x1"</span>, <span class="st">"x2"</span>, <span class="st">"x3"</span>, <span class="st">"x4"</span>)</span>
-<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>records <span class="op">=</span> []</span>
-<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> n_grid:</span>
-<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>    train <span class="op">=</span> sample(n, seed<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb29-48"><a href="#cb29-48" aria-hidden="true" tabindex="-1"></a>    test <span class="op">=</span> sample(<span class="dv">5</span> <span class="op">*</span> n, seed<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb29-49"><a href="#cb29-49" aria-hidden="true" tabindex="-1"></a>    truth <span class="op">=</span> truth_from(test)</span>
-<span id="cb29-50"><a href="#cb29-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-51"><a href="#cb29-51" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Logistic-regression IPW: a single horizontal reference (no depth knob).</span></span>
-<span id="cb29-52"><a href="#cb29-52" aria-hidden="true" tabindex="-1"></a>    log_ipw_alpha <span class="op">=</span> ipw_with_estimator(LogisticRegression(max_iter<span class="op">=</span><span class="dv">2000</span>), train, test)</span>
-<span id="cb29-53"><a href="#cb29-53" aria-hidden="true" tabindex="-1"></a>    log_ipw_rmse <span class="op">=</span> rmse(log_ipw_alpha, truth)</span>
-<span id="cb29-54"><a href="#cb29-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-55"><a href="#cb29-55" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> d <span class="kw">in</span> depths:</span>
-<span id="cb29-56"><a href="#cb29-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># riesztree at this depth.</span></span>
-<span id="cb29-57"><a href="#cb29-57" aria-hidden="true" tabindex="-1"></a>        est <span class="op">=</span> RieszTreeRegressor(</span>
-<span id="cb29-58"><a href="#cb29-58" aria-hidden="true" tabindex="-1"></a>            estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>covariates),</span>
-<span id="cb29-59"><a href="#cb29-59" aria-hidden="true" tabindex="-1"></a>            max_depth<span class="op">=</span>d, random_state<span class="op">=</span><span class="dv">0</span>,</span>
-<span id="cb29-60"><a href="#cb29-60" aria-hidden="true" tabindex="-1"></a>        ).fit(train)</span>
-<span id="cb29-61"><a href="#cb29-61" aria-hidden="true" tabindex="-1"></a>        records.append({</span>
-<span id="cb29-62"><a href="#cb29-62" aria-hidden="true" tabindex="-1"></a>            <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"riesztree"</span>, <span class="st">"depth"</span>: d,</span>
-<span id="cb29-63"><a href="#cb29-63" aria-hidden="true" tabindex="-1"></a>            <span class="st">"rmse"</span>: rmse(est.predict(test), truth),</span>
-<span id="cb29-64"><a href="#cb29-64" aria-hidden="true" tabindex="-1"></a>        })</span>
-<span id="cb29-65"><a href="#cb29-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># IPW-tree at this depth.</span></span>
-<span id="cb29-66"><a href="#cb29-66" aria-hidden="true" tabindex="-1"></a>        records.append({</span>
-<span id="cb29-67"><a href="#cb29-67" aria-hidden="true" tabindex="-1"></a>            <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"IPW (regression tree)"</span>, <span class="st">"depth"</span>: d,</span>
-<span id="cb29-68"><a href="#cb29-68" aria-hidden="true" tabindex="-1"></a>            <span class="st">"rmse"</span>: rmse(</span>
-<span id="cb29-69"><a href="#cb29-69" aria-hidden="true" tabindex="-1"></a>                ipw_with_estimator(</span>
-<span id="cb29-70"><a href="#cb29-70" aria-hidden="true" tabindex="-1"></a>                    DecisionTreeClassifier(max_depth<span class="op">=</span>d, min_samples_leaf<span class="op">=</span><span class="dv">10</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
-<span id="cb29-71"><a href="#cb29-71" aria-hidden="true" tabindex="-1"></a>                    train, test,</span>
-<span id="cb29-72"><a href="#cb29-72" aria-hidden="true" tabindex="-1"></a>                ),</span>
-<span id="cb29-73"><a href="#cb29-73" aria-hidden="true" tabindex="-1"></a>                truth,</span>
-<span id="cb29-74"><a href="#cb29-74" aria-hidden="true" tabindex="-1"></a>            ),</span>
-<span id="cb29-75"><a href="#cb29-75" aria-hidden="true" tabindex="-1"></a>        })</span>
-<span id="cb29-76"><a href="#cb29-76" aria-hidden="true" tabindex="-1"></a>    records.append({</span>
-<span id="cb29-77"><a href="#cb29-77" aria-hidden="true" tabindex="-1"></a>        <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"IPW (logistic regression)"</span>, <span class="st">"depth"</span>: <span class="va">None</span>,</span>
-<span id="cb29-78"><a href="#cb29-78" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rmse"</span>: log_ipw_rmse,</span>
-<span id="cb29-79"><a href="#cb29-79" aria-hidden="true" tabindex="-1"></a>    })</span>
-<span id="cb29-80"><a href="#cb29-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-81"><a href="#cb29-81" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> pd.DataFrame(records)</span>
-<span id="cb29-82"><a href="#cb29-82" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-83"><a href="#cb29-83" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="bu">len</span>(n_grid), figsize<span class="op">=</span>(<span class="fl">3.0</span> <span class="op">*</span> <span class="bu">len</span>(n_grid), <span class="dv">4</span>), sharey<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb29-84"><a href="#cb29-84" aria-hidden="true" tabindex="-1"></a>colors <span class="op">=</span> {<span class="st">"riesztree"</span>: <span class="st">"#005f73"</span>, <span class="st">"IPW (regression tree)"</span>: <span class="st">"#bb3e03"</span>}</span>
-<span id="cb29-85"><a href="#cb29-85" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, n <span class="kw">in</span> <span class="bu">zip</span>(axes, n_grid):</span>
-<span id="cb29-86"><a href="#cb29-86" aria-hidden="true" tabindex="-1"></a>    sub <span class="op">=</span> res[res[<span class="st">"n_train"</span>] <span class="op">==</span> n]</span>
-<span id="cb29-87"><a href="#cb29-87" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> method, color <span class="kw">in</span> colors.items():</span>
-<span id="cb29-88"><a href="#cb29-88" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> sub[sub[<span class="st">"method"</span>] <span class="op">==</span> method].sort_values(<span class="st">"depth"</span>)</span>
-<span id="cb29-89"><a href="#cb29-89" aria-hidden="true" tabindex="-1"></a>        ax.plot(m[<span class="st">"depth"</span>], m[<span class="st">"rmse"</span>], <span class="st">"-o"</span>, color<span class="op">=</span>color, label<span class="op">=</span>method, linewidth<span class="op">=</span><span class="dv">2</span>)</span>
-<span id="cb29-90"><a href="#cb29-90" aria-hidden="true" tabindex="-1"></a>    log_rmse <span class="op">=</span> sub[sub[<span class="st">"method"</span>] <span class="op">==</span> <span class="st">"IPW (logistic regression)"</span>][<span class="st">"rmse"</span>].iloc[<span class="dv">0</span>]</span>
-<span id="cb29-91"><a href="#cb29-91" aria-hidden="true" tabindex="-1"></a>    ax.axhline(log_rmse, color<span class="op">=</span><span class="st">"black"</span>, linestyle<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"IPW (logistic, well-spec.)"</span>)</span>
-<span id="cb29-92"><a href="#cb29-92" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"n_train = </span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb29-93"><a href="#cb29-93" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"max_depth"</span>)</span>
-<span id="cb29-94"><a href="#cb29-94" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"oracle RMSE"</span> <span class="cf">if</span> n <span class="op">==</span> n_grid[<span class="dv">0</span>] <span class="cf">else</span> <span class="st">""</span>)</span>
-<span id="cb29-95"><a href="#cb29-95" aria-hidden="true" tabindex="-1"></a>    ax.set_yscale(<span class="st">"log"</span>)</span>
-<span id="cb29-96"><a href="#cb29-96" aria-hidden="true" tabindex="-1"></a>    ax.grid(alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb29-97"><a href="#cb29-97" aria-hidden="true" tabindex="-1"></a>axes[<span class="op">-</span><span class="dv">1</span>].legend(loc<span class="op">=</span><span class="st">"best"</span>, fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb29-98"><a href="#cb29-98" aria-hidden="true" tabindex="-1"></a>fig.tight_layout()</span>
-<span id="cb29-99"><a href="#cb29-99" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd, matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.tree <span class="im">import</span> DecisionTreeClassifier</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sample(n, seed):</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> rng.normal(<span class="fl">0.0</span>, <span class="fl">1.0</span>, size<span class="op">=</span>(n, <span class="dv">5</span>))</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>    logit <span class="op">=</span> <span class="fl">0.7</span> <span class="op">*</span> x[:, <span class="dv">0</span>] <span class="op">-</span> <span class="fl">0.3</span> <span class="op">*</span> x[:, <span class="dv">1</span>]</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>    pi <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> (<span class="fl">1.0</span> <span class="op">+</span> np.exp(<span class="op">-</span>logit))</span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> (rng.uniform(<span class="dv">0</span>, <span class="dv">1</span>, n) <span class="op">&lt;</span> pi).astype(<span class="bu">float</span>)</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> pd.DataFrame(x, columns<span class="op">=</span>[<span class="ss">f"x</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>)])</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>    df.insert(<span class="dv">0</span>, <span class="st">"a"</span>, a)</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>    df[<span class="st">"_pi"</span>] <span class="op">=</span> pi</span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> df</span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-20"><a href="#cb32-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-21"><a href="#cb32-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> truth_from(df):</span>
+<span id="cb32-22"><a href="#cb32-22" aria-hidden="true" tabindex="-1"></a>    pi <span class="op">=</span> df[<span class="st">"_pi"</span>].values</span>
+<span id="cb32-23"><a href="#cb32-23" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> df[<span class="st">"a"</span>].values</span>
+<span id="cb32-24"><a href="#cb32-24" aria-hidden="true" tabindex="-1"></a>    prob_a <span class="op">=</span> a <span class="op">*</span> pi <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> a) <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> pi)</span>
+<span id="cb32-25"><a href="#cb32-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="fl">2.0</span> <span class="op">*</span> a <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">/</span> prob_a</span>
+<span id="cb32-26"><a href="#cb32-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-27"><a href="#cb32-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-28"><a href="#cb32-28" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rmse(a, b):</span>
+<span id="cb32-29"><a href="#cb32-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.sqrt(np.mean((a <span class="op">-</span> b) <span class="op">**</span> <span class="dv">2</span>)))</span>
+<span id="cb32-30"><a href="#cb32-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-31"><a href="#cb32-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-32"><a href="#cb32-32" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ipw_with_estimator(clf, train, test):</span>
+<span id="cb32-33"><a href="#cb32-33" aria-hidden="true" tabindex="-1"></a>    feats <span class="op">=</span> [<span class="ss">f"x</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>)]</span>
+<span id="cb32-34"><a href="#cb32-34" aria-hidden="true" tabindex="-1"></a>    clf.fit(train[feats].values, train[<span class="st">"a"</span>].values.astype(<span class="bu">int</span>))</span>
+<span id="cb32-35"><a href="#cb32-35" aria-hidden="true" tabindex="-1"></a>    pi_hat <span class="op">=</span> np.clip(clf.predict_proba(test[feats].values)[:, <span class="dv">1</span>], <span class="fl">1e-3</span>, <span class="dv">1</span> <span class="op">-</span> <span class="fl">1e-3</span>)</span>
+<span id="cb32-36"><a href="#cb32-36" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> test[<span class="st">"a"</span>].values</span>
+<span id="cb32-37"><a href="#cb32-37" aria-hidden="true" tabindex="-1"></a>    prob_a <span class="op">=</span> a <span class="op">*</span> pi_hat <span class="op">+</span> (<span class="fl">1.0</span> <span class="op">-</span> a) <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> pi_hat)</span>
+<span id="cb32-38"><a href="#cb32-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="fl">2.0</span> <span class="op">*</span> a <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">/</span> prob_a</span>
+<span id="cb32-39"><a href="#cb32-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-40"><a href="#cb32-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-41"><a href="#cb32-41" aria-hidden="true" tabindex="-1"></a>depths <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">6</span>, <span class="dv">8</span>, <span class="dv">12</span>]</span>
+<span id="cb32-42"><a href="#cb32-42" aria-hidden="true" tabindex="-1"></a>n_grid <span class="op">=</span> [<span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">500</span>, <span class="dv">2000</span>, <span class="dv">8000</span>]</span>
+<span id="cb32-43"><a href="#cb32-43" aria-hidden="true" tabindex="-1"></a>covariates <span class="op">=</span> (<span class="st">"x0"</span>, <span class="st">"x1"</span>, <span class="st">"x2"</span>, <span class="st">"x3"</span>, <span class="st">"x4"</span>)</span>
+<span id="cb32-44"><a href="#cb32-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-45"><a href="#cb32-45" aria-hidden="true" tabindex="-1"></a>records <span class="op">=</span> []</span>
+<span id="cb32-46"><a href="#cb32-46" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> n_grid:</span>
+<span id="cb32-47"><a href="#cb32-47" aria-hidden="true" tabindex="-1"></a>    train <span class="op">=</span> sample(n, seed<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb32-48"><a href="#cb32-48" aria-hidden="true" tabindex="-1"></a>    test <span class="op">=</span> sample(<span class="dv">5</span> <span class="op">*</span> n, seed<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb32-49"><a href="#cb32-49" aria-hidden="true" tabindex="-1"></a>    truth <span class="op">=</span> truth_from(test)</span>
+<span id="cb32-50"><a href="#cb32-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-51"><a href="#cb32-51" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Logistic-regression IPW: a single horizontal reference (no depth knob).</span></span>
+<span id="cb32-52"><a href="#cb32-52" aria-hidden="true" tabindex="-1"></a>    log_ipw_alpha <span class="op">=</span> ipw_with_estimator(LogisticRegression(max_iter<span class="op">=</span><span class="dv">2000</span>), train, test)</span>
+<span id="cb32-53"><a href="#cb32-53" aria-hidden="true" tabindex="-1"></a>    log_ipw_rmse <span class="op">=</span> rmse(log_ipw_alpha, truth)</span>
+<span id="cb32-54"><a href="#cb32-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-55"><a href="#cb32-55" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> d <span class="kw">in</span> depths:</span>
+<span id="cb32-56"><a href="#cb32-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># riesztree at this depth.</span></span>
+<span id="cb32-57"><a href="#cb32-57" aria-hidden="true" tabindex="-1"></a>        est <span class="op">=</span> RieszTreeRegressor(</span>
+<span id="cb32-58"><a href="#cb32-58" aria-hidden="true" tabindex="-1"></a>            estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>covariates),</span>
+<span id="cb32-59"><a href="#cb32-59" aria-hidden="true" tabindex="-1"></a>            max_depth<span class="op">=</span>d, random_state<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb32-60"><a href="#cb32-60" aria-hidden="true" tabindex="-1"></a>        ).fit(train)</span>
+<span id="cb32-61"><a href="#cb32-61" aria-hidden="true" tabindex="-1"></a>        records.append({</span>
+<span id="cb32-62"><a href="#cb32-62" aria-hidden="true" tabindex="-1"></a>            <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"riesztree"</span>, <span class="st">"depth"</span>: d,</span>
+<span id="cb32-63"><a href="#cb32-63" aria-hidden="true" tabindex="-1"></a>            <span class="st">"rmse"</span>: rmse(est.predict(test), truth),</span>
+<span id="cb32-64"><a href="#cb32-64" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb32-65"><a href="#cb32-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># IPW-tree at this depth.</span></span>
+<span id="cb32-66"><a href="#cb32-66" aria-hidden="true" tabindex="-1"></a>        records.append({</span>
+<span id="cb32-67"><a href="#cb32-67" aria-hidden="true" tabindex="-1"></a>            <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"IPW (regression tree)"</span>, <span class="st">"depth"</span>: d,</span>
+<span id="cb32-68"><a href="#cb32-68" aria-hidden="true" tabindex="-1"></a>            <span class="st">"rmse"</span>: rmse(</span>
+<span id="cb32-69"><a href="#cb32-69" aria-hidden="true" tabindex="-1"></a>                ipw_with_estimator(</span>
+<span id="cb32-70"><a href="#cb32-70" aria-hidden="true" tabindex="-1"></a>                    DecisionTreeClassifier(max_depth<span class="op">=</span>d, min_samples_leaf<span class="op">=</span><span class="dv">10</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
+<span id="cb32-71"><a href="#cb32-71" aria-hidden="true" tabindex="-1"></a>                    train, test,</span>
+<span id="cb32-72"><a href="#cb32-72" aria-hidden="true" tabindex="-1"></a>                ),</span>
+<span id="cb32-73"><a href="#cb32-73" aria-hidden="true" tabindex="-1"></a>                truth,</span>
+<span id="cb32-74"><a href="#cb32-74" aria-hidden="true" tabindex="-1"></a>            ),</span>
+<span id="cb32-75"><a href="#cb32-75" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb32-76"><a href="#cb32-76" aria-hidden="true" tabindex="-1"></a>    records.append({</span>
+<span id="cb32-77"><a href="#cb32-77" aria-hidden="true" tabindex="-1"></a>        <span class="st">"n_train"</span>: n, <span class="st">"method"</span>: <span class="st">"IPW (logistic regression)"</span>, <span class="st">"depth"</span>: <span class="va">None</span>,</span>
+<span id="cb32-78"><a href="#cb32-78" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rmse"</span>: log_ipw_rmse,</span>
+<span id="cb32-79"><a href="#cb32-79" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb32-80"><a href="#cb32-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-81"><a href="#cb32-81" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> pd.DataFrame(records)</span>
+<span id="cb32-82"><a href="#cb32-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-83"><a href="#cb32-83" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="bu">len</span>(n_grid), figsize<span class="op">=</span>(<span class="fl">3.0</span> <span class="op">*</span> <span class="bu">len</span>(n_grid), <span class="dv">4</span>), sharey<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb32-84"><a href="#cb32-84" aria-hidden="true" tabindex="-1"></a>colors <span class="op">=</span> {<span class="st">"riesztree"</span>: <span class="st">"#005f73"</span>, <span class="st">"IPW (regression tree)"</span>: <span class="st">"#bb3e03"</span>}</span>
+<span id="cb32-85"><a href="#cb32-85" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, n <span class="kw">in</span> <span class="bu">zip</span>(axes, n_grid):</span>
+<span id="cb32-86"><a href="#cb32-86" aria-hidden="true" tabindex="-1"></a>    sub <span class="op">=</span> res[res[<span class="st">"n_train"</span>] <span class="op">==</span> n]</span>
+<span id="cb32-87"><a href="#cb32-87" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> method, color <span class="kw">in</span> colors.items():</span>
+<span id="cb32-88"><a href="#cb32-88" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> sub[sub[<span class="st">"method"</span>] <span class="op">==</span> method].sort_values(<span class="st">"depth"</span>)</span>
+<span id="cb32-89"><a href="#cb32-89" aria-hidden="true" tabindex="-1"></a>        ax.plot(m[<span class="st">"depth"</span>], m[<span class="st">"rmse"</span>], <span class="st">"-o"</span>, color<span class="op">=</span>color, label<span class="op">=</span>method, linewidth<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb32-90"><a href="#cb32-90" aria-hidden="true" tabindex="-1"></a>    log_rmse <span class="op">=</span> sub[sub[<span class="st">"method"</span>] <span class="op">==</span> <span class="st">"IPW (logistic regression)"</span>][<span class="st">"rmse"</span>].iloc[<span class="dv">0</span>]</span>
+<span id="cb32-91"><a href="#cb32-91" aria-hidden="true" tabindex="-1"></a>    ax.axhline(log_rmse, color<span class="op">=</span><span class="st">"black"</span>, linestyle<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"IPW (logistic, well-spec.)"</span>)</span>
+<span id="cb32-92"><a href="#cb32-92" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"n_train = </span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb32-93"><a href="#cb32-93" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"max_depth"</span>)</span>
+<span id="cb32-94"><a href="#cb32-94" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"oracle RMSE"</span> <span class="cf">if</span> n <span class="op">==</span> n_grid[<span class="dv">0</span>] <span class="cf">else</span> <span class="st">""</span>)</span>
+<span id="cb32-95"><a href="#cb32-95" aria-hidden="true" tabindex="-1"></a>    ax.set_yscale(<span class="st">"log"</span>)</span>
+<span id="cb32-96"><a href="#cb32-96" aria-hidden="true" tabindex="-1"></a>    ax.grid(alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb32-97"><a href="#cb32-97" aria-hidden="true" tabindex="-1"></a>axes[<span class="op">-</span><span class="dv">1</span>].legend(loc<span class="op">=</span><span class="st">"best"</span>, fontsize<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb32-98"><a href="#cb32-98" aria-hidden="true" tabindex="-1"></a>fig.tight_layout()</span>
+<span id="cb32-99"><a href="#cb32-99" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -2177,8 +2225,8 @@ L(\hat\alpha_n) - L(\bar\alpha_n) \;\xrightarrow{P}\; 0.
 </ol>
 <p>The held-out depth that minimises RMSE for <code>riesztree</code> typically sits in the 4–8 range; deeper trees overfit. Tune via <a href="#sec-sklearn">GridSearchCV</a> in practice.</p>
 </section>
-<section id="sharp-edges" class="level2" data-number="14">
-<h2 data-number="14" class="anchored" data-anchor-id="sharp-edges"><span class="header-section-number">14</span> Sharp edges</h2>
+<section id="sharp-edges" class="level2" data-number="16">
+<h2 data-number="16" class="anchored" data-anchor-id="sharp-edges"><span class="header-section-number">16</span> Sharp edges</h2>
 <ul>
 <li><strong>High variance.</strong> A single tree’s RMSE is materially higher than a tuned forest or booster on the same DGP. Use this learner for interpretability or when the dependency footprint matters; otherwise pick <code>forestriesz</code> or <code>rieszboost</code>.</li>
 <li><strong>No confidence intervals in v1.</strong> Honest splits are not implemented.</li>
