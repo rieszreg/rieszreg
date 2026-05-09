@@ -90,6 +90,54 @@ After Phases 2-10 + the paired `rieszreg` augmentation-vectorize fix:
 
 (`hist` splitter, with the rieszreg augmentation fast path active.)
 
+## Exact splitter — Cython iterative driver (post-Phases-1–10)
+
+`splitter='exact'` previously drove the depthwise recursion in Python,
+calling into the Cython per-feature splitter once per (leaf × feature).
+Profiles at unlimited depth showed ~45% of `fit` time in
+`np.ascontiguousarray` and ~24% in the Python facade
+`best_split_continuous_fast` — both per-leaf overhead with no actual
+work content. A new Cython iterative driver
+([`fast/_grow_exact_c.pyx`](python/riesztree/fast/_grow_exact_c.pyx))
+mirrors the histogram path's `grow_depthwise_hist_c`: the depthwise
+worklist runs entirely inside Cython, sorts each (leaf × feature)
+slice via an in-Cython quicksort on a pre-allocated scratch buffer,
+and partitions an in-place index array per split. The Python recursion,
+the per-call `np.ascontiguousarray`, and the per-call numpy roundtrips
+(argsort / cumsum / take) are all eliminated.
+
+Eligibility: `splitter='exact'` AND no categorical features AND no
+`max_features` subsampling AND no early stopping AND no validation set
+AND a built-in (Squared / KL / Bernoulli / BoundedSquared) loss. Other
+configurations keep the existing Python recursion in
+[`riesztree/grow.py`](python/riesztree/grow.py).
+
+Single-tree exact, n=5000 × p=5, ATE / SquaredLoss:
+
+| Cell | Pre-fix | Post-fix | Speedup |
+|---|---|---|---|
+| `fit, depth=8` | 0.043 s | **0.022 s** | 2.0× |
+| `fit, depth=None` | 0.464 s | **0.050 s** | **9.3×** |
+| Depth-scaling (8 → None) | 10.8× | **2.3×** | matches sklearn (1.6×) |
+
+`AugForestRieszRegressor(exact)` at n=5000 × p=5 × n_est=100, n_jobs=-1
+(single-process forest joblib pool, sklearn / hist comparators on the
+same machine):
+
+| Library | depth=8 | depth=None | Depth-scale |
+|---|---|---|---|
+| AugForest(exact) — pre-fix | 0.64 s | 4.20 s | 6.5× |
+| **AugForest(exact) — post-fix** | **0.37 s** | **0.90 s** | **2.4×** |
+| AugForest(hist) | 0.21 s | 0.73 s | 3.4× |
+| sklearn-RandomForestRegressor | 0.19 s | 0.30 s | 1.6× |
+
+The depth-scaling factor for AugForest(exact) collapsed from 6.5× to
+2.4× — now better than the hist path (3.4×) and within striking
+distance of sklearn-RF (1.6×). At depth=None the absolute time
+improved from 4.20 s → 0.90 s (**4.7× speedup**). The remaining gap
+to sklearn-RF is the augmentation factor (n_aug = 2n for ATE) plus
+the joblib overhead for 100 trees, neither of which is splitter-side.
+
 ## Comparison vs state-of-the-art tree libraries (`bench_compare.py`)
 
 After Phases 1–10 + PMS + iterative-grow Cython + histogram buffer pool. `(n_aug=100k, p=20, depth=16)`, fully-grown trees, single fit each:

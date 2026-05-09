@@ -471,6 +471,38 @@ def grow_depthwise(
         )
         return node_from_growable_flat_tree(growable, loss=loss)
 
+    # Iterative-grow Cython driver for the *exact* splitter. Mirrors the
+    # histogram path's eligibility (no categoricals, no max_features
+    # subsampling, no early stopping, no validation set) and additionally
+    # restricts to the four built-in losses (the user-cfunc dispatch isn't
+    # wired through this driver yet).
+    exact_cython_iterative_eligible = (
+        splitter == "exact"
+        and not categorical_features
+        and n_features_to_consider == n_features
+        and early_stopping_rounds is None
+        and aug_valid is None
+        and fast_loss_kind is not None
+        and fast_loss_kind in (0, 1, 2, 3)  # built-ins; LOSS_USER_CFUNC == -1
+    )
+    if exact_cython_iterative_eligible:
+        from .fast._grow_exact_c import grow_depthwise_exact_c
+        from .fast._tree import node_from_growable_flat_tree
+        features_c = np.ascontiguousarray(features, dtype=np.float64)
+        D_c = np.ascontiguousarray(D, dtype=np.float64)
+        C_c = np.ascontiguousarray(C, dtype=np.float64)
+        growable = grow_depthwise_exact_c(
+            features_c, D_c, C_c,
+            int(max_depth),
+            int(min_samples_split),
+            int(eff_min_orig_leaf),
+            float(min_impurity_decrease),
+            int(fast_loss_kind),
+            float(bounded_lo),
+            float(bounded_hi),
+        )
+        return node_from_growable_flat_tree(growable, loss=loss)
+
     if pms_eligible:
         _recurse_pms_depthwise(
             root, np.arange(features.shape[0]),
