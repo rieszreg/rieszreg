@@ -249,6 +249,8 @@ Mirrors [`sklearn.ensemble.RandomForestRegressor`](https://scikit-learn.org/stab
 | `max_bins` | 255 | Histogram-splitter bin count. |
 | `categorical_features` | None | Column indices treated as integer category labels. |
 
+When `splitter="hist"` and the configuration is "simple" (no categoricals, no `max_features` subsampling, no `ccp_alpha`, no leaf-count cap, built-in loss), the bin mapper is fitted **once** on the full augmented training data and the binned matrix is shared across joblib workers — sklearn-`HistGradientBoostingRegressor` convention. The win is largest at shallow depths where per-tree binning dominates tree-build wall time (~2× speedup at `max_depth=8`).
+
 ### `ForestRieszRegressor`
 
 Forwarded to EconML's `BaseGRF`:

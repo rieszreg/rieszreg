@@ -138,6 +138,35 @@ improved from 4.20 s → 0.90 s (**4.7× speedup**). The remaining gap
 to sklearn-RF is the augmentation factor (n_aug = 2n for ATE) plus
 the joblib overhead for 100 trees, neither of which is splitter-side.
 
+## Histogram splitter — shared bin mapper across the forest
+
+`AugForestRieszBackend(splitter='hist')` previously called
+`fit_bin_mapper + transform` once per tree (inside
+`RieszTreeBackend.fit_augmented`). For `n_estimators=100` that's 100
+quantile-binning passes on near-identical data. The cost dominates at
+shallow depths where each tree-build is short.
+
+The forest now detects "simple" hist configurations (no categoricals,
+default `max_features`, no `ccp_alpha`, no leaf-count cap, built-in
+loss) and fits the bin mapper **once** on the full augmented training
+data, broadcasting the binned matrix + thresholds to each joblib
+worker. Each worker still slices its bootstrap subsample and grows a
+tree, but the per-tree binning is gone. Same convention as
+`sklearn.ensemble.HistGradientBoostingRegressor`.
+
+`AugForestRieszRegressor(hist)` at n=5000 × p=5 × n_est=100, n_jobs=-1:
+
+| Cell | Pre-fix (per-tree binning) | Post-fix (shared mapper) | Speedup |
+|---|---|---|---|
+| `fit, depth=8` | 0.21 s | **0.10 s** | **2.1×** |
+| `fit, depth=None` | 0.73 s | **0.65 s** | 1.1× |
+
+The win is largest at shallow depth where binning dominates. At
+unlimited depth the actual tree-build dominates and the savings are
+marginal (~10%). The exact-splitter path is unchanged — it has no
+per-tree shared work to amortise (the per-tree iterative Cython driver
+from the previous section already does the structural work in C).
+
 ## Comparison vs state-of-the-art tree libraries (`bench_compare.py`)
 
 After Phases 1–10 + PMS + iterative-grow Cython + histogram buffer pool. `(n_aug=100k, p=20, depth=16)`, fully-grown trees, single fit each:

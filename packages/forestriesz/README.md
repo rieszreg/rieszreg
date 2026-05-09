@@ -143,6 +143,8 @@ An ensemble of `riesztree.RieszTreeBackend` instances. For each tree, original-r
 
 Augmented rows carry weights $D_r$ (1 if $z_r$ is the original observation, 0 otherwise) and $C_r$ (the trace coefficient at $z_r$). The empirical Bregman-Riesz loss decomposes as $\sum_r [D_r \tilde h(\alpha(z_r)) + C_r h'(\alpha(z_r))]$, so each leaf has a closed-form per-loss optimum. For ATE the per-leaf solve recovers $1/\hat P(A=a \mid X\text{-leaf})$; for AdditiveShift it recovers a local density-ratio estimator. No user-supplied basis functions are needed — the augmented row weights already vary per row.
 
+When `splitter="hist"` on "simple" configurations (no categoricals, default `max_features`, no `ccp_alpha`, no leaf cap, built-in loss), the bin mapper is fitted once on the full augmented training data and reused across joblib workers — `sklearn.ensemble.HistGradientBoostingRegressor` convention. Saves `n_estimators - 1` repeats of `fit_bin_mapper + transform`. The win is largest at shallow depths where per-tree binning dominates tree-build cost (~2× faster at `max_depth=8`).
+
 ### Moment-style: `ForestRieszBackend` (`MomentBackend.fit_rows`)
 
 Per-row moments $m(\varphi)(Z_i, Y_i)$ are computed from `rieszreg.trace(estimand, Z_i)` for each user-supplied basis function $\varphi_j$ and packed into EconML's linear-moment slot:
