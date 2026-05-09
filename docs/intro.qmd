@@ -172,7 +172,7 @@ Riesz regression with the squared loss is a standard regression problem. Differe
 
 - **[Gradient boosting](backends/boosting.qmd)** — the standard tool for tabular data. `rieszboost` plugs the per-row gradient and Hessian into xgboost's custom-objective interface. Hyperparameters that work for outcome models transfer.
 - **[Kernel ridge regression](backends/kernel.qmd)** — closed form on small / medium data. `krrr` solves the linear system per $\lambda$; no boosting iterations.
-- **[Random forests](backends/forest.qmd)** — non-parametric and well-suited to many covariates. `forestriesz` ships two flavors built on EconML's GRF: a moment-style fit with honest-split confidence intervals, and an augmentation-style fit that handles every estimand (including custom ones) without a sieve.
+- **[Random forests](backends/forest.qmd)** — non-parametric and well-suited to many covariates. `forestriesz` ships two flavors: an augmentation-style fit that works on every estimand (including custom ones) without per-estimand configuration, and a moment-style fit with honest-split confidence intervals on `ATE`, `ATT`, and `TSM`.
 - **[Neural networks](backends/neural.qmd)** — `riesznet` trains the Riesz loss with PyTorch autograd; the same MLP / custom-`nn.Module` story you get from any neural regressor.
 
 The four learner families produce different $\hat\alpha$, but all are minimizers of the same population objective and converge to $\alpha$ under their respective consistency conditions.

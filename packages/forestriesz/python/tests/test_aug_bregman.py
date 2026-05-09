@@ -1,10 +1,8 @@
 """AugForestRieszRegressor with non-quadratic Bregman losses.
 
-The augmentation-style backend handles all four built-in losses by post-hoc
-replacing each leaf's stored θ with the per-leaf Newton optimum. Tree
-structure is still chosen by the squared-loss MSE criterion — splits that
-maximize variance reduction in -B/(2A) also separate the monotonically-
-related Bregman optima well in practice.
+The augmentation-style backend handles all four built-in losses via the
+riesztree-backed loss-aware splitter — no post-hoc Newton, no per-loss
+configuration on the forest side.
 """
 
 from __future__ import annotations
@@ -17,7 +15,6 @@ from rieszreg import (
     BernoulliLoss,
     BoundedSquaredLoss,
     KLLoss,
-    SquaredLoss,
 )
 from rieszreg.testing import dgps
 
@@ -26,59 +23,6 @@ from forestriesz import (
     ATE,
     TSM,
 )
-
-
-# ---- closed-form / Newton solver unit tests -------------------------------
-
-
-def test_solver_closed_form_squared_matches_minus_C_over_D():
-    """For squared loss the per-leaf optimum is exactly -ΣC/ΣD; one Newton step."""
-    from forestriesz._leaf_solver import solve_leaf_bregman
-
-    is_original = np.array([1.0, 1.0, 0.0, 0.0])
-    pdc = np.array([0.0, 0.0, -1.0, +1.0])
-    phi = np.ones((4, 1))
-    theta = solve_leaf_bregman(SquaredLoss(), is_original, pdc, phi)
-    expected = -pdc.sum() / is_original.sum()
-    np.testing.assert_allclose(theta[0], expected, atol=1e-8)
-
-
-def test_solver_kl_recovers_log_minus_C_over_D():
-    """For KLLoss the per-leaf optimum satisfies α = -ΣC/ΣD; η = log(α)."""
-    from forestriesz._leaf_solver import solve_leaf_bregman
-
-    is_original = np.array([2.0, 3.0, 0.0])
-    pdc = np.array([0.0, 0.0, -4.0])     # C ≤ 0 (KLLoss requirement)
-    phi = np.ones((3, 1))
-    theta = solve_leaf_bregman(KLLoss(), is_original, pdc, phi)
-    expected_alpha = -pdc.sum() / is_original.sum()    # 4 / 5 = 0.8
-    expected_eta = np.log(expected_alpha)
-    np.testing.assert_allclose(theta[0], expected_eta, atol=1e-6)
-
-
-def test_solver_bernoulli_recovers_logit_minus_C_over_D():
-    """For BernoulliLoss the per-leaf optimum satisfies α = -ΣC/ΣD; η = logit(α)."""
-    from forestriesz._leaf_solver import solve_leaf_bregman
-
-    is_original = np.array([5.0, 5.0, 0.0])
-    pdc = np.array([0.0, 0.0, -2.0])     # α* = 2/10 · 2 = 0.4 ∈ (0, 1)... see below
-    phi = np.ones((3, 1))
-    theta = solve_leaf_bregman(BernoulliLoss(), is_original, pdc, phi)
-    p = -pdc.sum() / is_original.sum()
-    expected_eta = np.log(p / (1.0 - p))
-    np.testing.assert_allclose(theta[0], expected_eta, atol=1e-6)
-
-
-def test_solver_handles_empty_leaf():
-    """Empty leaf returns the init θ (= 0 by default)."""
-    from forestriesz._leaf_solver import solve_leaf_bregman
-
-    is_original = np.array([])
-    pdc = np.array([])
-    phi = np.zeros((0, 1))
-    theta = solve_leaf_bregman(SquaredLoss(), is_original, pdc, phi)
-    assert theta.shape == (1,)
-    assert theta[0] == 0.0
 
 
 # ---- end-to-end: predictions stay in the loss's natural domain ------------
@@ -94,7 +38,10 @@ def df_binary():
     return pd.DataFrame({"a": a, "x": x}), x, pi, a
 
 
-def test_kl_loss_predictions_strictly_positive(df_binary):
+def test_kl_loss_predictions_in_natural_domain(df_binary):
+    """KL's natural α-domain is the non-negative reals. TSM's truth attains
+    α₀ = 0 at A=0 inputs, so a correctly fit forest should return values in
+    the closure of the natural domain (≥ 0)."""
     df, _, _, _ = df_binary
     est = AugForestRieszRegressor(
         estimand=TSM(level=1),
@@ -106,11 +53,14 @@ def test_kl_loss_predictions_strictly_positive(df_binary):
     est.fit(df)
     pred = est.predict(df)
     assert pred.shape == (len(df),)
-    assert np.all(pred > 0), "KLLoss must produce strictly positive α̂"
+    assert np.all(pred >= 0)
     assert np.all(np.isfinite(pred))
+    assert np.any(pred > 0)
 
 
-def test_bernoulli_loss_predictions_in_unit_interval(df_binary):
+def test_bernoulli_loss_predictions_in_natural_domain(df_binary):
+    """Bernoulli's natural α-domain is [0, 1]. TSM's truth attains α₀ = 0 at
+    A=0 inputs, so values at the lower boundary are expected."""
     df, _, _, _ = df_binary
     est = AugForestRieszRegressor(
         estimand=TSM(level=1),
@@ -121,7 +71,8 @@ def test_bernoulli_loss_predictions_in_unit_interval(df_binary):
     )
     est.fit(df)
     pred = est.predict(df)
-    assert np.all((pred > 0) & (pred < 1)), "BernoulliLoss must produce α̂ ∈ (0, 1)"
+    assert np.all((pred >= 0) & (pred <= 1))
+    assert np.any((pred > 0) & (pred < 1))
 
 
 def test_bounded_squared_predictions_in_bounds(df_binary):
@@ -165,7 +116,7 @@ def test_kl_converges_to_truth_on_tsm():
     assert rmses[-1] < rmses[0] * 1.5
 
 
-# ---- save/load round-trips the leaf_eta_table ----------------------------
+# ---- save/load round-trips through the per-tree predictor.json files ------
 
 
 def test_save_load_round_trip_preserves_kl_predictions(tmp_path, df_binary):
@@ -186,5 +137,3 @@ def test_save_load_round_trip_preserves_kl_predictions(tmp_path, df_binary):
     loaded = AugForestRieszRegressor.load(save_dir)
     pred_after = loaded.predict(df)
     np.testing.assert_allclose(pred_before, pred_after, atol=1e-12)
-
-

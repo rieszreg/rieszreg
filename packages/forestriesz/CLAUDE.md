@@ -1,14 +1,19 @@
 # forestriesz
 
-Random-forest backend for the [RieszReg meta-package](../README.md), implementing [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf) for the full set of estimands the rieszreg framework supports.
+Random-forest backends for the [RieszReg meta-package](../README.md). Two flavors:
 
-This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `forestriesz` contributes:
+- An augmentation-style ensemble of `riesztree.RieszTreeBackend` instances over block-bootstrapped augmented rows, with sklearn `RandomForestRegressor`-style hyperparameters and loss-aware splits. Works on every estimand without per-estimand configuration.
+- A moment-style implementation of [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf) on top of EconML's GRF, with honest-split confidence intervals on `ATE` / `ATT` / `TSM`.
 
-- `ForestRieszBackend` — `MomentBackend` Protocol implementation (the moment-style entry point added in the rieszreg refactor that ships with this package). Computes per-row moments via `rieszreg.trace` and packs them into EconML's linear-moment GRF.
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `Backend` / `MomentBackend` Protocols, `Diagnostics`, `RieszEstimator` orchestrator, `trace`, `AugmentedDataset`) and on `riesztree` for the per-tree augmented learner. See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `forestriesz` contributes:
+
+- `AugForestRieszBackend` — `Backend.fit_augmented` Protocol implementation. Ensemble of `riesztree.RieszTreeBackend` instances over block-bootstrapped augmented rows; each tree fits a loss-aware splitter directly on the augmented dataset. Works on every estimand without per-estimand configuration. Supports all four built-in Bregman losses.
+- `AugForestRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with sklearn `RandomForestRegressor`-style hyperparameters (`n_estimators`, `max_depth`, `min_samples_leaf`, `min_samples_split`, `max_features`, `bootstrap`, `max_samples`, `n_jobs`, `splitter`, `max_bins`, `categorical_features`, ...).
+- `ForestRieszBackend` — `MomentBackend.fit_rows` Protocol implementation. Computes per-row moments via `rieszreg.trace` and packs them into EconML's linear-moment GRF.
 - `ForestRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with forest-specific hyperparameters (`n_estimators`, `max_depth`, `min_samples_leaf`, `honest`, `inference`, `l2`, `riesz_feature_fns`, ...) on the constructor.
-- `default_riesz_features(estimand)` — sensible sieves for built-in estimands (treatment indicators).
-- `predict_interval(X, alpha)` — honest-split confidence intervals for the locally constant / single-basis sieve case.
-- R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
+- `default_riesz_features(estimand)` — defaults for the moment-style backend's `riesz_feature_fns` for built-in estimands (treatment indicators).
+- `predict_interval(X, alpha)` — honest-split confidence intervals on the moment-style backend for the locally constant / single-basis case.
+- R6 wrapper subclassing `rieszreg::RieszEstimatorR6` (moment-style only).
 
 ## Living-doc rule (README + meta-project docs)
 
@@ -39,9 +44,9 @@ R-side mirrors this: R6 classes (`ForestRieszRegressor$new(estimand=, n_estimato
 
 ## Layout
 
-- `python/forestriesz/` — `ForestRieszBackend`, `_RieszGRF` (BaseGRF subclass), `ForestRieszRegressor` convenience class, `ForestPredictor`, `default_riesz_features`. `pyproject.toml` declares `econml>=0.15`, `rieszreg>=0.0.1` as dependencies.
+- `python/forestriesz/` — `AugForestRieszBackend` / `AugForestRieszRegressor` / `AugForestPredictor` (augmentation-style; built on `riesztree.RieszTreeBackend`), `ForestRieszBackend` / `ForestRieszRegressor` / `ForestPredictor` / `_RieszGRF` (moment-style; built on EconML's BaseGRF), `default_riesz_features`. `pyproject.toml` declares `econml>=0.15`, `rieszreg>=0.0.1`, `riesztree>=0.0.1` as dependencies.
 - `r/forestriesz/` — R6 wrapper via reticulate. `ForestRieszRegressor` subclasses `rieszreg::RieszEstimatorR6` (~80 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE.
-- `examples/` — runnable demonstrations of each feature (ATE, TSM with intervals).
+- `examples/` — runnable demonstrations of each feature (ATE, TSM with intervals; AdditiveShift on the augmented backend).
 
 ## Run tests
 
@@ -62,16 +67,18 @@ Rscript -e '
 
 ## Architecture notes
 
-### Dependency on rieszreg
+### Dependency on rieszreg and riesztree
 
 `forestriesz` depends on `rieszreg` and reuses, without modification:
 
-- `Estimand`, `Tracer`/`LinearForm`, `trace` — the moment-functional abstraction. Forest backends use `trace` directly to compute per-row moments without going through `Estimand.augment`.
-- `Loss`, `SquaredLoss` — the Bregman-Riesz loss framework. (KLLoss / Bernoulli / BoundedSquared are NOT yet supported by the forest backend; v2.)
+- `Estimand`, `Tracer`/`LinearForm`, `trace`, `AugmentedDataset` — moment-functional / augmentation abstractions. The moment-style backend uses `trace` directly to compute per-row moments. The augmentation-style backend consumes the precomputed `AugmentedDataset` from the orchestrator.
+- `Loss`, `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` — the Bregman-Riesz loss framework. The augmentation-style backend supports all four; the moment-style backend supports `SquaredLoss` only (v2 will extend it).
 - `Diagnostics`, `diagnose` — base diagnostics (`ForestDiagnostics` extends with feature importance, leaf-size summary).
-- `RieszEstimator` — orchestration; `ForestRieszRegressor` is a thin subclass with the forest backend defaulted.
+- `RieszEstimator` — orchestration; `ForestRieszRegressor` and `AugForestRieszRegressor` are thin subclasses with their respective backends defaulted.
 
-The integration point is `rieszreg`'s `MomentBackend` Protocol (`rieszreg/backends/base.py`) — the moment-style alternative to `Backend`. `ForestRieszBackend.fit_rows(...)` consumes raw rows + the estimand and returns a `FitResult`. `ForestPredictor` registers itself for the registry-based save/load path on import via `register_predictor_loader("forestriesz", ...)`.
+The augmentation-style backend additionally depends on `riesztree`'s `RieszTreeBackend` (consumed via the `Backend.fit_augmented` Protocol) — each forest tree is one riesztree fit on a block-bootstrapped subsample.
+
+The integration points are `rieszreg`'s `Backend` and `MomentBackend` Protocols (`rieszreg/backends/base.py`). `AugForestRieszBackend.fit_augmented(...)` consumes the precomputed `AugmentedDataset`; `ForestRieszBackend.fit_rows(...)` consumes raw rows + the estimand. Both return a `FitResult`. The respective predictors register themselves on import via `register_predictor_loader("aug-forestriesz", ...)` and `register_predictor_loader("forestriesz", ...)`.
 
 ### Moment-path packing for EconML's BaseGRF
 
@@ -100,19 +107,31 @@ For all built-in estimands, `m(W; 1) = Σ coef` in the trace doesn't depend on W
 
 ### What's lazy-imported
 
-`econml` is imported eagerly because the BaseGRF subclass is constructed at fit time. There are no truly optional heavy deps in v1.
+`econml` and `riesztree` are imported eagerly. There are no truly optional heavy deps in v1.
 
 ## What works today (v0.0.1)
 
-- **`ForestRieszRegressor(BaseEstimator)`** — sklearn-compatible. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`. Same `fit / predict / score / diagnose` surface as `RieszBooster` and `KernelRieszRegressor`.
-- **All five built-in estimands** via the rieszreg re-exports: `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`. Custom `FiniteEvalEstimand`s also work; for difference-style functionals supply your own `riesz_feature_fns`. `StochasticIntervention` is currently stubbed in rieszreg and will be reintroduced.
-- **Default sieve auto-resolution**: `riesz_feature_fns="auto"` (the default) picks `[1{T=0}, 1{T=1}]` for ATE/ATT, `[1{T=level}]` for TSM, falling back to constant for custom estimands.
-- **Honest-split confidence intervals** via `predict_interval(X, alpha)` for single-basis fits.
-- **Loss**: `SquaredLoss` only (closed-form per-leaf solve). KLLoss / BernoulliLoss / BoundedSquaredLoss raise `NotImplementedError`; planned for v2.
-- **Save / load**: directory format with JSON metadata + joblib forest. Built-in estimands round-trip automatically (sieve re-resolves on load); custom sieves require repassing callables.
-- **Diagnostics**: `ForestDiagnostics` extends `rieszreg.Diagnostics` with feature importance, mean leaf size, leaf count per tree.
-- **R wrapper**: R6 mirror via reticulate. Single-basis fits only.
-- **34 Python tests** covering: Protocol satisfaction, all six built-in estimands, locally linear sieve correctness, single-leaf closed-form check, sklearn integration (clone, GridSearchCV, cross_val_predict), save/load round-trip, predict_interval (TSM single-basis works; ATE multi-basis raises), constant-basis degeneracy detection, NotImplementedError for non-squared losses.
+### Augmentation-style (`AugForestRieszRegressor`)
+
+- sklearn `RandomForestRegressor`-style hyperparameters. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`.
+- Works on every built-in estimand (`ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`) and any user-defined `FiniteEvalEstimand` without per-estimand configuration.
+- Supports all four built-in Bregman losses (`SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`) via riesztree's loss-aware splitter dispatch.
+- Save / load: per-tree subdir format. Round-trips without any extra arguments.
+- No CIs in v1.
+
+### Moment-style (`ForestRieszRegressor`)
+
+- sklearn-compatible. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`. Same `fit / predict / score / diagnose` surface as `RieszBooster` and `KernelRieszRegressor`.
+- All five built-in estimands. Custom `FiniteEvalEstimand`s also work; for difference-style functionals supply your own `riesz_feature_fns`. `StochasticIntervention` is currently stubbed in rieszreg and will be reintroduced.
+- Default `riesz_feature_fns` resolution: `riesz_feature_fns="auto"` (the default) picks `[1{A=0}, 1{A=1}]` for ATE/ATT, `[1{A=level}]` for TSM, falling back to constant for custom estimands.
+- Honest-split confidence intervals via `predict_interval(X, alpha)` for single-basis fits.
+- Loss: `SquaredLoss` only (closed-form per-leaf solve). KLLoss / BernoulliLoss / BoundedSquaredLoss raise `NotImplementedError`; planned for v2.
+- Save / load: directory format with JSON metadata + joblib forest. Built-in estimands round-trip automatically; custom `riesz_feature_fns` require repassing callables.
+- R wrapper: R6 mirror via reticulate. Single-basis fits only.
+
+### Shared
+
+- `ForestDiagnostics` extends `rieszreg.Diagnostics` with feature importance, mean leaf size, leaf count per tree (moment-style).
 
 ## Known sharp edges
 

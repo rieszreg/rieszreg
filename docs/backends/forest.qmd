@@ -4,63 +4,68 @@ title: "Forest backend (forestriesz)"
 
 {{< include ../_setup.qmd >}}
 
-`forestriesz` ships two backends, both built on EconML's `BaseGRF` (the same Cython criterion the paper authors used):
+`forestriesz` ships two random-forest backends. They differ in whether the user has to make per-estimand modeling choices to fit the model.
 
-- **`ForestRieszRegressor`** — moment-style. Implements [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (ICML 2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf). Trains the GRF on the n original rows; needs a sieve (auto-resolved for ATE/ATT/TSM). Supports `predict_interval` for single-basis fits.
-- **`AugForestRieszRegressor`** — augmentation-style. Trains the GRF on the M = k·n augmented `(a, b)` evaluation points produced by `Estimand.augment`. **Estimand-agnostic** — works on every built-in estimand and any custom user `Estimand` without a sieve. The combination of GRF + augmented data appears to be novel; see [How they differ](#how-they-differ) below.
+- **`AugForestRieszRegressor`** — augmentation-style. An ensemble of single-tree Riesz regressors fit on the augmented dataset of evaluation points $z_r$ with weights $(D_r, C_r)$ that `Estimand.augment` produces. Each tree uses sklearn-standard hyperparameters and a loss-aware splitter that handles every built-in Bregman loss directly. **Works on every estimand without per-estimand configuration** — built-in estimands (`ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`) and any user-defined `Estimand` use the same call.
+- **`ForestRieszRegressor`** — moment-style. Implements [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (ICML 2022)](https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf). To fit the model the user must supply a list of basis functions of the data — the `riesz_feature_fns` parameter — that the forest combines linearly inside each leaf. The required list is per-estimand: `ATE`, `ATT`, and `TSM` get reasonable defaults from `riesz_feature_fns="auto"`, but other estimands need a user-constructed list. Supports honest-split confidence intervals via `predict_interval` for single-basis fits.
 
-`rieszreg` exposes the two entry points as `MomentBackend.fit_rows` and `Backend.fit_augmented` respectively.
+`rieszreg` exposes the two entry points as `Backend.fit_augmented` and `MomentBackend.fit_rows` respectively.
 
 ## How they work
 
-### Moment-style (`ForestRieszRegressor`)
-
-In each leaf $\ell$ the per-leaf parameter $\theta_\ell$ solves the linear-moment equation
-
-$$
-\hat\theta_\ell = \big(\textstyle\sum_{i\in\ell} \varphi(W_i)\,\varphi(W_i)^{\top}\big)^{-1}
-                 \textstyle\sum_{i\in\ell} m(W_i;\,\varphi),
-$$
-
-and predictions are $\hat\alpha(z) = \hat\theta(z_{\text{split}}) \cdot \varphi(z)$. The MSE splitting criterion picks splits to minimize the sum of in-leaf residuals against this leaf optimum.
-
-The user-supplied basis $\varphi = (\varphi_1, \dots, \varphi_p)$ controls expressivity. The default `riesz_feature_fns="auto"` picks a sensible sieve for built-in estimands:
-
-| Estimand | Default sieve | Effect |
-|---|---|---|
-| `ATE`, `ATT` | `[1{T=0}, 1{T=1}]` | Forest splits on covariates only; sieve resolves treatment in each leaf. |
-| `TSM(level=v)` | `[1{T=v}]` | Single-basis sieve; intervals supported. |
-| `AdditiveShift`, `LocalShift`, custom | none | Constant basis is row-degenerate; raises with a hint. Use `AugForestRieszRegressor` instead. |
-
 ### Augmentation-style (`AugForestRieszRegressor`)
 
-The augmentation engine produces M = k·n evaluation points $z_k$ with coefficients $(a_k, b_k)$ such that the squared Riesz loss is $\sum_k a_k\,\alpha(z_k)^2 + b_k\,\alpha(z_k)$. Per *augmented* row:
+For each original row $i$, `Estimand.augment` emits the original observation $Z_i$ and one evaluation point per linear-form term in $m(\mu)(Z_i, Y_i)$. Each augmented row $r$ carries an evaluation point $z_r$, a weight $D_r \in \{0, 1\}$ indicating whether $z_r$ is the original observation, and a coefficient $C_r$ collecting the trace coefficients at $z_r$. The empirical Bregman-Riesz loss is
 
 $$
-J_k = 2 a_k \cdot \varphi(z_k)\varphi(z_k)^{\top}, \qquad A_k = -b_k \cdot \varphi(z_k).
+\hat L(\alpha) \;=\; \frac{1}{n} \sum_{r=1}^M \big[\, D_r\, \tilde h(\alpha(z_r)) \;+\; C_r\, h'(\alpha(z_r)) \,\big].
 $$
 
-Originals contribute $a_k = 1, b_k = 0$ so $J_k$ varies across rows; counterfactual evaluation points contribute $a_k = 0, b_k \neq 0$ so $A_k$ varies. The forest can split the full feature space usefully even with the constant basis $\varphi \equiv 1$. For ATE the leaf solve recovers $1/\hat P(T = t \mid X\text{-leaf})$; for AdditiveShift it recovers a local density-ratio estimator.
+See [Estimands](../estimands.qmd) for the construction. Each tree partitions the feature space and stores the loss-optimal $\alpha$ in every leaf $\ell$:
 
-The trade-off is that the augmented training rows aren't iid — there are blocks of $k$ correlated rows per original $W_i$ — so GRF's variance estimator no longer applies and `predict_interval` is not exposed in v1. Cluster-robust variance with `origin_index` as the cluster id is on the v2 roadmap.
+$$
+\hat\alpha_\ell \;=\; \arg\min_{\alpha} \sum_{r \in \ell} \big[\, D_r\, \tilde h(\alpha) \;+\; C_r\, h'(\alpha) \,\big].
+$$
+
+For `SquaredLoss` this has the closed form $\hat\alpha_\ell = -\sum_{r \in \ell} C_r / \sum_{r \in \ell} D_r$; for `KLLoss`, `BernoulliLoss`, and `BoundedSquaredLoss` the per-leaf optimum has its own closed form (see [Tree backend](tree.qmd) for the derivations). The forest averages the per-tree predictions of $\hat\alpha$.
+
+Because $D_r$ and $C_r$ already vary across augmented rows for every estimand — original observations have $D_r = 1, C_r = 0$ and counterfactual evaluation points have $D_r = 0, C_r \ne 0$ — the splitter learns from the full feature space directly. The user does not supply any basis functions.
+
+### Moment-style (`ForestRieszRegressor`)
+
+The user supplies a list of functions $\varphi = (\varphi_1, \dots, \varphi_p)$ of the data. Inside each leaf $\ell$ the per-leaf parameter $\theta_\ell \in \mathbb R^p$ solves the linear-moment equation
+
+$$
+\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top}\big)^{-1}
+                 \textstyle\sum_{i\in\ell} m(\varphi)(Z_i, Y_i),
+$$
+
+and predictions are $\hat\alpha(z) = \hat\theta(z_{\text{split}}) \cdot \varphi(z)$. The forest is fit on the $n$ original rows, and the MSE splitting criterion picks splits to minimize the sum of in-leaf residuals against this leaf optimum.
+
+The list $\varphi$ has to be chosen per estimand. The default `riesz_feature_fns="auto"` picks defaults for built-in estimands:
+
+| Estimand | Default list | Effect |
+|---|---|---|
+| `ATE`, `ATT` | `[1{A=0}, 1{A=1}]` | Forest splits on covariates only; the basis resolves treatment in each leaf. |
+| `TSM(level=v)` | `[1{A=v}]` | Single-basis fit; intervals supported. |
+| `AdditiveShift`, `LocalShift`, custom | none — auto-resolution falls back to a constant function, which is row-degenerate | Backend raises with a hint. Use `AugForestRieszRegressor` instead, or pass a custom list. |
+
+For ATE the leaf solve recovers $1/\hat P(A = a \mid X\text{-leaf})$ — the IPW representer.
 
 ## How they differ
 
-| | `ForestRieszRegressor` | `AugForestRieszRegressor` |
+| | `AugForestRieszRegressor` | `ForestRieszRegressor` |
 |---|---|---|
-| Estimand support | ATE/ATT/TSM via auto sieve; others need user-supplied sieve | Every built-in + custom user `Estimand`, no sieve |
-| Loss support | `SquaredLoss` only | All four built-in losses (`SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`) |
-| `predict_interval` | yes (single-basis fits, `honest=True`) | not in v1 |
-| Per-fit speed | baseline | ≈1.0× at n≤2000, ≈1.15× at n=5000 |
-| RMSE on shared estimands (ATE, TSM) | baseline | within ~5% |
-| Splits on | covariates only when sieve handles treatment | full (T, X) feature space |
-| Backend Protocol | `MomentBackend.fit_rows` | `Backend.fit_augmented` |
+| Per-estimand setup | none — works on every estimand directly | user supplies `riesz_feature_fns` (auto-resolved for `ATE`, `ATT`, `TSM`) |
+| Loss support | `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` | `SquaredLoss` only |
+| Confidence intervals | not in v1 | yes — `predict_interval` on single-basis fits with `honest=True, inference=True` |
+| Splits on | full feature space | covariates only when the basis handles treatment |
+| Backend Protocol | `Backend.fit_augmented` | `MomentBackend.fit_rows` |
+| When to pick | default for general use; required for shift-style or custom estimands | when you need CIs on `ATE`, `ATT`, or `TSM` |
 
-Default to `ForestRieszRegressor` for ATE/ATT/TSM when you want CIs. Reach for `AugForestRieszRegressor` for shift-style estimands, custom moments, non-quadratic Bregman losses, or when you want one estimator that just works on everything. See [`test_aug_vs_moment.py`](https://github.com/rieszreg/forestriesz/blob/main/python/tests/test_aug_vs_moment.py) for the benchmark behind the speed and RMSE numbers.
+## Bregman losses
 
-## Bregman losses on the augmentation-style backend
-
-`AugForestRieszRegressor` accepts every loss `rieszreg` ships. The fit still uses the squared MSE criterion to grow the trees (splits that maximize variance reduction in $-\Sigma b / (2 \Sigma a)$ also separate the monotonically-related Bregman optima well in practice), then a post-hoc Newton iteration on each leaf's augmented rows replaces the stored θ with the Bregman-optimal value. For locally constant fits the Newton has the closed form $\alpha^* = -B/(2A)$ followed by the loss's link; for sieves it's a small p×p Newton.
+`AugForestRieszRegressor` accepts every loss `rieszreg` ships. The per-tree splitter dispatches to a per-loss leaf-loss formula (squared, KL, Bernoulli, bounded-squared) so splits are chosen against the loss the user actually supplied. The forest averages per-tree $\hat\alpha$ predictions.
 
 ```{python}
 import numpy as np, pandas as pd
@@ -74,8 +79,8 @@ pi = 1 / (1 + np.exp(-(0.5 * x - 0.3)))
 a = rng.binomial(1, pi).astype(float)
 df_tsm = pd.DataFrame({"a": a, "x": x})
 
-# KLLoss enforces α̂ > 0 via the exp link — matched to density-ratio
-# estimands like TSM and IPSI. Requires non-negative m-coefficients.
+# KLLoss is matched to density-ratio estimands like TSM and IPSI;
+# it requires non-negative C-coefficients in the augmented dataset.
 est = AugForestRieszRegressor(
     estimand=TSM(level=1, treatment="a", covariates=("x",)),
     loss=KLLoss(),
@@ -85,11 +90,10 @@ est = AugForestRieszRegressor(
 )
 est.fit(df_tsm)
 alpha_hat = est.predict(df_tsm)
-print(f"all positive: {bool((alpha_hat > 0).all())}")
-print(f"min/max: {alpha_hat.min():.3f} / {alpha_hat.max():.3f}")
+print(f"alpha_hat range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 ```
 
-`KLLoss` and `BernoulliLoss` reject ATE / ATT / shift-style data at fit time (they require non-negative m-coefficients, which difference-of-evaluations estimands violate). `BoundedSquaredLoss(lo, hi)` accepts any signed coefficients and clips α̂ into the interval.
+`KLLoss` and `BernoulliLoss` reject `ATE` / `ATT` / shift-style data at fit time — they require non-negative $C$-coefficients, which difference-style estimands violate. `BoundedSquaredLoss(lo, hi)` accepts any signed coefficients and clips $\hat\alpha$ into the interval.
 
 ## Quickstart — ATE
 
@@ -136,7 +140,7 @@ pi <- 1 / (1 + exp(-(-0.02 * x - x^2 + 4 * log(x + 0.3) + 1.5)))
 a  <- rbinom(n, 1, pi)
 df <- data.frame(a = as.numeric(a), x = x)
 
-# ATE / ATT use a multi-basis sieve, which is Python-only in v1.
+# ATE / ATT use a multi-basis list, which is Python-only in v1.
 # Call into Python directly via reticulate.
 fr_py <- reticulate::import("forestriesz", convert = FALSE)
 pd_py <- reticulate::import("pandas", convert = FALSE)
@@ -152,9 +156,9 @@ alpha_hat <- as.numeric(reticulate::py_to_r(fr$predict(py_df)))
 
 :::
 
-## Quickstart — AdditiveShift with the augmentation-style backend
+## Quickstart — `AdditiveShift` with the augmentation-style backend
 
-For estimands without a canonical sieve, `AugForestRieszRegressor` is the right choice — no extra configuration.
+`AdditiveShift` has no canonical list of basis functions, so the moment-style backend would require the user to construct one. `AugForestRieszRegressor` works on it directly.
 
 ```{python}
 from forestriesz import AugForestRieszRegressor, AdditiveShift
@@ -164,7 +168,7 @@ a_cont = rng.normal(0.5*x, 1.0)
 df_cont = pd.DataFrame({"a": a_cont, "x": x})
 
 afr = AugForestRieszRegressor(
-    estimand=AdditiveShift(delta=0.5),
+    estimand=AdditiveShift(delta=0.5, treatment="a", covariates=("x",)),
     n_estimators=500,
     min_samples_leaf=10,
     random_state=0,
@@ -175,11 +179,9 @@ alpha_hat = afr.predict(df_cont)
 print(f"alpha_hat range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 ```
 
-The same estimator works on every built-in estimand at near-identical speed and quality vs the moment-style backend; trade off CIs for full agnosticism.
-
 ## Quickstart — TSM with confidence intervals
 
-`TSM` uses a single-basis sieve, so v1's `predict_interval` works.
+`TSM` uses a single-basis fit, so v1's `predict_interval` works.
 
 ::: {.panel-tabset group="lang"}
 
@@ -226,6 +228,29 @@ ci <- fr$predict_interval(df, alpha = 0.05)
 
 ## Hyperparameters
 
+### `AugForestRieszRegressor`
+
+Mirrors [`sklearn.ensemble.RandomForestRegressor`](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html):
+
+| Knob | Default | Notes |
+|---|---|---|
+| `n_estimators` | 100 | Number of trees. |
+| `max_depth` | None | Grow until leaves saturate `min_samples_leaf`. |
+| `min_samples_split` | 2 | Minimum count of original ($D > 0$) augmented rows in a node before considering a split. |
+| `min_samples_leaf` | 1 | Minimum count of original rows in each child of a candidate split. |
+| `max_features` | 1.0 | Per-split feature-subsampling rule. |
+| `max_leaf_nodes` | None | Cap on per-tree leaf count. |
+| `min_impurity_decrease` | 0.0 | Reject splits below this gain. |
+| `ccp_alpha` | 0.0 | Cost-complexity pruning per tree. |
+| `bootstrap` | True | Per-tree resampling at the original-row level (block bootstrap). |
+| `max_samples` | None | Per-tree subsample size as fraction or count of original rows. |
+| `n_jobs` | None | Parallelism across trees via `joblib.Parallel`. |
+| `splitter` | `"exact"` | `"exact"`, `"hist"`, `"random"`, or `"python"` — riesztree splitter dispatch. |
+| `max_bins` | 255 | Histogram-splitter bin count. |
+| `categorical_features` | None | Column indices treated as integer category labels. |
+
+### `ForestRieszRegressor`
+
 Forwarded to EconML's `BaseGRF`:
 
 | Knob | Default | Notes |
@@ -254,12 +279,12 @@ with tempfile.TemporaryDirectory() as tmp:
     print(f"max abs diff after round-trip: {np.max(np.abs(pred_loaded - alpha_hat)):.2e}")
 ```
 
-For built-in estimands the sieve is auto-resolved on load. For custom sieves, repass the callables: `ForestRieszRegressor.load(path, riesz_feature_fns=my_basis)`.
+For built-in estimands the moment-style basis is auto-resolved on load. For custom bases, repass the callables: `ForestRieszRegressor.load(path, riesz_feature_fns=my_basis)`. `AugForestRieszRegressor` round-trips without any extra arguments.
 
 ## Sklearn integration
 
-`ForestRieszRegressor` is a `BaseEstimator`, so it composes with `clone`, `GridSearchCV`, `cross_val_predict`, `Pipeline`. See [Tuning and Cross-Fitting](../tuning-and-cross-fitting.qmd).
+Both regressors are `BaseEstimator`s, so they compose with `clone`, `GridSearchCV`, `cross_val_predict`, `Pipeline`. See [Tuning and Cross-Fitting](../tuning-and-cross-fitting.qmd).
 
-## When the constant basis raises
+## When the constant basis raises (moment-style only)
 
-For built-in estimands the per-row moment $m(W; 1)$ doesn't depend on $W$, so the constant basis is degenerate (every leaf would predict the same constant). The backend detects this and raises with a hint to use `riesz_feature_fns="auto"` (the default) or supply a custom sieve. The default does the right thing; explicit `riesz_feature_fns=None` is what raises.
+For built-in estimands the per-row moment $m(\varphi)(Z_i, Y_i)$ doesn't depend on $Z_i$ when $\varphi \equiv 1$, so the constant basis is degenerate (every leaf would predict the same constant). `ForestRieszRegressor` detects this and raises with a hint to use `riesz_feature_fns="auto"` (the default) or supply a custom list. Explicit `riesz_feature_fns=None` is what raises. `AugForestRieszRegressor` is unaffected — its splitter does not depend on a user-supplied basis.

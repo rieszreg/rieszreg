@@ -16,6 +16,7 @@ members = [
 
 [tool.uv.sources]
 rieszreg = { workspace = true }
+riesztree = { workspace = true }
 
 [dependency-groups]
 docs = [
