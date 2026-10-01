@@ -743,17 +743,17 @@ window.Quarto = {
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ATE</span>(<span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x7f8b07904590&gt;
+<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x7f881dd77f50&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>, <span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x7f8b073164b0&gt;
+<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x7f881dd77860&gt;
  signature: (alpha)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">LocalShift</span>(<span class="at">delta =</span> <span class="fl">0.3</span>, <span class="at">threshold =</span> <span class="fl">0.7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x7f8b07397320&gt;
+<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x7f8811d39010&gt;
  signature: (alpha)</code></pre>
 </div>
 </div>
@@ -798,7 +798,8 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>The <code>Z</code> dataframe must contain every name in <code>feature_keys</code>; extra columns are ignored. With an <code>ndarray</code>, columns are interpreted in <code>feature_keys</code> order.</p>
+<p>Leave <code>covariates</code> out to use every column of <code>Z</code> other than the treatment: <code>ATE(treatment="treat")</code> fits <span class="math inline">\(\alpha\)</span> on <code>treat</code> plus all eight covariates here. Keep the outcome out of <code>Z</code> when you do this. After fitting, <code>est.feature_names_in_</code> lists the columns <span class="math inline">\(\alpha\)</span> uses.</p>
+<p>When <code>covariates</code> is given, <code>Z</code> must contain every name in <code>feature_keys</code>, and other columns are ignored. With an <code>ndarray</code>, the treatment is column 0 and the rest are the covariates, in order.</p>
 </section>
 <section id="theory-how-the-augmented-dataset-is-derived" class="level2">
 <h2 class="anchored" data-anchor-id="theory-how-the-augmented-dataset-is-derived">Theory: how the augmented dataset is derived</h2>
@@ -1033,7 +1034,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(est)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x7f8afb146420&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x7f8811df5e80&gt;</code></pre>
 </div>
 </div>
 <p>The inner function takes <code>(z, y)</code> even when <code>y</code> is unused — that signature is the contract every custom <code>m</code> follows. Pass the estimand to any backend’s estimator class:</p>
@@ -1131,7 +1132,6 @@ P_n L(a) \;=\; \tilde h(a) \;-\; h'(a) \cdot \bar m, \qquad \bar m = P_n[m(\alph
 <li><strong>Derivatives.</strong> <span class="math inline">\(m(\mu)(z, y) = \partial_a \mu(a, x)\big|_{a = z_a}\)</span>. Finite-difference approximations reduce to the finite-evaluation case; backends with autodiff can support directly.</li>
 <li><strong>Other linear operators on <span class="math inline">\(\mu\)</span>.</strong> Any <span class="math inline">\(m\)</span> that satisfies linearity on <span class="math inline">\(\mu\)</span> (additivity and scalar homogeneity) but doesn’t fit the patterns above.</li>
 </ul>
-<p>A previously released <code>StochasticIntervention</code> factory is currently stubbed (raises <code>NotImplementedError</code>). A reintroduction will land once the integral-vs-finite-evaluation distinction is wired into the type hierarchy.</p>
 
 
 </section>

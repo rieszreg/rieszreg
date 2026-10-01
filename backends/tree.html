@@ -1118,8 +1118,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbce0d40&gt;,
-                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbce0d40&gt;,
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f61028e7b60&gt;,
+                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f61028e7b60&gt;,
                    max_depth=4)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> est.predict(df)</span>
@@ -1165,7 +1165,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <li><strong>Leafwise</strong> (<code>growth_policy="leafwise"</code>). Best-first growth: at each step split the leaf whose best candidate has the highest gain anywhere in the tree. Termination on <code>max_leaf_nodes</code> (the natural cap for this policy) or when no positive-gain split remains.</li>
 </ul>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE, n_leaves</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>est_dw <span class="op">=</span> RieszTreeRegressor(</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
@@ -1177,11 +1177,11 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    growth_policy<span class="op">=</span><span class="st">"leafwise"</span>, max_leaf_nodes<span class="op">=</span><span class="dv">16</span>, max_depth<span class="op">=</span><span class="dv">20</span>,</span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"depthwise leaves: </span><span class="sc">{</span>n_leaves(est_dw.predictor_.tree)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"depthwise leaves: </span><span class="sc">{</span>est_dw<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>depthwise leaves: 14</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"leafwise  leaves: </span><span class="sc">{</span>n_leaves(est_lw.predictor_.tree)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"leafwise  leaves: </span><span class="sc">{</span>est_lw<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>leafwise  leaves: 16</code></pre>
 </div>
@@ -1206,15 +1206,15 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    max_depth<span class="op">=</span><span class="dv">10</span>, early_stopping_rounds<span class="op">=</span><span class="dv">3</span>, validation_fraction<span class="op">=</span><span class="fl">0.2</span>,</span>
 <span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
 <span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"unpruned: </span><span class="sc">{</span>n_leaves(RieszTreeRegressor(estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">'a'</span>, covariates<span class="op">=</span>(<span class="st">'x'</span>,)), max_depth<span class="op">=</span><span class="dv">10</span>).fit(df).predictor_.tree)<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"unpruned: </span><span class="sc">{</span>RieszTreeRegressor(estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">'a'</span>, covariates<span class="op">=</span>(<span class="st">'x'</span>,)), max_depth<span class="op">=</span><span class="dv">10</span>)<span class="sc">.</span>fit(df)<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>unpruned: 83 leaves</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"pruned  : </span><span class="sc">{</span>n_leaves(est_pruned.predictor_.tree)<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"pruned  : </span><span class="sc">{</span>est_pruned<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>pruned  : 64 leaves</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"early-stop: </span><span class="sc">{</span>n_leaves(est_es.predictor_.tree)<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"early-stop: </span><span class="sc">{</span>est_es<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>early-stop: 9 leaves</code></pre>
 </div>
@@ -1690,11 +1690,11 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbccc290&gt;),
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f61028e6030&gt;),
              n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox"><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>GridSearchCV</div></div><div><a class="sk-estimator-doc-link fitted" rel="noreferrer" target="_blank" href="https://scikit-learn.org/1.6/modules/generated/sklearn.model_selection.GridSearchCV.html">?<span>Documentation for GridSearchCV</span></a><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbccc290&gt;),
-             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbcce090&gt;,
-                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f46fbcce090&gt;,
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f61028e6030&gt;),
+             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f6113d11370&gt;,
+                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f6113d11370&gt;,
                    max_depth=4)</pre></div> </div></div></div></div></div></div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best max_depth = </span><span class="sc">{</span>gs<span class="sc">.</span>best_params_[<span class="st">'max_depth'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1802,7 +1802,6 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </tr>
 </tbody>
 </table>
-<p>The v0.0.1 names <code>max_leaves</code> and <code>pruning_alpha</code> are accepted as deprecated aliases for <code>max_leaf_nodes</code> and <code>ccp_alpha</code>; passing them emits a <code>FutureWarning</code>.</p>
 </section>
 <section id="sec-splitters" class="level2" data-number="9">
 <h2 data-number="9" class="anchored" data-anchor-id="sec-splitters"><span class="header-section-number">9</span> Splitter modes</h2>
@@ -1810,7 +1809,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare splitter modes on the same data — predictions and timings.</span></span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE, n_leaves</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> riesztree <span class="im">import</span> RieszTreeRegressor, ATE</span>
 <span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>estimand <span class="op">=</span> ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,))</span>
 <span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
@@ -1818,11 +1817,11 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
 <span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    est <span class="op">=</span> RieszTreeRegressor(estimand<span class="op">=</span>estimand, max_depth<span class="op">=</span><span class="dv">4</span>, splitter<span class="op">=</span>sp).fit(df)</span>
 <span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    fit_ms <span class="op">=</span> (time.perf_counter() <span class="op">-</span> t0) <span class="op">*</span> <span class="dv">1000</span></span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"splitter=</span><span class="sc">{</span>sp<span class="sc">:6s}</span><span class="ss">  fit=</span><span class="sc">{</span>fit_ms<span class="sc">:6.1f}</span><span class="ss"> ms  leaves=</span><span class="sc">{</span>n_leaves(est.predictor_.tree)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"splitter=</span><span class="sc">{</span>sp<span class="sc">:6s}</span><span class="ss">  fit=</span><span class="sc">{</span>fit_ms<span class="sc">:6.1f}</span><span class="ss"> ms  leaves=</span><span class="sc">{</span>est<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>splitter=exact   fit=   1.7 ms  leaves=14
-splitter=hist    fit=   3.0 ms  leaves=14
-splitter=random  fit=   1.0 ms  leaves=12</code></pre>
+<pre><code>splitter=exact   fit=   1.2 ms  leaves=14
+splitter=hist    fit=   2.6 ms  leaves=14
+splitter=random  fit=   0.9 ms  leaves=12</code></pre>
 </div>
 </div>
 <ul>

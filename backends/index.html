@@ -527,7 +527,10 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#pick-a-backend" id="toc-pick-a-backend" class="nav-link active" data-scroll-target="#pick-a-backend">Pick a backend</a></li>
+  <li><a href="#pick-a-backend" id="toc-pick-a-backend" class="nav-link active" data-scroll-target="#pick-a-backend">Pick a backend</a>
+  <ul class="collapse">
+  <li><a href="#the-same-setting-under-different-names" id="toc-the-same-setting-under-different-names" class="nav-link" data-scroll-target="#the-same-setting-under-different-names">The same setting under different names</a></li>
+  </ul></li>
   <li><a href="#compose-explicitly" id="toc-compose-explicitly" class="nav-link" data-scroll-target="#compose-explicitly">Compose explicitly</a></li>
   <li><a href="#adding-a-backend" id="toc-adding-a-backend" class="nav-link" data-scroll-target="#adding-a-backend">Adding a backend</a>
   <ul class="collapse">
@@ -563,7 +566,7 @@ window.Quarto = {
 </header>
 
 
-<p>A backend fits the Riesz representer for a given estimand and loss. Four implementation packages ship today; each slots into <code>RieszEstimator</code> through one of two Protocols. <code>rieszboost</code> and <code>krrr</code> consume the augmented dataset of evaluation points with weights <span class="math inline">\((D_r, C_r)\)</span> (<code>Backend.fit_augmented</code>). <code>forestriesz</code> ships <em>both</em>: an augmentation-style <code>AugForestRieszRegressor</code> that works on every estimand without per-estimand configuration (<code>Backend.fit_augmented</code>), and a moment-style <code>ForestRieszRegressor</code> that consumes original rows plus a user-supplied list of basis functions (<code>MomentBackend.fit_rows</code>) and supports honest-split confidence intervals. <code>riesznet</code> consumes original rows plus per-row moments via <code>MomentBackend.fit_rows</code>, training a PyTorch model with autograd.</p>
+<p>A backend fits the Riesz representer for a given estimand and loss. Five implementation packages ship today; each slots into <code>RieszEstimator</code> through one of two Protocols. <code>rieszboost</code> and <code>krrr</code> consume the augmented dataset of evaluation points with weights <span class="math inline">\((D_r, C_r)\)</span> (<code>Backend.fit_augmented</code>). <code>forestriesz</code> ships <em>both</em>: an augmentation-style <code>AugForestRieszRegressor</code> that works on every estimand without per-estimand configuration (<code>Backend.fit_augmented</code>), and a moment-style <code>ForestRieszRegressor</code> that consumes original rows plus a user-supplied list of basis functions (<code>MomentBackend.fit_rows</code>) and supports honest-split confidence intervals. <code>riesznet</code> consumes original rows plus per-row moments via <code>MomentBackend.fit_rows</code>, training a PyTorch model with autograd.</p>
 <section id="pick-a-backend" class="level2">
 <h2 class="anchored" data-anchor-id="pick-a-backend">Pick a backend</h2>
 <table class="caption-top table">
@@ -637,11 +640,79 @@ window.Quarto = {
 <td><strong>Convenience class</strong></td>
 <td><code>rieszboost.RieszBooster</code></td>
 <td><code>krrr.KernelRieszRegressor</code></td>
-<td><code>forestriesz.AugForestRieszRegressor</code> (works on every estimand without per-estimand configuration) and <code>forestriesz.ForestRieszRegressor</code> (moment-style; user supplies a list of basis functions; supports CIs)</td>
+<td><code>forestriesz.AugForestRieszRegressor</code> (recommended; works on every estimand) and <code>forestriesz.ForestRieszRegressor</code> (the published ForestRiesz method, kept for comparison; supports CIs)</td>
 <td><code>riesznet.RieszNet</code> (default MLP); <code>riesznet.TorchBackend</code> for arbitrary <code>nn.Module</code> factories</td>
 </tr>
 </tbody>
 </table>
+<p>A fifth learner, <a href="../backends/tree.html"><code>riesztree</code></a>, fits a single decision tree (<code>RieszTreeRegressor</code>). It is fast and easy to inspect, and it supports all four losses.</p>
+<section id="the-same-setting-under-different-names" class="level3">
+<h3 class="anchored" data-anchor-id="the-same-setting-under-different-names">The same setting under different names</h3>
+<p>Each learner names its settings after the library it follows (xgboost, sklearn, PyTorch). This table lines them up.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Setting</th>
+<th><code>RieszBooster</code></th>
+<th><code>KernelRieszRegressor</code></th>
+<th><code>AugForestRieszRegressor</code></th>
+<th><code>RieszTreeRegressor</code></th>
+<th><code>RieszNet</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Amount of fitting</td>
+<td><code>n_estimators</code> (trees)</td>
+<td>—</td>
+<td><code>n_estimators</code> (trees)</td>
+<td><code>max_depth</code>, <code>max_leaf_nodes</code></td>
+<td><code>epochs</code></td>
+</tr>
+<tr class="even">
+<td>Step size</td>
+<td><code>learning_rate</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>learning_rate</code></td>
+</tr>
+<tr class="odd">
+<td>Regularization</td>
+<td><code>reg_lambda</code>, <code>max_depth</code></td>
+<td><code>lambda_grid</code> (chosen automatically)</td>
+<td><code>min_samples_leaf</code>, <code>max_depth</code></td>
+<td><code>min_samples_leaf</code>, <code>ccp_alpha</code></td>
+<td><code>weight_decay</code>, <code>dropout</code></td>
+</tr>
+<tr class="even">
+<td>Early stopping</td>
+<td><code>early_stopping_rounds</code></td>
+<td>—</td>
+<td>—</td>
+<td><code>early_stopping_rounds</code></td>
+<td><code>early_stopping_rounds</code></td>
+</tr>
+<tr class="odd">
+<td>Held-out fraction</td>
+<td><code>validation_fraction=0.1</code></td>
+<td><code>validation_fraction=0.2</code></td>
+<td>—</td>
+<td><code>validation_fraction=0.1</code></td>
+<td><code>validation_fraction=0.1</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>validation_fraction</code> is used only when early stopping is on. <code>KernelRieszRegressor</code> always holds out rows, because it picks λ from <code>lambda_grid</code> by held-out loss. Passing <code>eval_set=</code> to <code>fit</code> replaces the internal split in every learner.</p>
+</section>
 </section>
 <section id="compose-explicitly" class="level2">
 <h2 class="anchored" data-anchor-id="compose-explicitly">Compose explicitly</h2>
@@ -691,7 +762,7 @@ window.Quarto = {
 <span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>        epochs<span class="op">=</span><span class="dv">300</span>,</span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>    ),</span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The convenience classes are thin subclasses that bake in the backend and surface backend-specific hyperparameters as constructor args, so that they fit cleanly into <code>GridSearchCV</code>. See the <a href="../backends/boosting.html">boosting</a>, <a href="../backends/kernel.html">kernel</a>, <a href="../backends/forest.html">forest</a>, and <a href="../backends/neural.html">neural</a> pages for each.</p>
+<p>The convenience classes are thin subclasses that bake in the backend and surface backend-specific hyperparameters as constructor args, so that they fit cleanly into <code>GridSearchCV</code>. See the <a href="../backends/boosting.html">boosting</a>, <a href="../backends/kernel.html">kernel</a>, <a href="../backends/forest.html">forest</a>, <a href="../backends/tree.html">tree</a>, and <a href="../backends/neural.html">neural</a> pages for each.</p>
 </section>
 <section id="adding-a-backend" class="level2">
 <h2 class="anchored" data-anchor-id="adding-a-backend">Adding a backend</h2>
