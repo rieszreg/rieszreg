@@ -559,7 +559,7 @@ window.Quarto = {
 
 
 <p>You don’t observe <span class="math inline">\(\alpha_0\)</span> on real data, so the held-out Riesz loss from cross-validation (<code>cross_val_score</code>, or whatever validation signal a backend exposes during fit) is the only training-time signal. After fitting, <code>.diagnose()</code> reports magnitude statistics and warnings about extreme tail values, near-positivity violations, and single-point extrapolation. Those warnings often matter more for downstream variance than the bulk fit quality.</p>
-<p><code>.diagnose()</code> is defined in <code>rieszreg.diagnostics</code> and works for any <code>RieszEstimator</code> subclass. Backend-specific extensions (e.g.&nbsp;<code>KernelDiagnostics</code> adds chosen λ, support size, effective d.o.f., and the kernel matrix’s condition number) layer on top of the shared base.</p>
+<p><code>.diagnose(Z)</code> works on every learner. Some learners add their own fields on top of the shared ones: <code>KernelRieszRegressor</code> reports the chosen λ, support size, effective degrees of freedom, and condition number. <code>RieszTreeRegressor</code> and <code>ForestRieszRegressor</code> report leaf counts, leaf sizes, and feature importances.</p>
 <p>This page walks through <code>.diagnose()</code> on an under-tuned booster (so the warnings fire) and maps each warning to the hyperparameter that fixes it. See <a href="./backends/boosting.html">Boosting backend</a> and <a href="./backends/kernel.html">Kernel backend</a> for the backend-specific tuning recipes.</p>
 <section id="setup-a-low-overlap-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="setup-a-low-overlap-dataset">Setup: a low-overlap dataset</h2>
