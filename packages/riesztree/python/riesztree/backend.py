@@ -12,10 +12,11 @@ NotImplementedError from the leaf-solver dispatcher.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import numpy as np
 
 from rieszreg import AugmentedDataset, FitResult, Loss
+from rieszreg.backends import resolve_column_positions
 
 from .grow import _Grower
 from .predictor import RieszTreePredictor
@@ -66,9 +67,10 @@ class RieszTreeBackend:
         for early stopping. Rows are held out only when
         ``early_stopping_rounds`` is set. Default 0.1.
     categorical_features
-        Tuple of column indices (into the estimand's ``feature_keys``)
-        whose values should be treated as integer category labels rather
-        than ordered numerics. Default ``()``.
+        Columns whose values are integer category labels rather than
+        ordered numerics, as column names or as 0-based positions in the
+        estimand's ``feature_keys`` (treatment first). Names are resolved
+        when fitting through ``RieszEstimator``. Default ``()``.
     splitter
         ``"exact"`` (default) routes continuous-feature splits through
         the Cython sweep in :mod:`riesztree.fast._splitter_c`;
@@ -91,13 +93,21 @@ class RieszTreeBackend:
     ccp_alpha: float = 0.0
     early_stopping_rounds: int | None = None
     validation_fraction: float = 0.1
-    categorical_features: tuple[int, ...] = field(default_factory=tuple)
+    categorical_features: tuple[int | str, ...] = field(default_factory=tuple)
     splitter: str = "exact"
     max_bins: int = 255      # used when splitter == "hist"
 
     def holdout_fraction(self) -> float:
         """Rows to hold out: ``validation_fraction`` under early stopping, else 0."""
         return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
+
+    def bind_columns(self, feature_keys: tuple[str, ...]) -> "RieszTreeBackend":
+        """Resolve column names in ``categorical_features`` (``ColumnBackend``)."""
+        return replace(self, categorical_features=resolve_column_positions(
+            self.categorical_features, feature_keys, "categorical_features"))
+
+    def _categorical_positions(self) -> tuple[int, ...]:
+        return resolve_column_positions(self.categorical_features, None, "categorical_features")
 
     def fit_augmented(
         self,
@@ -111,7 +121,7 @@ class RieszTreeBackend:
         # Leaves store the loss-optimal α directly, so there is no boosting
         # offset: base_score (and hence `init`) has no effect on a tree.
         del base_score
-        check_categorical(aug_train.features, self.categorical_features)
+        check_categorical(aug_train.features, self._categorical_positions())
         X_binned, mapper = self._bin(aug_train.features, random_state)
         return self._fit_binned(
             aug_train, aug_valid, loss,
@@ -146,7 +156,7 @@ class RieszTreeBackend:
             )
         unbounded = 2**31 - 1
         has_valid = aug_valid is not None and aug_valid.n_rows > 0
-        cat_feats = tuple(int(i) for i in self.categorical_features)
+        cat_feats = self._categorical_positions()
         g = _Grower(
             aug_train.features, aug_train.is_original, aug_train.potential_deriv_coef, loss,
             max_depth=unbounded if self.max_depth is None else int(self.max_depth),

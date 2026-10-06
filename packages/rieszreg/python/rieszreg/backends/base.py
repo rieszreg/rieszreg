@@ -154,6 +154,64 @@ def holdout_fraction(backend) -> float:
     return float(method()) if callable(method) else 0.0
 
 
+class ColumnBackend(Protocol):
+    """Optional capability of a ``Backend`` or ``MomentBackend``: settings
+    that name input columns (e.g. ``categorical_features``).
+
+    ``bind_columns(feature_keys)`` returns a copy of the backend with those
+    names resolved to positions in ``feature_keys``, the bound estimand's
+    column order. The orchestrator calls it once per fit, after binding the
+    estimand, and fits the copy; the user's backend is left unchanged.
+    """
+
+    def bind_columns(self, feature_keys: tuple[str, ...]):
+        ...
+
+
+def bind_columns(backend, feature_keys) -> Any:
+    """The backend to fit: ``backend.bind_columns(feature_keys)`` when the
+    backend defines it, else ``backend`` itself."""
+    method = getattr(backend, "bind_columns", None)
+    if callable(method):
+        return method(tuple(feature_keys))
+    return backend
+
+
+def resolve_column_positions(columns, feature_keys, setting: str) -> tuple[int, ...]:
+    """Map ``columns`` (names or 0-based positions) to positions in
+    ``feature_keys``. With ``feature_keys=None`` (no bound estimand yet),
+    only positions are accepted.
+
+    Positions index ``feature_keys``, where the treatment comes first, not the
+    columns of the user's data; names avoid that pitfall.
+    """
+    out = []
+    for c in columns or ():
+        if isinstance(c, str):
+            if feature_keys is None:
+                raise ValueError(
+                    f"{setting} names column {c!r}, but names are resolved only "
+                    "when fitting through RieszEstimator (or a learner class). "
+                    "Pass 0-based positions into the estimand's feature_keys "
+                    "when calling the backend directly."
+                )
+            if c not in feature_keys:
+                raise ValueError(
+                    f"{setting} names column {c!r}, which α̂ doesn't use; its "
+                    f"columns are {list(feature_keys)}."
+                )
+            out.append(feature_keys.index(c))
+        else:
+            j = int(c)
+            if feature_keys is not None and not 0 <= j < len(feature_keys):
+                raise ValueError(
+                    f"{setting} position {j} is out of range for α̂'s "
+                    f"{len(feature_keys)} columns {list(feature_keys)}."
+                )
+            out.append(j)
+    return tuple(out)
+
+
 # ----- Predictor loader registry (used by RieszEstimator.load) -----
 
 _PREDICTOR_LOADERS: dict[str, Any] = {}

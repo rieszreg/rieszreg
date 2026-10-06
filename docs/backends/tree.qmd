@@ -192,7 +192,7 @@ print(f"early-stop: {est_es.get_n_leaves()} leaves")
 
 ## Categorical predictors {#sec-categorical}
 
-Declare integer-coded categorical columns via `categorical_features=(col_idx, ...)`. The splitter uses the standard CART trick: order levels by within-level $\alpha_{\text{level}}^* = -C_{\text{level}} / D_{\text{level}}$, then sweep contiguous splits in that order. The ordering theorem carries over because the augmented Bregman per-leaf objective is convex.
+Declare integer-coded categorical columns via `categorical_features`, by name (`categorical_features=["cat"]`) or by 0-based position in the estimand's `feature_keys`. Positions count the treatment first, so they don't follow the column order of your data; names avoid that. The splitter uses the standard CART trick: order levels by within-level $\alpha_{\text{level}}^* = -C_{\text{level}} / D_{\text{level}}$, then sweep contiguous splits in that order. The ordering theorem carries over because the augmented Bregman per-leaf objective is convex.
 
 ```{python}
 rng = np.random.default_rng(0)
@@ -260,7 +260,7 @@ Mirrors `sklearn.tree.DecisionTreeRegressor` where the augmented Bregman-Riesz s
 | `ccp_alpha` | 0.0 | Cost-complexity pruning penalty. Sklearn name. |
 | `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many accepted splits, then roll back to the best partial tree. |
 | `validation_fraction` | 0.1 | Held-out fraction for early stopping. Ignored when not needed. |
-| `categorical_features` | None | Sequence of column indices treated as integer category labels. |
+| `categorical_features` | None | Column names, or positions in `feature_keys`, treated as integer category labels. |
 | `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
 | `init` | None | No effect on a tree. Each leaf stores its loss-optimal α directly. |
 | `random_state` | 0 | Seeds the per-split feature subsample (`max_features`), the per-feature random threshold (`splitter='random'`) and the histogram bin subsample. |

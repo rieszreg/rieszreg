@@ -58,8 +58,10 @@ use_python_riesztree <- function(python = NULL, required = TRUE) {
 #' mean no limit. `max_features` follows Python: an integer (`3L`, or a
 #' whole number above 1) is a feature count, while a fraction in (0, 1] or a
 #' string such as `"sqrt"` is passed as is, so `max_features = 1` means all
-#' features. `categorical_features` takes 1-based positions in the
-#' estimand's input columns (treatment first, then covariates).
+#' features. `categorical_features` takes column names
+#' (`c("region")`), or 1-based positions in the estimand's input columns
+#' (treatment first, then covariates), which don't follow the column order
+#' of the data.
 #'
 #' @export
 RieszTreeRegressor <- R6::R6Class(
@@ -113,12 +115,16 @@ RieszTreeRegressor <- R6::R6Class(
         args$early_stopping_rounds <- as.integer(early_stopping_rounds)
       }
       if (!is.null(categorical_features)) {
-        pos <- as.integer(categorical_features)
-        if (any(is.na(pos) | pos < 1L)) {
-          stop("`categorical_features` takes 1-based column positions (>= 1).",
-               call. = FALSE)
+        args$categorical_features <- if (is.character(categorical_features)) {
+          as.list(categorical_features)
+        } else {
+          pos <- as.integer(categorical_features)
+          if (any(is.na(pos) | pos < 1L)) {
+            stop("`categorical_features` takes column names or 1-based positions (>= 1).",
+                 call. = FALSE)
+          }
+          as.list(pos - 1L)
         }
-        args$categorical_features <- as.list(pos - 1L)
       }
       py_object <- do.call(.module()$RieszTreeRegressor, args)
       super$initialize(py_object = py_object, estimand = estimand)

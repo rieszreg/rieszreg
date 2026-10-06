@@ -94,7 +94,7 @@ The R wrapper exposes the moment-style `ForestRieszRegressor`. It handles ATE, A
 | &nbsp;&nbsp;`$save(path)` | `.save(path)` |
 | `load_riesz_tree_regressor(path)` | `RieszTreeRegressor.load(path)` |
 
-`categorical_features` takes 1-based R column positions.
+`categorical_features` takes column names, or 1-based positions in the estimand's input columns (treatment first).
 
 ## API surface (riesznet)
 

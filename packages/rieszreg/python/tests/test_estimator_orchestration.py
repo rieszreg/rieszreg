@@ -277,3 +277,18 @@ def test_fit_rejects_unidentified_designs():
         RieszEstimator(estimand=ATE(), backend=_StubBackend()).fit(df.assign(a=1.0))
     with pytest.raises(ValueError, match="No row has"):
         RieszEstimator(estimand=TSM(level=2), backend=_StubBackend()).fit(df)
+
+
+def test_fit_binds_a_builtin_subclass_with_its_own_init():
+    from rieszreg import AdditiveShift
+
+    class DoseShift(AdditiveShift):
+        def __init__(self, treatment="dose", covariates=None):
+            super().__init__(delta=1.0, treatment=treatment, covariates=covariates)
+
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"age": rng.normal(size=50), "dose": rng.normal(size=50)})
+    est = RieszEstimator(estimand=DoseShift(), backend=_StubBackend()).fit(df)
+    assert type(est.estimand_) is DoseShift
+    assert est.estimand_.feature_keys == ("dose", "age")
+    assert est.predict(df).shape == (50,)

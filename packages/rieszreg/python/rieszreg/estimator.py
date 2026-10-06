@@ -24,7 +24,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 
 from ._omp import warn_if_multi_backend_omp
-from .backends import Backend, holdout_fraction, load_predictor
+from .backends import Backend, bind_columns, holdout_fraction, load_predictor
 from .estimands.base import Estimand, FiniteEvalEstimand, estimand_from_spec
 from .losses import Loss, SquaredLoss, loss_from_spec
 
@@ -272,6 +272,7 @@ class RieszEstimator(BaseEstimator):
         estimand = self.estimand.bind(
             list(Z.columns) if _is_dataframe(Z) else _n_columns(Z)
         )
+        backend = bind_columns(backend, estimand.feature_keys)
 
         # Resolve validation slice. The backend says how many rows it needs
         # held out for this fit (HoldoutBackend); the split happens before

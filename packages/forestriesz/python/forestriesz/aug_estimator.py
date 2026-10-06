@@ -70,7 +70,7 @@ class AugForestRieszRegressor(RieszEstimator):
         verbose: int = 0,
         splitter: str = "exact",
         max_bins: int = 255,
-        categorical_features: Sequence[int] | None = None,
+        categorical_features: Sequence[str | int] | None = None,
         init: float | None = None,
         random_state: int = 0,
     ):
@@ -99,11 +99,7 @@ class AugForestRieszRegressor(RieszEstimator):
         self.categorical_features = categorical_features
 
     def _resolved_backend(self) -> AugForestRieszBackend:
-        cat = (
-            tuple(int(i) for i in self.categorical_features)
-            if self.categorical_features is not None
-            else None
-        )
+        cat = tuple(self.categorical_features) if self.categorical_features is not None else None
         return AugForestRieszBackend(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,

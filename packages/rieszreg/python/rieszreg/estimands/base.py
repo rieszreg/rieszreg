@@ -164,7 +164,18 @@ class FiniteEvalEstimand(Estimand):
 
 
 def _rebuild_builtin(cls, spec_args):
+    # Kept so estimands pickled before `_restore_builtin` still load.
     return cls(**spec_args)
+
+
+def _restore_builtin(cls, state):
+    """Rebuild a built-in (or a user subclass of one) from its instance state,
+    without calling its constructor: a subclass may define its own
+    ``__init__`` that doesn't take the parent's arguments."""
+    obj = cls.__new__(cls)
+    obj.__dict__.update(state)
+    obj.m = obj._m  # re-bound, so the copy's m reads the copy's fields
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +235,8 @@ class _BuiltinEstimand(FiniteEvalEstimand):
         return hash((type(self), json.dumps(self._spec_args, sort_keys=True, default=str)))
 
     def __reduce__(self):
-        return (_rebuild_builtin, (type(self), self._spec_args))
+        state = {k: v for k, v in self.__dict__.items() if k != "m"}
+        return (_restore_builtin, (type(self), state))
 
     def _treatment_keys(self) -> tuple[str, ...]:
         return () if self.treatment is None else (self.treatment,)
@@ -268,7 +280,13 @@ class _BuiltinEstimand(FiniteEvalEstimand):
                     f"treatment={columns[0]!r})."
                 )
             cov = [c for c in columns if c != str(self.treatment)]
-        return type(self)(**{**self._spec_args, "covariates": cov})
+        bound = _restore_builtin(type(self), self.__dict__)
+        bound.covariates = tuple(cov)
+        bound._spec_args = {**self._spec_args, "covariates": list(cov)}
+        bound.feature_keys = (*t, *cov)
+        if self.factory_spec is not None:
+            bound.factory_spec = {**self.factory_spec, "args": bound._spec_args}
+        return bound
 
 
 class ATE(_BuiltinEstimand):
