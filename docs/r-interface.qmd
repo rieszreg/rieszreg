@@ -37,6 +37,7 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 | `TSM(level, treatment, covariates)` | `rieszreg.TSM(level, treatment, covariates)` |
 | `AdditiveShift(delta, treatment, covariates)` | `rieszreg.AdditiveShift(...)` |
 | `LocalShift(delta, threshold, treatment, covariates)` | `rieszreg.LocalShift(...)` |
+| `OutcomeRegNormSq(covariates)` | `rieszreg.OutcomeRegNormSq(covariates)` |
 | `SquaredLoss()` | `rieszreg.SquaredLoss()` |
 | `KLLoss(max_eta)` | `rieszreg.KLLoss(max_eta)` |
 | `BernoulliLoss(max_abs_eta)` | `rieszreg.BernoulliLoss(...)` |
@@ -48,7 +49,7 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 | &nbsp;&nbsp;`$predict(Z)` | `.predict(Z)` |
 | &nbsp;&nbsp;`$score(Z, y=)` | `.score(Z, y=)` |
 | &nbsp;&nbsp;`$riesz_loss(Z, y=)` | `.riesz_loss(Z, y=)` |
-| &nbsp;&nbsp;`$diagnose(Z)` | `.diagnose(Z)` (returns a list with `$summary` as a string) |
+| &nbsp;&nbsp;`$diagnose(Z, y=)` | `.diagnose(Z, y=)` (returns a list with `$summary` as a string) |
 | &nbsp;&nbsp;`$save(path)` | `.save(path)` |
 | `load_riesz_booster(path)` | `RieszBooster.load(path)` |
 | &nbsp;&nbsp;`$py` | the underlying Python object |
@@ -60,7 +61,7 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 | `Gaussian(length_scale)` | `krrr.Gaussian(length_scale)` |
 | `Matern(nu, length_scale)` | `krrr.Matern(nu, length_scale)` |
 | `Linear()` / `Polynomial(...)` | `krrr.Linear()` / `krrr.Polynomial(...)` |
-| `KernelRidgeBackend(kernel, lambda_grid, solver, ...)` | `krrr.KernelRidgeBackend(...)` |
+| `Tensor(a, cols_a, b, cols_b)` | `krrr.Tensor(...)` (R column positions are 1-based) |
 | `KernelRieszRegressor$new(estimand, kernel, ...)` | `krrr.KernelRieszRegressor(...)` |
 | &nbsp;&nbsp;`$fit(df, eval_set=)` | `.fit(Z, eval_set=)` |
 | &nbsp;&nbsp;`$predict(df)` | `.predict(Z)` |
@@ -77,7 +78,7 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 | &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(Z)` |
 | `load_forest_riesz_regressor(path)` | `ForestRieszRegressor.load(path)` |
 
-The R wrapper exposes the moment-style `ForestRieszRegressor` (single-basis fits — handles ATE/ATT/TSM via the auto-resolved sieve in Python). The augmentation-style `AugForestRieszRegressor` is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.
+The R wrapper exposes the moment-style `ForestRieszRegressor`. It handles ATE, ATT and TSM through the default treatment-indicator basis. The augmentation-style `AugForestRieszRegressor` is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.
 
 ## API surface (riesznet)
 
@@ -92,6 +93,8 @@ The R wrapper exposes the moment-style `ForestRieszRegressor` (single-basis fits
 The R wrapper exposes the simple-MLP convenience surface only. Custom torch architectures (custom `nn.Module` factory, custom optimizer, custom scheduler) are Python-only — define the factory in Python at module top level and call into Python via reticulate. `TorchBackend` direct construction is also Python-only in v1.
 
 R6's `$method()` syntax maps to Python's `.method()`. Integer-typed kwargs (`n_estimators`, `max_depth`, `random_state`, `early_stopping_rounds`, `n_landmarks`, `n_features`, `cg_max_iter`, `min_samples_leaf`, `subforest_size`, `epochs`, `batch_size`) take an `L` suffix in R: `n_estimators = 200L`. Other kwargs are auto-converted by reticulate.
+
+Data frames are converted to pandas column by column. Numeric and logical columns pass through as numbers. Factor columns are converted through their labels, so a treatment coded `factor(c("0", "1"))` arrives as 0/1. ATE and ATT need the treatment coded 0/1 and stop with an error otherwise.
 
 ## Parity
 

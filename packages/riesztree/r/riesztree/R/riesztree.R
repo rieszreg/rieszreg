@@ -54,7 +54,12 @@ use_python_riesztree <- function(python = NULL, required = TRUE) {
 #' `min_samples_leaf`, `min_weight_fraction_leaf`, `max_leaf_nodes`,
 #' `max_features`, `growth_policy`, `min_impurity_decrease`, `ccp_alpha`,
 #' `early_stopping_rounds`, `validation_fraction`, `categorical_features`,
-#' `splitter`, `max_bins`.
+#' `splitter`, `max_bins`. `max_depth = NULL` and `max_leaf_nodes = NULL`
+#' mean no limit. `max_features` follows Python: an integer (`3L`, or a
+#' whole number above 1) is a feature count, while a fraction in (0, 1] or a
+#' string such as `"sqrt"` is passed as is, so `max_features = 1` means all
+#' features. `categorical_features` takes 1-based positions in the
+#' estimand's input columns (treatment first, then covariates).
 #'
 #' @export
 RieszTreeRegressor <- R6::R6Class(
@@ -81,11 +86,9 @@ RieszTreeRegressor <- R6::R6Class(
                           max_bins = 255L) {
       args <- list(
         estimand = estimand,
-        max_depth = as.integer(max_depth),
         min_samples_split = as.integer(min_samples_split),
         min_samples_leaf = as.integer(min_samples_leaf),
         min_weight_fraction_leaf = min_weight_fraction_leaf,
-        max_leaf_nodes = as.integer(max_leaf_nodes),
         growth_policy = growth_policy,
         min_impurity_decrease = min_impurity_decrease,
         ccp_alpha = ccp_alpha,
@@ -96,12 +99,26 @@ RieszTreeRegressor <- R6::R6Class(
       )
       if (!is.null(loss)) args$loss <- loss
       if (!is.null(init)) args$init <- init
-      if (!is.null(max_features)) args$max_features <- max_features
+      args["max_depth"] <- list(if (is.null(max_depth)) NULL else as.integer(max_depth))
+      args["max_leaf_nodes"] <- list(if (is.null(max_leaf_nodes)) NULL else as.integer(max_leaf_nodes))
+      if (!is.null(max_features)) {
+        # An R integer or a whole number above 1 is a feature count (Python
+        # int). 1 stays a float: in Python, 1.0 means all features.
+        count <- is.integer(max_features) ||
+          (is.numeric(max_features) && max_features > 1 &&
+             max_features == round(max_features))
+        args$max_features <- if (count) as.integer(max_features) else max_features
+      }
       if (!is.null(early_stopping_rounds)) {
         args$early_stopping_rounds <- as.integer(early_stopping_rounds)
       }
       if (!is.null(categorical_features)) {
-        args$categorical_features <- as.integer(categorical_features)
+        pos <- as.integer(categorical_features)
+        if (any(is.na(pos) | pos < 1L)) {
+          stop("`categorical_features` takes 1-based column positions (>= 1).",
+               call. = FALSE)
+        }
+        args$categorical_features <- as.list(pos - 1L)
       }
       py_object <- do.call(.module()$RieszTreeRegressor, args)
       super$initialize(py_object = py_object, estimand = estimand)

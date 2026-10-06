@@ -7,11 +7,9 @@
 #' Estimand and loss factories live in the shared `rieszreg` R package and are
 #' re-exported from here for convenience.
 #'
-#' Scope note: the R wrapper exposes locally constant fits only. Locally
-#' linear fits require Python-callable basis functions (`riesz_feature_fns`)
-#' and are Python-only in this release. Difference-style estimands (ATE,
-#' ATT, AdditiveShift, LocalShift) need a sieve, so call them from Python via
-#' reticulate or wait for v2.
+#' The R wrapper uses the default basis functions (`riesz_feature_fns =
+#' "auto"`): treatment indicators for ATE, ATT and TSM. Custom basis
+#' functions are Python callables and are set from Python.
 #'
 #' @keywords internal
 "_PACKAGE"
@@ -58,8 +56,9 @@ use_python_forestriesz <- function(python = NULL, required = TRUE) {
 #' (`n_estimators`, `max_depth`, `min_samples_leaf`, `honest`, `inference`,
 #' `l2`, ...) on the constructor.
 #'
-#' Locally constant only from R (single-level estimands like `TSM(level=1)`).
-#' For ATE/ATT/sieve fits, call into Python via reticulate.
+#' Works with ATE, ATT and TSM through the default treatment-indicator
+#' basis. `l2` (default 0) is a ridge added to each leaf's linear solve;
+#' values above 0 can give very large weights out of sample.
 #'
 #' @export
 ForestRieszRegressor <- R6::R6Class(
@@ -108,9 +107,10 @@ ForestRieszRegressor <- R6::R6Class(
     #' Requires `honest = TRUE` and `inference = TRUE` at fit. Locally
     #' constant only in v1.
     predict_interval = function(df, alpha = 0.05) {
-      result <- self$py$predict_interval(df, alpha = alpha)
-      list(lb = reticulate::py_to_r(result[[1]]),
-           ub = reticulate::py_to_r(result[[2]]))
+      result <- reticulate::py_to_r(
+        self$py$predict_interval(rieszreg::df_to_py(df), alpha = alpha)
+      )
+      list(lb = as.numeric(result[[1]]), ub = as.numeric(result[[2]]))
     }
   )
 )

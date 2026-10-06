@@ -76,16 +76,24 @@ Polynomial <- function(degree = 3L, gamma = 1.0, coef0 = 1.0) {
 }
 
 #' Tensor-product kernel over disjoint feature subsets.
+#'
+#' Column indices are 1-based positions in the estimand's input columns
+#' (treatment first, then covariates in order), as usual in R.
 #' @param a Kernel applied on `cols_a`.
-#' @param cols_a Integer vector of column indices.
+#' @param cols_a Integer vector of 1-based column positions.
 #' @param b Kernel applied on `cols_b`.
-#' @param cols_b Integer vector of column indices.
+#' @param cols_b Integer vector of 1-based column positions.
 #' @export
 Tensor <- function(a, cols_a, b, cols_b) {
+  cols_a <- as.integer(cols_a)
+  cols_b <- as.integer(cols_b)
+  if (any(is.na(c(cols_a, cols_b)) | c(cols_a, cols_b) < 1L)) {
+    stop("Tensor() takes 1-based column positions (>= 1).", call. = FALSE)
+  }
   .module()$Tensor(a = a,
-                   cols_a = as.list(as.integer(cols_a)),
+                   cols_a = as.list(as.integer(cols_a) - 1L),
                    b = b,
-                   cols_b = as.list(as.integer(cols_b)))
+                   cols_b = as.list(as.integer(cols_b) - 1L))
 }
 
 
