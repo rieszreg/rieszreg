@@ -921,7 +921,7 @@ window.Quarto = {
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> holdout_fraction(<span class="va">self</span>):</span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Hold rows out only when early stopping will use them.</span></span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.validation_fraction <span class="cf">if</span> <span class="va">self</span>.early_stopping_rounds <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="fl">0.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>An <code>eval_set</code> passed to <code>fit</code> replaces the split. A backend with a <code>validation_fraction</code> attribute but no <code>holdout_fraction()</code> method gets that fraction held out on every fit. Backends that compute their own internal CV or that don’t need a holdout define neither.</p>
+<p>An <code>eval_set</code> passed to <code>fit</code> replaces the split. A backend without the method gets no holdout, whatever attributes it has. Backends that compute their own internal CV or that don’t need a holdout define neither.</p>
 </section>
 <section id="save-load-conformance" class="level3">
 <h3 class="anchored" data-anchor-id="save-load-conformance">Save, load, conformance</h3>

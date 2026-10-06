@@ -571,8 +571,8 @@ L_i = \tilde h(\alpha(z_i)) - \sum_{j} c_j \cdot h'(\alpha(p_j))
 <section id="two-surfaces" class="level2">
 <h2 class="anchored" data-anchor-id="two-surfaces">Two surfaces</h2>
 <ul>
-<li><strong><code>RieszNet</code></strong> — convenience class with a default MLP. Surfaces <code>hidden_sizes</code>, <code>activation</code>, <code>dropout</code>, <code>learning_rate</code>, <code>weight_decay</code>, <code>epochs</code>, <code>batch_size</code>, <code>device</code>, <code>dtype</code>.</li>
-<li><strong><code>TorchBackend</code></strong> — power-user surface. Pass any <code>nn.Module</code> factory and any optimizer factory. Compose with <code>rieszreg.RieszEstimator</code> for full control.</li>
+<li><strong><code>RieszNet</code></strong>: convenience class with a default MLP. Surfaces <code>hidden_sizes</code>, <code>activation</code>, <code>dropout</code>, <code>learning_rate</code>, <code>weight_decay</code>, <code>epochs</code>, <code>batch_size</code>, <code>device</code>, <code>dtype</code>, <code>standardize</code>, <code>n_jobs</code>.</li>
+<li><strong><code>TorchBackend</code></strong>: power-user surface. Pass any <code>nn.Module</code> factory and any optimizer factory. Compose with <code>rieszreg.RieszEstimator</code> for full control.</li>
 </ul>
 </section>
 <section id="quickstart-ate" class="level2">
@@ -1020,24 +1020,24 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f439b965c70&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x15da9d5d0&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f439b965c70&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x15da9d5d0&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="op">=</span> a <span class="op">/</span> pi <span class="op">-</span> (<span class="dv">1</span> <span class="op">-</span> a) <span class="op">/</span> (<span class="dv">1</span> <span class="op">-</span> pi)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr(α̂, α₀) = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>corr(α̂, α₀) = 0.963</code></pre>
+<pre><code>corr(α̂, α₀) = 0.962</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"RMSE         = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(np.mean((alpha_hat <span class="op">-</span> true_alpha)<span class="op">**</span><span class="dv">2</span>))<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>RMSE         = 0.699</code></pre>
+<pre><code>RMSE         = 0.722</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best_iter    = </span><span class="sc">{</span>rn<span class="sc">.</span>best_iteration_<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>best_iter    = 17</code></pre>
+<pre><code>best_iter    = 5</code></pre>
 </div>
 </div>
 </div>
@@ -1503,24 +1503,24 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f439c2fec30&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x1618a6310&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f439063f4a0&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x1621c7150&gt;,
          validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f439c2fec30&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x1618a6310&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f439063f4a0&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x1621c7150&gt;,
          validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="op">=</span> (a <span class="op">==</span> <span class="dv">1</span>).astype(<span class="bu">float</span>) <span class="op">/</span> pi</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"min α̂        = </span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.4f}</span><span class="ss">  (positive by construction)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>min α̂        = 0.0003  (positive by construction)</code></pre>
+<pre><code>min α̂        = 0.0002  (positive by construction)</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr(α̂, α₀) = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>corr(α̂, α₀) = 0.977</code></pre>
+<pre><code>corr(α̂, α₀) = 0.973</code></pre>
 </div>
 </div>
 <p><code>KLLoss</code> and <code>BernoulliLoss</code> reject ATE / ATT / shift-style estimands at fit time, because their α takes negative values. <code>BoundedSquaredLoss(lo, hi)</code> with <code>lo &lt; 0</code> accepts them and clips α̂ into the interval.</p>
@@ -1979,7 +1979,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f438fee0680&gt;,
+</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x162619940&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -1989,8 +1989,10 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     grad_clip_norm=1.0,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
-                                    snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f4390327d40&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f438fee0680&gt;,
+                                    snapshot_epochs=(),
+                                    standardize=True,
+                                    n_jobs=None),
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x161e3b510&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x162619940&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -2000,16 +2002,18 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     grad_clip_norm=1.0,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
-                                    snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f4390327d40&gt;)</pre></div> </div></div></div></div>
+                                    snapshot_epochs=(),
+                                    standardize=True,
+                                    n_jobs=None),
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x161e3b510&gt;)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> est.predict(df)</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"α̂ range: [</span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>α̂ range: [-4.868, 5.654]</code></pre>
+<pre><code>α̂ range: [-5.428, 9.614]</code></pre>
 </div>
 </div>
-<p><code>module_factory</code> and <code>optimizer_factory</code> must be top-level callables (<code>functools.partial</code> over a top-level function is fine). Closures and lambdas raise on <code>save()</code> because they cannot be reconstructed by qualname.</p>
+<p><code>module_factory</code> and <code>optimizer_factory</code> must be top-level callables (<code>functools.partial</code> over a top-level function is fine). Closures and lambdas fit and predict, but raise on <code>save()</code> because they cannot be reconstructed by qualname.</p>
 </section>
 <section id="hyperparameters" class="level2">
 <h2 class="anchored" data-anchor-id="hyperparameters">Hyperparameters</h2>
@@ -2079,29 +2083,44 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <td>Global L2 clip on the gradient.</td>
 </tr>
 <tr class="odd">
+<td><code>standardize</code></td>
+<td><code>True</code></td>
+<td>Center and scale each input column by its mean and standard deviation over the observed training rows, so covariates on any scale train well. The counterfactual rows get the same transformation.</td>
+</tr>
+<tr class="even">
 <td><code>loss</code></td>
 <td><code>SquaredLoss()</code></td>
 <td>Any of the four built-in Bregman losses.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>init</code></td>
 <td><code>None</code></td>
 <td>α-space initialization. Default is <code>m̄ = E[m(Z, 1)]</code> projected into the loss’s domain (the loss-minimizing constant); pass a float to override.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>validation_fraction</code></td>
 <td><code>0.1</code></td>
 <td>Held-out fraction for early stopping. Used only when <code>early_stopping_rounds</code> is set and no <code>eval_set</code> is passed.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>early_stopping_rounds</code></td>
 <td><code>None</code></td>
 <td>Patience (in epochs) for validation Riesz loss. The best-validation weights are restored at the end. With <code>None</code>, all <code>epochs</code> run and the final weights are kept.</td>
 </tr>
+<tr class="even">
+<td><code>snapshot_epochs</code></td>
+<td><code>None</code></td>
+<td>Epochs at which to store the weights for <code>predict_path</code>. <code>None</code> gives about 20 ticks; <code>[]</code> stores none.</td>
+</tr>
 <tr class="odd">
+<td><code>n_jobs</code></td>
+<td><code>None</code></td>
+<td>torch threads during fit and predict. <code>None</code> keeps torch’s setting (all cores unless changed); <code>-1</code> uses all cores. Set <code>1</code> when running many fits in parallel processes.</td>
+</tr>
+<tr class="even">
 <td><code>random_state</code></td>
 <td><code>0</code></td>
-<td>Seeds <code>torch</code>, <code>torch.cuda</code>, and the DataLoader generator.</td>
+<td>Seeds the fit. The global torch random state is restored afterward.</td>
 </tr>
 </tbody>
 </table>
@@ -2160,6 +2179,31 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <td><code>None</code></td>
 <td></td>
 </tr>
+<tr class="odd">
+<td><code>early_stopping_rounds</code></td>
+<td><code>None</code></td>
+<td>Patience in epochs; restores the best-validation weights.</td>
+</tr>
+<tr class="even">
+<td><code>validation_fraction</code></td>
+<td><code>0.1</code></td>
+<td>Held-out fraction for early stopping when no <code>eval_set</code> is passed. Rows are held out only when <code>early_stopping_rounds</code> is set.</td>
+</tr>
+<tr class="odd">
+<td><code>snapshot_epochs</code></td>
+<td><code>()</code></td>
+<td>Epochs at which to store the weights for <code>predict_eta_path</code>.</td>
+</tr>
+<tr class="even">
+<td><code>standardize</code></td>
+<td><code>True</code></td>
+<td>As for <code>RieszNet</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>n_jobs</code></td>
+<td><code>None</code></td>
+<td>As for <code>RieszNet</code>.</td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -2175,7 +2219,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    pred_loaded <span class="op">=</span> loaded.predict(df)</span>
 <span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"max abs diff after round-trip: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">max</span>(np.<span class="bu">abs</span>(pred_loaded <span class="op">-</span> alpha_hat))<span class="sc">:.2e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>max abs diff after round-trip: 9.48e+00</code></pre>
+<pre><code>max abs diff after round-trip: 5.43e+00</code></pre>
 </div>
 </div>
 <p>Save writes <code>state_dict.pt</code> (PyTorch weights, on CPU) plus <code>predictor.json</code> (carries the factory’s module + qualname, the input dim, and the Bregman-loss spec). Load re-imports the factory by qualname, rebuilds the module, and calls <code>load_state_dict</code>. A model saved on a GPU loads and predicts on a machine without one; it runs on the CPU.</p>
@@ -2233,7 +2277,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </section>
 <section id="device-dtype-reproducibility" class="level2">
 <h2 class="anchored" data-anchor-id="device-dtype-reproducibility">Device, dtype, reproducibility</h2>
-<p>The training loop seeds <code>torch</code>, <code>torch.cuda</code>, and a <code>torch.Generator</code> for the data loader, so single-device fits are reproducible run-to-run on the same hardware. Bitwise reproducibility on CUDA across machines is not promised; <code>torch.use_deterministic_algorithms</code> is not enabled by default because it slows training significantly.</p>
+<p>Each fit seeds torch from <code>random_state</code> and restores the global torch random state afterward, so single-device fits are reproducible run-to-run on the same hardware and do not change random draws elsewhere in your code. torch’s random state is shared by the whole process (and, on some torch builds, so is its thread count), so fits started in parallel threads of one process run one at a time; to fit in parallel, use processes (joblib’s default backend). Bitwise reproducibility on CUDA across machines is not promised; <code>torch.use_deterministic_algorithms</code> is not enabled by default because it slows training significantly.</p>
 <p><code>device="auto"</code> picks <code>cuda</code> → <code>mps</code> → <code>cpu</code> in that order. <code>dtype="float64"</code> runs end-to-end in double precision, useful for tightly-coupled gradient checks but slower.</p>
 
 
