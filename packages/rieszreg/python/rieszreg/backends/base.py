@@ -147,13 +147,11 @@ class HoldoutBackend(Protocol):
 def holdout_fraction(backend) -> float:
     """The fraction of training rows the orchestrator holds out for ``backend``.
 
-    Calls ``backend.holdout_fraction()`` when the backend defines it.
-    Otherwise reads a ``validation_fraction`` attribute, or 0 without one.
+    ``backend.holdout_fraction()`` when the backend defines it, otherwise 0:
+    a backend without the method gets no holdout.
     """
     method = getattr(backend, "holdout_fraction", None)
-    if callable(method):
-        return float(method())
-    return float(getattr(backend, "validation_fraction", 0.0) or 0.0)
+    return float(method()) if callable(method) else 0.0
 
 
 # ----- Predictor loader registry (used by RieszEstimator.load) -----

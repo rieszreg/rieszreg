@@ -8,10 +8,14 @@ is a ``TorchPredictor``.
 
 from __future__ import annotations
 
+import contextlib
+import copy
 import functools
 import importlib
 import json
 import math
+import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Iterable
@@ -77,7 +81,7 @@ def _factory_metadata(factory: Callable) -> dict:
             ) from e
     qualname = getattr(inner, "__qualname__", None)
     module = getattr(inner, "__module__", None)
-    if qualname is None or module is None or "." in qualname:
+    if qualname is None or module is None or "." in qualname or qualname.startswith("<"):
         raise ValueError(
             "TorchBackend save/load requires `module_factory` to be a "
             "top-level callable (e.g. a module-level `def`). Closures, "
@@ -95,6 +99,49 @@ def _factory_from_metadata(meta: dict) -> Callable:
     return inner
 
 
+# torch's random state is process-wide, and whether its thread count is
+# depends on the build (per-thread under OpenMP). A fit (and a predict that
+# sets n_jobs) holds this lock while it changes them, so fits in parallel
+# threads run one at a time instead of mixing each other's seeds, and thread
+# counts can't leak between them on any build.
+_TORCH_STATE_LOCK = threading.RLock()
+
+
+@contextlib.contextmanager
+def _num_threads(n_jobs: int | None):
+    """Run the block with torch's intra-op thread count set to ``n_jobs``
+    (``None`` leaves it alone, -1 means all cores), then restore the
+    previous count."""
+    if n_jobs is None:
+        yield
+        return
+    if n_jobs == -1:
+        n_jobs = os.cpu_count() or 1
+    if int(n_jobs) < 1:
+        raise ValueError(f"n_jobs must be None, -1 or a positive integer; got {n_jobs!r}.")
+    with _TORCH_STATE_LOCK:
+        prev = torch.get_num_threads()
+        torch.set_num_threads(int(n_jobs))
+        try:
+            yield
+        finally:
+            torch.set_num_threads(prev)
+
+
+def _standardizer(aug: AugmentedDataset) -> tuple[np.ndarray, np.ndarray]:
+    """Per-column mean and standard deviation of the observed rows (D ≠ 0).
+    Constant columns get scale 1. The test is relative, as in sklearn: a
+    constant 0.1 has a float std of about 1e-16, not 0."""
+    X = aug.features[aug.is_original != 0]
+    loc, scale = X.mean(axis=0), X.std(axis=0)
+    constant = scale <= 10 * np.finfo(float).eps * np.maximum(1.0, np.abs(loc))
+    return loc, np.where(constant, 1.0, scale)
+
+
+def _standardize(X: np.ndarray, loc: np.ndarray | None, scale: np.ndarray | None) -> np.ndarray:
+    return X if loc is None else (X - loc) / scale
+
+
 @dataclass
 class _AugTensors:
     """An ``AugmentedDataset`` on the training device, sorted by origin row
@@ -109,7 +156,7 @@ class _AugTensors:
     n_rows: int
 
     @classmethod
-    def build(cls, aug: AugmentedDataset, device, dtype) -> "_AugTensors":
+    def build(cls, aug: AugmentedDataset, device, dtype, loc=None, scale=None) -> "_AugTensors":
         # Rows with D = C = 0 contribute nothing; drop them.
         keep = (aug.is_original != 0) | (aug.potential_deriv_coef != 0)
         order = np.flatnonzero(keep)[np.argsort(aug.origin_index[keep], kind="stable")]
@@ -120,7 +167,7 @@ class _AugTensors:
             return torch.as_tensor(np.ascontiguousarray(a), dtype=dt, device=device)
 
         return cls(
-            features=t(aug.features[order]),
+            features=t(_standardize(aug.features[order], loc, scale)),
             is_original=t(aug.is_original[order]),
             potential_deriv_coef=t(aug.potential_deriv_coef[order]),
             origin=t(origin, torch.long),
@@ -192,6 +239,13 @@ class TorchPredictor:
     When fit with ``snapshot_epochs`` set, also stores a per-epoch
     ``state_dict`` snapshot dictionary so ``predict_eta_path`` /
     ``predict_alpha_path`` can return α̂ at every snapshot epoch in one call.
+    ``feature_loc`` / ``feature_scale`` standardize inputs before the model
+    sees them (``None`` when the backend was fit with ``standardize=False``).
+
+    The predictor puts the model in eval mode on its device once, at
+    construction, and never changes it afterward. Each snapshot is evaluated
+    on its own copy of the model, built on first use, so concurrent
+    predictions are safe.
     """
 
     model: torch.nn.Module
@@ -200,45 +254,56 @@ class TorchPredictor:
     input_dim: int
     dtype: str
     device: str
-    factory_metadata: dict
+    module_factory: Callable[[int], torch.nn.Module]
     snapshot_state_dicts: dict[int, dict[str, torch.Tensor]] | None = None
     snapshot_epochs: tuple[int, ...] | None = None
+    feature_loc: np.ndarray | None = None
+    feature_scale: np.ndarray | None = None
+    n_jobs: int | None = None
 
     kind: ClassVar[str] = "riesznet"
+
+    def __post_init__(self):
+        device = _resolve_device(self.device, self.dtype)
+        # A model saved on a GPU still predicts on a machine without one.
+        if (device.type == "cuda" and not torch.cuda.is_available()) or (
+            device.type == "mps" and not torch.backends.mps.is_available()
+        ):
+            device = torch.device("cpu")
+        self._device = device
+        self.model.to(device=device, dtype=_resolve_dtype(self.dtype)).eval()
+        self._snapshot_models: dict[int, torch.nn.Module] = {}
+
+    def _snapshot_model(self, epoch: int) -> torch.nn.Module:
+        model = self._snapshot_models.get(epoch)
+        if model is None:
+            model = copy.deepcopy(self.model)
+            model.load_state_dict(self.snapshot_state_dicts[epoch])
+            self._snapshot_models[epoch] = model
+        return model
 
     # ---- prediction ----
 
     def _input_tensor(self, features: np.ndarray) -> torch.Tensor:
-        """Check the feature width, move the model to its device, and return
-        ``features`` as a tensor there."""
+        """Check the feature width and return the standardized ``features``
+        as a tensor on the model's device."""
         X = np.atleast_2d(np.array(features, dtype=float))
         if X.shape[1] != self.input_dim:
             raise ValueError(
                 f"TorchPredictor expects {self.input_dim} input features, "
                 f"got {X.shape[1]}."
             )
-        device, dtype = _resolve_device(self.device, self.dtype), _resolve_dtype(self.dtype)
-        # A model saved on a GPU still predicts on a machine without one.
-        if (device.type == "cuda" and not torch.cuda.is_available()) or (
-            device.type == "mps" and not torch.backends.mps.is_available()
-        ):
-            device = torch.device("cpu")
-        self.model.to(device=device, dtype=dtype)
-        return torch.as_tensor(X, dtype=dtype, device=device)
+        X = _standardize(X, self.feature_loc, self.feature_scale)
+        return torch.as_tensor(X, dtype=_resolve_dtype(self.dtype), device=self._device)
 
-    def _eta(self, X_t: torch.Tensor) -> np.ndarray:
-        with torch.no_grad():
-            eta_t = self.model(X_t).squeeze(-1) + self.base_score
+    def _eta(self, X_t: torch.Tensor, model: torch.nn.Module | None = None) -> np.ndarray:
+        """η at ``X_t`` from the fitted model, or from ``model`` (a snapshot)."""
+        with torch.no_grad(), _num_threads(self.n_jobs):
+            eta_t = (self.model if model is None else model)(X_t).squeeze(-1) + self.base_score
         return eta_t.cpu().numpy().astype(float)
 
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
-        X_t = self._input_tensor(features)
-        was_training = self.model.training
-        self.model.eval()
-        try:
-            return self._eta(X_t)
-        finally:
-            self.model.train(was_training)
+        return self._eta(self._input_tensor(features))
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
@@ -272,20 +337,7 @@ class TorchPredictor:
     ) -> np.ndarray:
         chosen = self._resolve_snapshot_epochs(epochs)
         X_t = self._input_tensor(features)
-        original_state = {
-            k: v.detach().clone() for k, v in self.model.state_dict().items()
-        }
-        was_training = self.model.training
-        self.model.eval()
-        try:
-            out = []
-            for ep in chosen:
-                self.model.load_state_dict(self.snapshot_state_dicts[ep])
-                out.append(self._eta(X_t))
-            return np.column_stack(out)
-        finally:
-            self.model.load_state_dict(original_state)
-            self.model.train(was_training)
+        return np.column_stack([self._eta(X_t, self._snapshot_model(ep)) for ep in chosen])
 
     def predict_alpha_path(
         self, features: np.ndarray, epochs: Iterable[int] | None = None
@@ -296,6 +348,9 @@ class TorchPredictor:
     # ---- serialization ----
 
     def save(self, dir_path) -> None:
+        # Raises for a factory that can't be re-imported by qualname, before
+        # anything is written.
+        factory_meta = _factory_metadata(self.module_factory)
         path = Path(dir_path)
         path.mkdir(parents=True, exist_ok=True)
         # Always save weights on CPU so load works on machines without the
@@ -309,12 +364,15 @@ class TorchPredictor:
             "input_dim": int(self.input_dim),
             "dtype": self.dtype,
             "device": self.device,
-            "factory": self.factory_metadata,
+            "factory": factory_meta,
             "snapshot_epochs": (
                 list(self.snapshot_epochs)
                 if self.snapshot_epochs is not None
                 else None
             ),
+            "feature_loc": None if self.feature_loc is None else self.feature_loc.tolist(),
+            "feature_scale": None if self.feature_scale is None else self.feature_scale.tolist(),
+            "n_jobs": self.n_jobs,
         }
         with open(path / "predictor.json", "w") as f:
             json.dump(meta, f, indent=2)
@@ -340,6 +398,7 @@ class TorchPredictor:
         device = meta.get("device", "cpu")
 
         factory = _factory_from_metadata(meta["factory"])
+        loc, scale = meta.get("feature_loc"), meta.get("feature_scale")
         model = factory(int(meta["input_dim"]))
         torch_dtype = _resolve_dtype(dtype)
         model.to(dtype=torch_dtype)
@@ -363,11 +422,14 @@ class TorchPredictor:
             input_dim=int(meta["input_dim"]),
             dtype=dtype,
             device=device,
-            factory_metadata=meta["factory"],
+            module_factory=factory,
             snapshot_state_dicts=snap_state_dicts,
             snapshot_epochs=(
                 tuple(int(e) for e in snap_epochs) if snap_epochs else None
             ),
+            feature_loc=None if loc is None else np.asarray(loc, dtype=float),
+            feature_scale=None if scale is None else np.asarray(scale, dtype=float),
+            n_jobs=meta.get("n_jobs"),
         )
 
 
@@ -420,6 +482,27 @@ class TorchBackend:
     dtype : {"float32", "float64"}, default "float32"
     grad_clip_norm : float or None, default None
         Global L2 gradient-norm clip applied before each optimizer step.
+    early_stopping_rounds : int or None, default None
+        Stop after this many epochs without validation-loss improvement and
+        restore the best-validation weights.
+    validation_fraction : float, default 0.1
+        Fraction of training rows held out for early stopping when no
+        ``eval_set`` is passed. Rows are held out only when
+        ``early_stopping_rounds`` is set.
+    snapshot_epochs : tuple of int, default ()
+        Epochs at which to store the weights for ``predict_eta_path``.
+    standardize : bool, default True
+        Center and scale each input column by its mean and standard deviation
+        over the observed training rows. The counterfactual rows get the
+        same transformation, so it is valid for every estimand.
+    n_jobs : int or None, default None
+        torch intra-op threads during fit and predict. ``None`` keeps torch's
+        current setting (all cores unless changed); -1 uses all cores.
+
+    torch's random state is process-wide (and, on some builds, so is its
+    thread count), so fits running in parallel threads of one process take
+    turns. Run parallel fits in separate processes (joblib's default) to fit
+    them at the same time.
     """
 
     module_factory: Callable[[int], torch.nn.Module] = field(
@@ -435,8 +518,14 @@ class TorchBackend:
     dtype: str = "float32"
     grad_clip_norm: float | None = None
     early_stopping_rounds: int | None = None
-    validation_fraction: float = 0.0
+    validation_fraction: float = 0.1
     snapshot_epochs: tuple[int, ...] = ()
+    standardize: bool = True
+    n_jobs: int | None = None
+
+    def holdout_fraction(self) -> float:
+        """Rows to hold out: ``validation_fraction`` under early stopping, else 0."""
+        return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
 
     def fit_augmented(
         self,
@@ -447,27 +536,39 @@ class TorchBackend:
         base_score: float,
         random_state: int,
     ) -> FitResult:
-        torch_loss = TorchRieszLoss(loss)
         if aug_valid is None and self.early_stopping_rounds is not None:
             raise ValueError(
                 "early_stopping_rounds requires a validation set. Set "
                 "validation_fraction>0 (or pass eval_set=) when fitting."
             )
-
-        # ---- seeding ----
+        device = _resolve_device(self.device, self.dtype)
         seed = int(random_state)
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
+        # fork_rng restores the caller's torch random state, on the CPU and
+        # on the training device, after the fit.
+        cpu = device.type == "cpu"
+        with _TORCH_STATE_LOCK, _num_threads(self.n_jobs), torch.random.fork_rng(
+            devices=[] if cpu else None, device_type="cuda" if cpu else device.type,
+        ):
+            if cpu:
+                torch.default_generator.manual_seed(seed)
+            else:
+                torch.manual_seed(seed)
+            return self._fit(aug_train, aug_valid, loss, base_score, seed, device)
+
+    def _fit(self, aug_train, aug_valid, loss, base_score, seed, device) -> FitResult:
+        torch_loss = TorchRieszLoss(loss)
         gen = torch.Generator().manual_seed(seed)
 
-        device = _resolve_device(self.device, self.dtype)
         dtype = _resolve_dtype(self.dtype)
         input_dim = int(aug_train.features.shape[1])
 
         # ---- data: each row's evaluation points, grouped by row ----
-        train = _AugTensors.build(aug_train, device, dtype)
-        valid = _AugTensors.build(aug_valid, device, dtype) if aug_valid is not None else None
+        loc, scale = _standardizer(aug_train) if self.standardize else (None, None)
+        train = _AugTensors.build(aug_train, device, dtype, loc, scale)
+        valid = (
+            _AugTensors.build(aug_valid, device, dtype, loc, scale)
+            if aug_valid is not None else None
+        )
 
         # ---- build model + optimizer ----
         model = self.module_factory(input_dim).to(device=device, dtype=dtype)
@@ -533,10 +634,6 @@ class TorchBackend:
         if best_state is not None:
             model.load_state_dict(best_state)
 
-        # Build factory metadata once at end-of-fit so any importability error
-        # surfaces early, before the user tries to save.
-        factory_meta = _factory_metadata(self.module_factory)
-
         # Only retain snapshot epochs that were actually reached during
         # training (early stopping may end the loop before later ticks).
         retained_epochs = tuple(sorted(snapshots.keys()))
@@ -547,9 +644,12 @@ class TorchBackend:
             input_dim=input_dim,
             dtype=self.dtype,
             device=str(device),
-            factory_metadata=factory_meta,
+            module_factory=self.module_factory,
             snapshot_state_dicts=snapshots if retained_epochs else None,
             snapshot_epochs=retained_epochs if retained_epochs else None,
+            feature_loc=loc,
+            feature_scale=scale,
+            n_jobs=self.n_jobs,
         )
 
         return FitResult(

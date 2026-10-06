@@ -1,6 +1,6 @@
 ---
 name: rieszreg-add-learner-package
-description: Contract checklist for adding a new learner package or a new backend to the rieszreg family. Covers which Protocol to implement (`Backend.fit_augmented` for augmentation-style, `MomentBackend.fit_rows` for moment-style), the directory layout, sklearn-compatibility gates, the R6 wrapper, required test suites (sklearn-conformance, reference parity, consistency), per-estimand examples, and serialization. Triggers when scaffolding a new package directory under `packages/`, adding a backend file under `packages/*/python/*/backends/`, asking "how do I add a learner / backend / package", or when the conversation mentions a not-yet-existing package name.
+description: Contract checklist for adding a new learner package or a new backend to the rieszreg family. Covers which Protocol to implement (`Backend.fit_augmented` for augmentation-style, `MomentBackend.fit_rows` for moment-style), the directory layout, sklearn-compatibility gates, the R6 wrapper, required test suites (sklearn-conformance, reference parity, consistency), per-estimand examples, and serialization. Triggers when scaffolding a new package directory under `packages/`, adding a backend file (`packages/*/python/*/backend.py` or `backends/`), asking "how do I add a learner / backend / package", or when the conversation mentions a not-yet-existing package name.
 ---
 
 # Adding a new learner package or backend
@@ -14,9 +14,9 @@ For the architectural rules behind the contract (tier classification, the agnost
 ```
 packages/<pkg>/
 ├── python/<pkg>/
-│   ├── backends/              # ONLY backend implementations
+│   ├── backend.py             # backend implementation; a backends/ folder when there are several
 │   ├── <pkg>_specific.py      # things unique to the package (e.g. kernel algebra in krrr)
-│   ├── convenience.py         # optional thin subclass of rieszreg.RieszEstimator with backend baked in
+│   ├── estimator.py           # optional thin subclass of rieszreg.RieszEstimator with backend baked in
 │   └── __init__.py            # re-exports rieszreg primitives + the package's own additions
 ├── r/<pkg>/                   # subclass of rieszreg's R6 base
 │   ├── DESCRIPTION            # Imports: R6, reticulate, rieszreg

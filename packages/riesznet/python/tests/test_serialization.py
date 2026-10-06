@@ -91,19 +91,29 @@ def test_metadata_round_trips(tmp_path, logistic_tsm_df):
     assert hp["epochs"] == 10
 
 
-def test_closure_factory_save_raises(tmp_path, logistic_tsm_df):
-    """Defining a factory inside a function should raise on save (qualname carries '<locals>')."""
+def _local_factory():
     def local_factory(input_dim):  # qualname includes "<locals>"
         return nn.Linear(input_dim, 1)
+    return local_factory
 
+
+_lambda_factory = lambda input_dim: nn.Linear(input_dim, 1)  # noqa: E731
+
+
+@pytest.mark.parametrize("factory", [_local_factory(), _lambda_factory], ids=["closure", "lambda"])
+def test_unimportable_factory_fits_but_save_raises(tmp_path, logistic_tsm_df, factory):
+    """A factory that can't be re-imported by qualname still fits and
+    predicts; only save raises, before writing anything."""
     backend = TorchBackend(
-        module_factory=local_factory,
+        module_factory=factory,
         optimizer_factory=functools.partial(build_adam),
         epochs=2,
     )
     est = RieszEstimator(estimand=TSM(level=1), backend=backend, random_state=0)
+    assert np.all(np.isfinite(est.fit(logistic_tsm_df).predict(logistic_tsm_df)))
     with pytest.raises(ValueError, match="top-level"):
-        est.fit(logistic_tsm_df)
+        est.save(tmp_path / "m")
+    assert not (tmp_path / "m" / "state_dict.pt").exists()
 
 
 @pytest.mark.skipif(torch.cuda.is_available(), reason="needs a machine without CUDA")

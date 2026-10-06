@@ -2,16 +2,19 @@
 
 Bit-equality against an independent fit at the same epoch count holds because
 PyTorch's Adam trajectory is deterministic given a fixed seed and identical
-data ordering. The riesznet backend seeds both `torch.manual_seed` and the
+data ordering. The riesznet backend seeds both torch's global generator and the
 `torch.Generator` driving minibatch shuffles, so two fits with the same
 `random_state`, `batch_size`, and `epochs` see the same per-step state.
 """
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from riesznet import ATE, RieszNet
 from riesznet.backend import auto_snapshot_epochs
@@ -132,3 +135,19 @@ def test_early_stopping_drops_post_stop_snapshots():
     # Every retained tick must be ≤ the number of epochs actually run.
     assert all(e <= 50 for e in stored)
     assert 1 in stored
+
+
+def test_predictions_leave_the_model_unchanged_and_are_thread_safe():
+    """predict_path evaluates snapshots without loading them into the model,
+    so predictions running at the same time never see another epoch's weights."""
+    df = _df(200)
+    est = RieszNet(ATE(), hidden_sizes=(8,), epochs=20, snapshot_epochs=[1, 20], random_state=0).fit(df)
+    before = {k: v.clone() for k, v in est.predictor_.model.state_dict().items()}
+    alpha, path = est.predict(df), est.predict_path(df)
+    for k, v in est.predictor_.model.state_dict().items():
+        torch.testing.assert_close(v, before[k], rtol=0, atol=0)
+    assert not est.predictor_.model.training
+    with ThreadPoolExecutor(4) as ex:
+        futures = [ex.submit(est.predict_path if i % 2 else est.predict, df) for i in range(40)]
+    for i, f in enumerate(futures):
+        np.testing.assert_array_equal(f.result(), path if i % 2 else alpha)

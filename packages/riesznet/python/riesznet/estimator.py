@@ -3,7 +3,7 @@
 Subclass of ``rieszreg.RieszEstimator`` that defaults the backend to a simple
 MLP trained with Adam, surfacing the common knobs (``hidden_sizes``,
 ``activation``, ``dropout``, ``learning_rate``, ``weight_decay``, ``epochs``,
-``device``, ``dtype``) on the constructor.
+``device``, ``dtype``, ``standardize``, ``n_jobs``) on the constructor.
 
 Power users who want a custom architecture instantiate ``TorchBackend``
 directly and pass it to ``RieszEstimator(estimand, backend=...)``.
@@ -49,6 +49,10 @@ class RieszNet(RieszEstimator):
     device : {"cpu", "cuda", "mps", "auto"}, default "cpu"
     dtype : {"float32", "float64"}, default "float32"
     grad_clip_norm : float or None, default None
+    standardize : bool, default True
+        Center and scale each input column by its mean and standard deviation
+        over the observed training rows, so covariates on any scale train
+        well. The counterfactual rows get the same transformation.
     loss : rieszreg.Loss, default SquaredLoss()
         Any of ``SquaredLoss``, ``KLLoss``, ``BernoulliLoss``,
         ``BoundedSquaredLoss``.
@@ -70,6 +74,10 @@ class RieszNet(RieszEstimator):
         builds an auto-grid of about 20 ticks: epochs 1, 2, 5, 10, then every
         ``epochs // 20`` epochs up to ``epochs`` (see :func:`riesznet.backend.auto_snapshot_epochs`). Pass an empty
         sequence to disable snapshotting entirely.
+    n_jobs : int or None, default None
+        torch intra-op threads during fit and predict. ``None`` keeps torch's
+        current setting (all cores unless changed); -1 uses all cores. Set 1
+        when running many fits in parallel.
     random_state : int, default 0
     """
 
@@ -86,11 +94,13 @@ class RieszNet(RieszEstimator):
         device: str = "cpu",
         dtype: str = "float32",
         grad_clip_norm: float | None = None,
+        standardize: bool = True,
         loss: Loss | None = None,
         init: float | None = None,
         validation_fraction: float = 0.1,
         early_stopping_rounds: int | None = None,
         snapshot_epochs: Sequence[int] | None = None,
+        n_jobs: int | None = None,
         random_state: int = 0,
     ):
         super().__init__(
@@ -110,9 +120,11 @@ class RieszNet(RieszEstimator):
         self.device = device
         self.dtype = dtype
         self.grad_clip_norm = grad_clip_norm
+        self.standardize = standardize
         self.early_stopping_rounds = early_stopping_rounds
         self.validation_fraction = validation_fraction
         self.snapshot_epochs = snapshot_epochs
+        self.n_jobs = n_jobs
 
     # ---- defaults / backend construction ----
 
@@ -150,10 +162,10 @@ class RieszNet(RieszEstimator):
             dtype=self.dtype,
             grad_clip_norm=self.grad_clip_norm,
             early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=(
-                self.validation_fraction if self.early_stopping_rounds is not None else 0.0
-            ),
+            validation_fraction=self.validation_fraction,
             snapshot_epochs=self._resolved_snapshot_epochs(),
+            standardize=bool(self.standardize),
+            n_jobs=self.n_jobs,
         )
 
     def predict_path(

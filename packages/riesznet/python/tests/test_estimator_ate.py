@@ -83,3 +83,30 @@ def test_ate_correlation_with_true_alpha():
     # Lax: just confirm we're learning *something* positive.
     corr = np.corrcoef(alpha_hat, alpha_true)[0, 1]
     assert corr > 0.5, f"Pearson corr too low: {corr:.3f}"
+
+
+def test_standardize_makes_fit_invariant_to_covariate_scale():
+    """With standardize=True, an affine change of units in a covariate leaves
+    the fitted α̂ unchanged, because the counterfactual rows are standardized
+    with the observed rows' mean and scale."""
+    df = dgps.linear_gaussian_ate().sample(300, np.random.default_rng(0))
+    rescaled = df.assign(x=1000.0 * df["x"] + 50.0)
+    kw = dict(estimand=ATE(), hidden_sizes=(16,), epochs=30, dtype="float64", random_state=0)
+    np.testing.assert_allclose(
+        RieszNet(**kw).fit(df).predict(df),
+        RieszNet(**kw).fit(rescaled).predict(rescaled),
+        rtol=1e-6, atol=1e-8,
+    )
+    # Without standardization the raw scale reaches the network.
+    raw = RieszNet(**kw, standardize=False)
+    assert not np.allclose(raw.fit(df).predict(df), raw.fit(rescaled).predict(rescaled), rtol=1e-3)
+
+
+def test_standardize_leaves_a_constant_column_unscaled():
+    """A constant 0.1 has a float std of about 1e-16. Dividing by it would
+    send any other value of that column to ~1e15 at predict time."""
+    df = dgps.linear_gaussian_ate().sample(300, np.random.default_rng(0)).assign(c=0.1)
+    est = RieszNet(estimand=ATE(covariates=["x", "c"]), hidden_sizes=(16,), epochs=5,
+                   random_state=0).fit(df)
+    shifted = est.predict(df.assign(c=0.2))
+    assert np.abs(shifted).max() < 100 * np.abs(est.predict(df)).max()

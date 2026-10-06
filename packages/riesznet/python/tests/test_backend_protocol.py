@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import functools
 
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
+import pytest
+import torch
 
 import riesznet
 from riesznet import RieszNet, TorchBackend, TorchPredictor
@@ -73,3 +77,88 @@ def test_rieszreg_orchestrator_composes_with_torch_backend(linear_gaussian_ate_d
     pred = est.predict(linear_gaussian_ate_df)
     assert pred.shape == (len(linear_gaussian_ate_df),)
     assert np.all(np.isfinite(pred))
+
+
+_threads_seen: list[int] = []
+
+
+def _thread_recording_factory(input_dim):
+    _threads_seen.append(torch.get_num_threads())
+    return build_mlp(input_dim, hidden_sizes=(4,))
+
+
+def test_n_jobs_sets_threads_for_fit_and_restores_them(linear_gaussian_ate_df):
+    from rieszreg import ATE, RieszEstimator
+
+    before = torch.get_num_threads()
+    n_jobs = 1 if before > 1 else 2
+    backend = TorchBackend(
+        module_factory=_thread_recording_factory,
+        optimizer_factory=functools.partial(build_adam),
+        epochs=2, n_jobs=n_jobs,
+    )
+    est = RieszEstimator(estimand=ATE(), backend=backend).fit(linear_gaussian_ate_df)
+    assert _threads_seen[-1] == n_jobs
+    assert torch.get_num_threads() == before
+    est.predict(linear_gaussian_ate_df)
+    assert torch.get_num_threads() == before
+
+
+def test_n_jobs_minus_one_uses_all_cores_and_bad_values_raise(linear_gaussian_ate_df):
+    import os
+
+    from rieszreg import ATE, RieszEstimator
+
+    def backend(n_jobs):
+        return TorchBackend(
+            module_factory=_thread_recording_factory,
+            optimizer_factory=functools.partial(build_adam),
+            epochs=1, n_jobs=n_jobs,
+        )
+
+    RieszEstimator(estimand=ATE(), backend=backend(-1)).fit(linear_gaussian_ate_df)
+    assert _threads_seen[-1] == os.cpu_count()
+    with pytest.raises(ValueError, match="n_jobs must be"):
+        RieszEstimator(estimand=ATE(), backend=backend(0)).fit(linear_gaussian_ate_df)
+
+
+def test_fit_leaves_global_torch_rng_alone(linear_gaussian_ate_df):
+    torch.manual_seed(123)
+    expected = torch.rand(3)
+    torch.manual_seed(123)
+    RieszNet(estimand=riesznet.ATE(), hidden_sizes=(4,), epochs=2).fit(linear_gaussian_ate_df)
+    torch.testing.assert_close(torch.rand(3), expected)
+
+
+def test_rows_are_held_out_only_under_early_stopping(linear_gaussian_ate_df):
+    """Without early stopping every row trains (the standardization mean is
+    the full-data mean); with it, validation_fraction of the rows is held out."""
+    from rieszreg import ATE, RieszEstimator
+
+    df = linear_gaussian_ate_df
+
+    def fitted_x_mean(**kw):
+        backend = TorchBackend(
+            module_factory=functools.partial(build_mlp, hidden_sizes=(4,)),
+            optimizer_factory=functools.partial(build_adam),
+            epochs=2, validation_fraction=0.2, **kw,
+        )
+        assert backend.holdout_fraction() == (0.2 if kw else 0.0)
+        return RieszEstimator(estimand=ATE(), backend=backend).fit(df).predictor_.feature_loc[1]
+
+    assert fitted_x_mean() == pytest.approx(df["x"].mean())
+    assert fitted_x_mean(early_stopping_rounds=5) != pytest.approx(df["x"].mean())
+
+
+def test_fits_in_parallel_threads_match_sequential_fits(small_df):
+    """torch's random state is process-wide; fits in threads take turns, so
+    each still depends only on its data and random_state."""
+    def fit(seed):
+        net = RieszNet(estimand=riesznet.ATE(), hidden_sizes=(8,), dropout=0.2, epochs=5, random_state=seed)
+        return net.fit(small_df).predict(small_df)
+
+    sequential = [fit(s) for s in range(4)]
+    with ThreadPoolExecutor(4) as ex:
+        threaded = list(ex.map(fit, range(4)))
+    for a, b in zip(sequential, threaded):
+        np.testing.assert_array_equal(a, b)

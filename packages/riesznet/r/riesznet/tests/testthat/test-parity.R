@@ -36,3 +36,25 @@ test_that("R-side and Python-side predictions match on a small TSM problem", {
 
   expect_equal(alpha_R, alpha_py, tolerance = 1e-6)
 })
+
+test_that("standardize and n_jobs reach Python", {
+  skip_if_not(reticulate::py_module_available("riesznet"))
+
+  set.seed(1)
+  n <- 100
+  x <- rnorm(n, mean = 50, sd = 20)
+  a <- as.numeric(rbinom(n, 1, 1 / (1 + exp(-(x - 50) / 20))))
+  df <- data.frame(a = a, x = x)
+  fit <- function(...) {
+    rn <- RieszNet$new(estimand = ATE(treatment = "a", covariates = "x"),
+                       hidden_sizes = c(8L), epochs = 5L, random_state = 0L, ...)
+    rn$fit(df)
+    rn
+  }
+  rn <- fit(standardize = FALSE, n_jobs = 1L)
+  expect_false(reticulate::py_to_r(rn$py$standardize))
+  expect_equal(reticulate::py_to_r(rn$py$n_jobs), 1L)
+  expect_null(reticulate::py_to_r(rn$py$predictor_$feature_loc))
+  expect_equal(as.numeric(reticulate::py_to_r(fit()$py$predictor_$feature_loc))[2],
+               mean(x), tolerance = 1e-10)
+})

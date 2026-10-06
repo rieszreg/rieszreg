@@ -21,7 +21,7 @@ The user guide is the unified Quarto site at [`../docs/`](../docs/). The neural-
 
 ## R wrapper scope
 
-The R6 wrapper exposes the simple-MLP knobs (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `device`). Custom torch architectures (custom `nn.Module`, custom optimizer, custom scheduler) are Python-only — the factory callables don't survive the reticulate boundary cleanly. R users who need a custom architecture write the factory in Python and call into Python via reticulate.
+The R6 wrapper exposes every `RieszNet` constructor argument (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `batch_size`, `device`, `dtype`, `grad_clip_norm`, `standardize`, `loss`, `init`, `validation_fraction`, `early_stopping_rounds`, `snapshot_epochs`, `n_jobs`, `random_state`). Custom torch architectures (custom `nn.Module`, custom optimizer, custom scheduler) are Python-only — the factory callables don't survive the reticulate boundary cleanly. R users who need a custom architecture write the factory in Python and call into Python via reticulate.
 
 ## API design rule
 
@@ -34,7 +34,7 @@ Object-oriented factory `RieszNet(estimand=, hidden_sizes=, ...)`, `BaseEstimato
   - `losses_torch.py` — `TorchRieszLoss`: torch-autograd `h̃(α(η))` and `h'(α(η))` for each Bregman loss (resolved once per loss) and the per-row Riesz loss.
   - `modules.py` — top-level default factories (`build_mlp`, `build_adam`) for the convenience class.
   - `estimator.py` — `RieszNet` convenience subclass of `RieszEstimator`.
-- `r/riesznet/` — R6 wrapper via reticulate, ~120 lines.
+- `r/riesznet/` — R6 wrapper via reticulate.
 - `examples/` — runnable demonstrations (ATE, TSM).
 
 ## Run tests
@@ -88,23 +88,23 @@ This is `Loss.aug_loss_alpha` summed per original row, so values (not just gradi
 
 ### Training loop
 
-`_AugTensors` holds the augmented rows sorted by origin with CSR offsets. A minibatch of original rows gathers only its own augmented rows (O(batch) per step), runs one forward pass, and `scatter_add`s the per-row terms. Validation loss is the same formula on the held-out rows. The convenience class defaults to `batch_size=64`; set `batch_size=None` for full-batch GD on small problems. With `early_stopping_rounds=None` all epochs run and the final weights are kept, even when an `eval_set` is passed.
+`_AugTensors` holds the augmented rows sorted by origin with CSR offsets. A minibatch of original rows gathers only its own augmented rows (O(batch) per step), runs one forward pass, and `scatter_add`s the per-row terms. Validation loss is the same formula on the held-out rows. The convenience class defaults to `batch_size=64`; set `batch_size=None` for full-batch GD on small problems. With `early_stopping_rounds=None` all epochs run and the final weights are kept, even when an `eval_set` is passed. With `standardize=True` (the default) the features are centered and scaled by the observed training rows' mean and standard deviation after augmentation, so counterfactual rows get the same affine map; `TorchPredictor` stores `feature_loc` / `feature_scale` and applies them at predict time.
 
 ### Save / load
 
-Saves the model's `state_dict` plus a JSON metadata blob carrying the `module_factory` qualname (and `functools.partial` kwargs if applicable). Load re-imports the factory by qualname, rebuilds the module, and calls `load_state_dict`. The default `RieszNet` MLP path uses `functools.partial(riesznet.modules.build_mlp, ...)` so it round-trips cleanly. Closures, lambdas, and locally-defined classes raise on save with a clear error.
+Saves the model's `state_dict` plus a JSON metadata blob carrying the `module_factory` qualname (and `functools.partial` kwargs if applicable). Load re-imports the factory by qualname, rebuilds the module, and calls `load_state_dict`. The default `RieszNet` MLP path uses `functools.partial(riesznet.modules.build_mlp, ...)` so it round-trips cleanly. `TorchPredictor` puts the model in eval mode on its device once, in `__post_init__`, and never changes it afterward; `predict_eta_path` evaluates each snapshot on its own cached copy of the model, so concurrent predictions are safe. (`torch.func.functional_call` is not an option: it swaps the module's parameters in place while it runs.) The factory's qualname is resolved in `TorchPredictor.save`, so closures, lambdas, and locally-defined classes fit and predict, then raise on save with a clear error.
 
 ### Hyperparameter forwarding
 
-`epochs` and `batch_size` live on `TorchBackend` as dataclass fields. The optimizer's LR is the source of truth (set by `optimizer_factory`). `RieszNet` exposes `learning_rate` and `weight_decay` as ctor args and folds them into the default `Adam` factory via `functools.partial`. `RieszEstimator` no longer carries any iterative-method knobs — those are owned by the backend.
+`epochs`, `batch_size`, `standardize`, `n_jobs`, `early_stopping_rounds`, and `validation_fraction` live on `TorchBackend` as dataclass fields. `TorchBackend.holdout_fraction()` returns `validation_fraction` only under early stopping, so a fit without early stopping trains on every row; `RieszNet` forwards `validation_fraction` unchanged. `n_jobs` sets `torch.set_num_threads` for the duration of fit and predict and then restores it. The optimizer's LR is the source of truth (set by `optimizer_factory`). `RieszNet` exposes `learning_rate` and `weight_decay` as ctor args and folds them into the default `Adam` factory via `functools.partial`. `RieszEstimator` no longer carries any iterative-method knobs — those are owned by the backend.
 
 ### Device / dtype
 
-Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corresponding torch backend is available; fitting on an unavailable device raises. A saved model whose device isn't available predicts on CPU, so GPU-saved models load anywhere. `device="auto"` skips MPS for `float64`. `dtype="float64"` works at a small speed penalty. Bitwise reproducibility on CUDA is not promised; the loop seeds `torch`, `torch.cuda`, and a `torch.Generator` for the DataLoader, but does not enable `torch.use_deterministic_algorithms`.
+Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corresponding torch backend is available; fitting on an unavailable device raises. A saved model whose device isn't available predicts on CPU, so GPU-saved models load anywhere. `device="auto"` skips MPS for `float64`. `dtype="float64"` works at a small speed penalty. Bitwise reproducibility on CUDA is not promised; the fit holds a process-wide lock, runs inside `torch.random.fork_rng()` for the CPU and the training device, and seeds torch plus a `torch.Generator` for the minibatch order, so the caller's global RNG is untouched and fits in parallel threads take turns instead of mixing seeds, but it does not enable `torch.use_deterministic_algorithms`.
 
 ### What's lazy-imported
 
-`torch` is a hard dependency, not lazy; `riesznet`'s import surface always includes the model classes. `pandas` is needed only for tests.
+`torch` is a hard dependency but is imported lazily: `riesznet/__init__.py` resolves `RieszNet`, `TorchBackend`, `TorchPredictor`, `build_mlp`, and `build_adam` on first access, and registers the predictor loader by string, so `import riesznet` next to `rieszboost` doesn't load two OpenMP runtimes. `pandas` is needed only for tests.
 
 ## What works today (v0.0.1)
 
@@ -115,7 +115,7 @@ Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corr
 - **Save / load**: `state_dict` + JSON metadata. Built-in estimands round-trip automatically; the default MLP factory round-trips cleanly via qualname; user-defined factories must be importable by qualname.
 - **Early stopping**: `early_stopping_rounds` measures epochs without validation-loss improvement; restores best-validation weights at end of fit.
 - **Diagnostics**: inherits `rieszreg.Diagnostics`.
-- **R wrapper**: simple-MLP knobs only.
+- **R wrapper**: every `RieszNet` argument; custom architectures are Python-only.
 
 ## Known sharp edges
 

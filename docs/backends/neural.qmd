@@ -16,8 +16,8 @@ where the `(c_j, p_j)` pairs are the evaluation points of `m` at `z_i` and the m
 
 ## Two surfaces
 
-- **`RieszNet`** — convenience class with a default MLP. Surfaces `hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `batch_size`, `device`, `dtype`.
-- **`TorchBackend`** — power-user surface. Pass any `nn.Module` factory and any optimizer factory. Compose with `rieszreg.RieszEstimator` for full control.
+- **`RieszNet`**: convenience class with a default MLP. Surfaces `hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `batch_size`, `device`, `dtype`, `standardize`, `n_jobs`.
+- **`TorchBackend`**: power-user surface. Pass any `nn.Module` factory and any optimizer factory. Compose with `rieszreg.RieszEstimator` for full control.
 
 ## Quickstart — ATE
 
@@ -154,7 +154,7 @@ alpha_hat = est.predict(df)
 print(f"α̂ range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 ```
 
-`module_factory` and `optimizer_factory` must be top-level callables (`functools.partial` over a top-level function is fine). Closures and lambdas raise on `save()` because they cannot be reconstructed by qualname.
+`module_factory` and `optimizer_factory` must be top-level callables (`functools.partial` over a top-level function is fine). Closures and lambdas fit and predict, but raise on `save()` because they cannot be reconstructed by qualname.
 
 ## Hyperparameters
 
@@ -172,11 +172,14 @@ print(f"α̂ range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 | `device` | `"cpu"` | Also `"cuda"`, `"mps"`, `"auto"`. `"auto"` skips MPS when `dtype="float64"`. |
 | `dtype` | `"float32"` | Also `"float64"` (slower, more precise). |
 | `grad_clip_norm` | `None` | Global L2 clip on the gradient. |
+| `standardize` | `True` | Center and scale each input column by its mean and standard deviation over the observed training rows, so covariates on any scale train well. The counterfactual rows get the same transformation. |
 | `loss` | `SquaredLoss()` | Any of the four built-in Bregman losses. |
 | `init` | `None` | α-space initialization. Default is `m̄ = E[m(Z, 1)]` projected into the loss's domain (the loss-minimizing constant); pass a float to override. |
 | `validation_fraction` | `0.1` | Held-out fraction for early stopping. Used only when `early_stopping_rounds` is set and no `eval_set` is passed. |
 | `early_stopping_rounds` | `None` | Patience (in epochs) for validation Riesz loss. The best-validation weights are restored at the end. With `None`, all `epochs` run and the final weights are kept. |
-| `random_state` | `0` | Seeds `torch`, `torch.cuda`, and the DataLoader generator. |
+| `snapshot_epochs` | `None` | Epochs at which to store the weights for `predict_path`. `None` gives about 20 ticks; `[]` stores none. |
+| `n_jobs` | `None` | torch threads during fit and predict. `None` keeps torch's setting (all cores unless changed); `-1` uses all cores. Set `1` when running many fits in parallel processes. |
+| `random_state` | `0` | Seeds the fit. The global torch random state is restored afterward. |
 
 `TorchBackend` constructor (power-user surface):
 
@@ -190,6 +193,11 @@ print(f"α̂ range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 | `device` | `"cpu"` | |
 | `dtype` | `"float32"` | |
 | `grad_clip_norm` | `None` | |
+| `early_stopping_rounds` | `None` | Patience in epochs; restores the best-validation weights. |
+| `validation_fraction` | `0.1` | Held-out fraction for early stopping when no `eval_set` is passed. Rows are held out only when `early_stopping_rounds` is set. |
+| `snapshot_epochs` | `()` | Epochs at which to store the weights for `predict_eta_path`. |
+| `standardize` | `True` | As for `RieszNet`. |
+| `n_jobs` | `None` | As for `RieszNet`. |
 
 ## Save / load
 
@@ -225,6 +233,6 @@ The autograd implementation matches the analytic gradient in the loss spec exact
 
 ## Device, dtype, reproducibility
 
-The training loop seeds `torch`, `torch.cuda`, and a `torch.Generator` for the data loader, so single-device fits are reproducible run-to-run on the same hardware. Bitwise reproducibility on CUDA across machines is not promised; `torch.use_deterministic_algorithms` is not enabled by default because it slows training significantly.
+Each fit seeds torch from `random_state` and restores the global torch random state afterward, so single-device fits are reproducible run-to-run on the same hardware and do not change random draws elsewhere in your code. torch's random state is shared by the whole process (and, on some torch builds, so is its thread count), so fits started in parallel threads of one process run one at a time; to fit in parallel, use processes (joblib's default backend). Bitwise reproducibility on CUDA across machines is not promised; `torch.use_deterministic_algorithms` is not enabled by default because it slows training significantly.
 
 `device="auto"` picks `cuda` → `mps` → `cpu` in that order. `dtype="float64"` runs end-to-end in double precision, useful for tightly-coupled gradient checks but slower.

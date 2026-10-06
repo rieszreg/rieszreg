@@ -7,9 +7,8 @@
 #' Estimand and loss factories live in the shared `rieszreg` R package and are
 #' re-exported from here for convenience.
 #'
-#' Scope note: the R wrapper exposes the simple-MLP knobs (`hidden_sizes`,
-#' `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`,
-#' `device`). Custom torch architectures are Python-only — write the
+#' Scope note: the R wrapper exposes the `RieszNet` constructor arguments.
+#' Custom torch architectures are Python-only — write the
 #' `nn.Module` factory in Python and call into Python via reticulate.
 #'
 #' @keywords internal
@@ -55,8 +54,12 @@ use_python_riesznet <- function(python = NULL, required = TRUE) {
 #' Subclass of [rieszreg::RieszEstimatorR6] that defaults the backend to a
 #' simple MLP trained with Adam and surfaces the simple-MLP knobs
 #' (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`,
-#' `epochs`, `batch_size`, `device`) on the constructor. `batch_size` is the
-#' number of rows per minibatch; `NULL` trains full-batch.
+#' `epochs`, `batch_size`, `device`, `standardize`, `n_jobs`) on the
+#' constructor. `batch_size` is the number of rows per minibatch; `NULL` trains
+#' full-batch. `standardize = TRUE` centers and scales each input column by
+#' its mean and standard deviation over the observed training rows. `n_jobs`
+#' sets torch's thread count during fit and predict (`NULL` keeps torch's
+#' setting).
 #'
 #' Custom torch architectures are Python-only. R users who need a custom
 #' `nn.Module` write the factory in Python and call into Python via reticulate.
@@ -77,11 +80,13 @@ RieszNet <- R6::R6Class(
                           device = "cpu",
                           dtype = "float32",
                           grad_clip_norm = NULL,
+                          standardize = TRUE,
                           loss = NULL,
                           init = NULL,
                           validation_fraction = 0.1,
                           early_stopping_rounds = NULL,
                           snapshot_epochs = NULL,
+                          n_jobs = NULL,
                           random_state = 0L) {
       # Build the hidden_sizes Python tuple from the R integer vector.
       hs <- reticulate::tuple(lapply(as.integer(hidden_sizes), as.integer))
@@ -95,12 +100,14 @@ RieszNet <- R6::R6Class(
         epochs = as.integer(epochs),
         device = device,
         dtype = dtype,
+        standardize = standardize,
         validation_fraction = validation_fraction,
         random_state = as.integer(random_state)
       )
       # NULL batch_size means full-batch training (Python None).
       args["batch_size"] <- list(if (is.null(batch_size)) NULL else as.integer(batch_size))
       if (!is.null(grad_clip_norm)) args$grad_clip_norm <- grad_clip_norm
+      if (!is.null(n_jobs)) args$n_jobs <- as.integer(n_jobs)
       if (!is.null(loss)) args$loss <- loss
       if (!is.null(init)) args$init <- init
       if (!is.null(early_stopping_rounds)) {

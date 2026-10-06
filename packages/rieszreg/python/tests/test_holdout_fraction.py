@@ -1,8 +1,8 @@
 """The orchestrator holds out the fraction of rows the backend asks for.
 
-A backend with `holdout_fraction()` decides for each fit; one with only a
-`validation_fraction` attribute gets that fraction; one with neither gets no
-holdout. An `eval_set` passed to `fit` replaces the split.
+A backend with `holdout_fraction()` decides for each fit; one without it gets
+no holdout, even with a `validation_fraction` attribute. An `eval_set` passed to
+`fit` replaces the split.
 """
 
 from __future__ import annotations
@@ -74,9 +74,9 @@ def test_method_returning_zero_holds_nothing_out():
     assert (b.n_train, b.n_valid) == (200, None)
 
 
-def test_validation_fraction_attribute_without_method():
+def test_validation_fraction_attribute_alone_holds_nothing_out():
     b = _fit(_AttributeBackend(0.2), _df())
-    assert (b.n_train, b.n_valid) == (160, 40)
+    assert (b.n_train, b.n_valid) == (200, None)
 
 
 def test_no_holdout_without_method_or_attribute():
@@ -92,8 +92,7 @@ def test_eval_set_replaces_the_split():
 
 @pytest.mark.parametrize("backend, expected", [
     (_MethodBackend(0.3), 0.3),
-    (_AttributeBackend(0.2), 0.2),
-    (_AttributeBackend(None), 0.0),
+    (_AttributeBackend(0.2), 0.0),
 ])
 def test_holdout_fraction_helper(backend, expected):
     assert holdout_fraction(backend) == expected

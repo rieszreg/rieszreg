@@ -1,6 +1,6 @@
 ---
 name: rieszreg-architecture
-description: Architectural rules for the rieszreg meta-package and its learner backends — tier 1/2/3 classification, the agnostic-orchestrator principle, sklearn-first, lazy imports for optional heavy deps, module separation. Triggers when editing `RieszEstimator`, the `Backend` / `MomentBackend` Protocols, any concrete backend in `packages/*/python/*/backends/`, the public re-exports in any package's `__init__.py`, or when adding a kwarg to any tier-1 object. Especially important when wondering "should this go in rieszreg or in the impl package?" or "should this kwarg live on `RieszEstimator` or on the backend?"
+description: Architectural rules for the rieszreg meta-package and its learner backends — tier 1/2/3 classification, the agnostic-orchestrator principle, sklearn-first, lazy imports for optional heavy deps, module separation. Triggers when editing `RieszEstimator`, the `Backend` / `MomentBackend` Protocols, any concrete backend (`packages/*/python/*/backend.py` or `backends/`), the public re-exports in any package's `__init__.py`, or when adding a kwarg to any tier-1 object. Especially important when wondering "should this go in rieszreg or in the impl package?" or "should this kwarg live on `RieszEstimator` or on the backend?"
 ---
 
 # Architectural rules for the rieszreg family
@@ -43,7 +43,7 @@ The `Backend` / `MomentBackend` Protocol method signatures pass only:
 
 Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. Example: `RieszBooster(n_estimators=200, max_depth=3)` builds `XGBoostBackend(n_estimators=200, max_depth=3)` in `_resolved_backend()`. The orchestrator does not see `n_estimators` or `max_depth`.
 
-`validation_fraction` is per-backend, not tier-1. Backends that use a held-out slice for fit-time logic expose `validation_fraction` as a constructor attribute and implement the optional `HoldoutBackend` protocol: `holdout_fraction()` returns the fraction to hold out for this fit, or 0 when the fit won't use it. The orchestrator calls `rieszreg.backends.holdout_fraction(backend)` and produces the row-level split before augmentation; that helper falls back to a bare `validation_fraction` attribute for backends without the method. Backends that don't use a holdout for fit-time logic implement neither; users wanting held-out loss reporting on those backends pass `eval_set=` at fit time.
+`validation_fraction` is per-backend, not tier-1. Backends that use a held-out slice for fit-time logic expose `validation_fraction` as a constructor attribute and implement the optional `HoldoutBackend` protocol: `holdout_fraction()` returns the fraction to hold out for this fit, or 0 when the fit won't use it. The orchestrator calls `rieszreg.backends.holdout_fraction(backend)` and produces the row-level split before augmentation. Backends that don't use a holdout for fit-time logic implement neither; users wanting held-out loss reporting on those backends pass `eval_set=` at fit time.
 
 ## 3. The "would-be-ignored" lint test
 
@@ -89,7 +89,7 @@ Backends implementing both default to `fit_augmented` for back-compat.
 | New `Estimand` factory | `packages/rieszreg/python/rieszreg/estimands/` | impl package |
 | New `Loss` subclass | `packages/rieszreg/python/rieszreg/losses/` | impl package |
 | Tracer / `LinearForm` / `AugmentedDataset` | `packages/rieszreg/python/rieszreg/` (already there) | impl package — reuse |
-| Backend `fit_augmented` or `fit_rows` impl | `packages/<pkg>/python/<pkg>/backends/` | rieszreg |
+| Backend `fit_augmented` or `fit_rows` impl | `packages/<pkg>/python/<pkg>/backend.py` (one backend) or `backends/` (several) | rieszreg |
 | Backend hyperparameter (e.g. `kernel`, `n_estimators`) | concrete backend dataclass | `RieszEstimator` |
 | Convenience subclass (`RieszBooster`, `KernelRieszRegressor`) | `packages/<pkg>/python/<pkg>/` | rieszreg |
 | Per-package R wrapper subclassing `RieszEstimatorR6` | `packages/<pkg>/r/<pkg>/R/` | rieszreg |
@@ -137,7 +137,7 @@ Keep this seam structure:
 - `serialization.py` — save/load + factory_spec
 - `testing/` — DGPs and conformance helpers
 
-In an impl package, `backends/` is what you actually own. Backend-specific code lives in `backends/<backend>.py`. Everything else comes from `rieszreg`.
+In an impl package, the backend module is what you actually own: `backend.py` when the package has one backend (krrr, forestriesz, riesztree, riesznet), `backends/<backend>.py` when it has several (rieszboost). Everything else comes from `rieszreg`.
 
 ## 10. What NOT to do
 

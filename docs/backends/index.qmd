@@ -272,7 +272,7 @@ class MyEarlyStoppingBackend(BaseEstimator):
         return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
 ```
 
-An `eval_set` passed to `fit` replaces the split. A backend with a `validation_fraction` attribute but no `holdout_fraction()` method gets that fraction held out on every fit. Backends that compute their own internal CV or that don't need a holdout define neither.
+An `eval_set` passed to `fit` replaces the split. A backend without the method gets no holdout, whatever attributes it has. Backends that compute their own internal CV or that don't need a holdout define neither.
 
 ### Save, load, conformance
 

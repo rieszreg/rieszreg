@@ -164,15 +164,18 @@ Without the flush, `future` reuses workers across plans of the same shape and th
 - sklearn composition: `clone`, `GridSearchCV`, `cross_val_predict`, `Pipeline`.
 - Save / load round-trip with built-in estimands and the default MLP.
 - Early stopping by validation Riesz loss.
+- Inputs standardized by default (`standardize=True`), using the observed training rows' mean and standard deviation, so covariates need no rescaling.
+- `n_jobs` sets torch's thread count during fit and predict; use `n_jobs=1` when running many fits in parallel.
 - CPU, CUDA, and MPS device support.
 - R6 wrapper for the simple-MLP path.
 
 ## Known sharp edges
 
-- `module_factory` must be importable by qualname for save/load to work. Closures, lambdas, and notebook-cell-defined modules raise on `save()`. Define them at module top level.
+- `module_factory` must be importable by qualname for save/load to work. Closures, lambdas, and notebook-cell-defined modules fit and predict but raise on `save()`. Define them at module top level.
 - Single-device training only; no multi-GPU or distributed support.
 - No mixed precision; `dtype` is `float32` or `float64` end-to-end.
 - Bitwise reproducibility on CUDA is not promised; seeding is best-effort.
+- Fits started in parallel threads of one process run one at a time, because torch's random state is shared by the whole process (and, on some torch builds, so is its thread count). Use processes (joblib's default) for parallel fits.
 - The R wrapper exposes simple MLP knobs only. Custom torch architectures are Python-only.
 
 ## On the roadmap
