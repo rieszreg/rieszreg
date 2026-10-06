@@ -33,7 +33,7 @@ With `BernoulliLoss` the `"auto"` steps are large, so a fit converges in far few
 | `n_estimators` + `early_stopping_rounds` | 200, `None` | Set `n_estimators=1000-2000` and `early_stopping_rounds=20` | The validation split picks the iteration count. |
 | `validation_fraction` | 0.1 | Raise to 0.2 with `early_stopping_rounds` | Internal split for early stopping. Used only when `early_stopping_rounds` is set. Alternative: pass `eval_set=` explicitly. |
 | `reg_lambda` | 1.0 | Bump to 5–10 for low-overlap data | xgboost L2 on leaf weights; damps the magnitude of any single leaf. |
-| `subsample` | 1.0 | Try 0.5–0.8 with very large $n$ | Stochastic boosting. |
+| `subsample` | 1.0 | Try 0.5–0.8 with very large $n$ | Stochastic boosting. Each round draws this fraction of individuals and keeps all of their augmented rows. |
 
 `XGBoostBackend` exposes two more knobs:
 

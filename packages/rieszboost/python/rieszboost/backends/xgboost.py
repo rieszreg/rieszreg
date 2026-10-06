@@ -90,16 +90,29 @@ class XGBoostPredictor:
 
 
 def _make_objective(
-    is_original: np.ndarray,
-    potential_deriv_coef: np.ndarray,
+    aug: AugmentedDataset,
     loss: Loss,
     hessian_floor: float | str,
     gradient_only: bool,
+    subsample: float,
+    seed: int,
 ):
+    is_original, potential_deriv_coef = aug.is_original, aug.potential_deriv_coef
+    rng = np.random.default_rng(seed)
+
     def obj(preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
         del dtrain
         # xgboost passes float32 margins; a saturated link rounds to its bound.
-        preds = preds.astype(np.float64)
+        grad, hess = _grad_hess(preds.astype(np.float64))
+        if subsample < 1.0:
+            # Called once per round: draw individuals, keep all their
+            # augmented rows. Zeroed rows drop out of every split and leaf,
+            # which is how xgboost's own `subsample` removes rows.
+            keep = (rng.random(aug.n_rows) < subsample)[aug.origin_index]
+            grad, hess = grad * keep, hess * keep
+        return grad, hess
+
+    def _grad_hess(preds: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         grad = loss.aug_grad_eta(is_original, potential_deriv_coef, preds)
         if gradient_only:
             hess = np.ones_like(grad)
@@ -135,6 +148,9 @@ class XGBoostBackend:
     ``loss.curvature_eta(η̂)``, the Gauss-Newton curvature of an observed row
     at the current prediction: 2 for ``SquaredLoss``, α̂ for ``KLLoss``,
     α̂(1 − α̂) for ``BernoulliLoss``. A float sets a fixed floor.
+
+    ``subsample`` is the fraction of individuals (original rows) drawn each
+    round. An individual's augmented rows are kept or dropped together.
     """
 
     n_estimators: int = 200
@@ -156,6 +172,10 @@ class XGBoostBackend:
         base_score: float,
         random_state: int,
     ) -> FitResult:
+        # xgboost no longer sees `subsample` (the objective applies it), so
+        # check its range here.
+        if not 0.0 < self.subsample <= 1.0:
+            raise ValueError(f"subsample must be in (0, 1]; got {self.subsample!r}.")
         dtrain = xgb.DMatrix(aug_train.features)
 
         params = {
@@ -165,7 +185,6 @@ class XGBoostBackend:
             "disable_default_eval_metric": 1,
             "max_depth": self.max_depth,
             "reg_lambda": self.reg_lambda,
-            "subsample": self.subsample,
         }
 
         # The held-out metric only drives early stopping; without it, skip the
@@ -187,11 +206,12 @@ class XGBoostBackend:
             dtrain,
             num_boost_round=self.n_estimators,
             obj=_make_objective(
-                aug_train.is_original,
-                aug_train.potential_deriv_coef,
+                aug_train,
                 loss,
                 hessian_floor=self.hessian_floor,
                 gradient_only=self.gradient_only,
+                subsample=self.subsample,
+                seed=random_state,
             ),
             evals=evals,
             custom_metric=custom_metric,
