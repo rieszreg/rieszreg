@@ -566,7 +566,13 @@ window.Quarto = {
 <p><code>hessian_floor</code> is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have <span class="math inline">\(H = 0\)</span> (except under <code>BoundedSquaredLoss</code>, whose scaled-sigmoid link adds a term); without a floor, xgboost’s leaf-weight Newton step (<code>-G/(H+λ)</code>) is degenerate at those leaves. The default <code>"auto"</code> floors each row at the Gauss-Newton curvature of an observed row at the current prediction, <span class="math inline">\(h''(\hat\alpha)\,(d\alpha/d\eta)^2\)</span>, which is the exact curvature for every built-in loss except <code>BoundedSquaredLoss</code>. That is <span class="math inline">\(2\)</span> for <code>SquaredLoss</code>, <span class="math inline">\(\hat\alpha\)</span> for <code>KLLoss</code>, and <span class="math inline">\(\hat\alpha(1-\hat\alpha)\)</span> for <code>BernoulliLoss</code>. Each loss then takes Newton steps on its own scale. Pass a float for a fixed floor.</p>
 <p>With <code>BernoulliLoss</code> the <code>"auto"</code> steps are large, so a fit converges in far fewer trees. Use early stopping (<code>early_stopping_rounds</code> with <code>validation_fraction</code>) rather than a fixed <code>n_estimators</code>.</p>
 <p><code>gradient_only</code> short-circuits the second-order Hessian and uses <span class="math inline">\(H = 1\)</span> everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set <code>True</code> to reproduce the Lee-Schuler reference implementation exactly.</p>
-<p><code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code>, <code>learning_rate</code>, <code>n_estimators</code>, <code>early_stopping_rounds</code> and <code>validation_fraction</code> are <code>XGBoostBackend</code> fields; <code>RieszBooster</code> forwards its constructor args of the same names when it builds the backend.</p>
+<p><code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code>, <code>learning_rate</code>, <code>n_estimators</code>, <code>early_stopping_rounds</code>, <code>validation_fraction</code> and <code>n_jobs</code> are <code>XGBoostBackend</code> fields; <code>RieszBooster</code> forwards its constructor args of the same names when it builds the backend.</p>
+<p>Both backends have sklearn’s <code>get_params</code> and <code>set_params</code>. In Python, <code>GridSearchCV</code> tunes any backend field through <code>backend__&lt;field&gt;</code>. This reaches <code>hessian_floor</code> and <code>gradient_only</code>, which <code>RieszBooster</code> does not take directly:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>GridSearchCV(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    RieszBooster(estimand<span class="op">=</span>ATE(), backend<span class="op">=</span>XGBoostBackend(n_estimators<span class="op">=</span><span class="dv">300</span>)),</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    param_grid<span class="op">=</span>{<span class="st">"backend__hessian_floor"</span>: [<span class="st">"auto"</span>, <span class="fl">2.0</span>], <span class="st">"backend__max_depth"</span>: [<span class="dv">3</span>, <span class="dv">4</span>]},</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    cv<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="tuning-recipe" class="level2">
 <h2 class="anchored" data-anchor-id="tuning-recipe">Tuning recipe</h2>
@@ -622,6 +628,12 @@ window.Quarto = {
 <td>Try 0.5–0.8 with very large <span class="math inline">\(n\)</span></td>
 <td>Stochastic boosting. Each round draws this fraction of individuals and keeps all of their augmented rows.</td>
 </tr>
+<tr class="odd">
+<td><code>n_jobs</code></td>
+<td><code>None</code></td>
+<td>Set 1 when fits already run in parallel</td>
+<td>Number of xgboost threads. <code>None</code> uses all cores. The fit is the same at any thread count.</td>
+</tr>
 </tbody>
 </table>
 <p><code>XGBoostBackend</code> exposes two more knobs:</p>
@@ -657,39 +669,40 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="sklearnbackend"><code>SklearnBackend</code></h2>
 <p>To use a non-tree base learner, pass a <code>base_learner_factory</code>: a zero-arg callable returning a fresh sklearn-compatible regressor each round.</p>
 <p>The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction. As in <code>XGBoostBackend</code>’s <code>hessian_floor="auto"</code>, counterfactual rows count with an observed row’s curvature at the current prediction in that surrogate. Without this, the step size blew up wherever the base learner isolated rows that exist only as counterfactuals.</p>
-<p>Base learners with an unset <code>random_state</code> are seeded from the estimator’s <code>random_state</code>, so fits are reproducible. As with <code>XGBoostBackend</code>, the model is cut back to the best round only when <code>early_stopping_rounds</code> is set. Otherwise all <code>n_estimators</code> rounds are kept, even when you pass <code>eval_set=</code>. <code>max_depth</code>, <code>reg_lambda</code> and <code>subsample</code> on <code>RieszBooster</code> apply to <code>XGBoostBackend</code> only. Set tree settings on the base learner instead.</p>
+<p>Base learners with an unset <code>random_state</code> are seeded from the estimator’s <code>random_state</code>, so fits are reproducible. As with <code>XGBoostBackend</code>, the model is cut back to the best round only when <code>early_stopping_rounds</code> is set. Otherwise all <code>n_estimators</code> rounds are kept, even when you pass <code>eval_set=</code>. <code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code> and <code>n_jobs</code> on <code>RieszBooster</code> apply to <code>XGBoostBackend</code> only. Set tree settings on the base learner instead. <code>predict_path</code> works as it does with <code>XGBoostBackend</code>.</p>
+<p><code>save</code> can’t store the <code>base_learner_factory</code>. A loaded model predicts as before. To refit it, set the backend again with <code>set_params(backend=SklearnBackend(...))</code>.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">R</a></li></ul>
 <div class="tab-content" data-group="lang">
 <div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.kernel_ridge <span class="im">import</span> KernelRidge</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszboost <span class="im">import</span> RieszBooster, SklearnBackend</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> ATE</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="dv">1000</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> rng.uniform(<span class="dv">0</span>, <span class="dv">1</span>, n)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>pi <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span>(<span class="dv">8</span> <span class="op">*</span> x <span class="op">-</span> <span class="dv">4</span>)))</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> rng.binomial(<span class="dv">1</span>, pi)</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">"a"</span>: a.astype(<span class="bu">float</span>), <span class="st">"x"</span>: x})</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>booster <span class="op">=</span> RieszBooster(</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(),</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    backend<span class="op">=</span>SklearnBackend(</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        base_learner_factory<span class="op">=</span><span class="kw">lambda</span>: KernelRidge(alpha<span class="op">=</span><span class="fl">1.0</span>, kernel<span class="op">=</span><span class="st">"rbf"</span>, gamma<span class="op">=</span><span class="fl">2.0</span>),</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">80</span>,</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        learning_rate<span class="op">=</span><span class="fl">0.05</span>,</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>        early_stopping_rounds<span class="op">=</span><span class="dv">10</span>,</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>        validation_fraction<span class="op">=</span><span class="fl">0.2</span>,</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> booster.predict(df)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="op">=</span> a <span class="op">/</span> pi <span class="op">-</span> (<span class="dv">1</span> <span class="op">-</span> a) <span class="op">/</span> (<span class="dv">1</span> <span class="op">-</span> pi)</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>,<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">, "</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"RMSE = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(np.mean((alpha_hat <span class="op">-</span> true_alpha)<span class="op">**</span><span class="dv">2</span>))<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.kernel_ridge <span class="im">import</span> KernelRidge</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszboost <span class="im">import</span> RieszBooster, SklearnBackend</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> ATE</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> rng.uniform(<span class="dv">0</span>, <span class="dv">1</span>, n)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>pi <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> (<span class="dv">1</span> <span class="op">+</span> np.exp(<span class="op">-</span>(<span class="dv">8</span> <span class="op">*</span> x <span class="op">-</span> <span class="dv">4</span>)))</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> rng.binomial(<span class="dv">1</span>, pi)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">"a"</span>: a.astype(<span class="bu">float</span>), <span class="st">"x"</span>: x})</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>booster <span class="op">=</span> RieszBooster(</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(),</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    backend<span class="op">=</span>SklearnBackend(</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        base_learner_factory<span class="op">=</span><span class="kw">lambda</span>: KernelRidge(alpha<span class="op">=</span><span class="fl">1.0</span>, kernel<span class="op">=</span><span class="st">"rbf"</span>, gamma<span class="op">=</span><span class="fl">2.0</span>),</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        n_estimators<span class="op">=</span><span class="dv">80</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        learning_rate<span class="op">=</span><span class="fl">0.05</span>,</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        early_stopping_rounds<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        validation_fraction<span class="op">=</span><span class="fl">0.2</span>,</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> booster.predict(df)</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="op">=</span> a <span class="op">/</span> pi <span class="op">-</span> (<span class="dv">1</span> <span class="op">-</span> a) <span class="op">/</span> (<span class="dv">1</span> <span class="op">-</span> pi)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>,<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">, "</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"RMSE = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(np.mean((alpha_hat <span class="op">-</span> true_alpha)<span class="op">**</span><span class="dv">2</span>))<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>corr = 0.707, RMSE = 3.158</code></pre>
 </div>
@@ -697,37 +710,37 @@ window.Quarto = {
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">0</span>)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>n  <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>x  <span class="ot">&lt;-</span> <span class="fu">runif</span>(n)</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>pi <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">+</span> <span class="fu">exp</span>(<span class="sc">-</span>(<span class="dv">8</span> <span class="sc">*</span> x <span class="sc">-</span> <span class="dv">4</span>)))</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>a  <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pi)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">a =</span> <span class="fu">as.numeric</span>(a), <span class="at">x =</span> x)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the Python factory directly via reticulate so each round gets a</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># fresh sklearn object.</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>sk_kr <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">"sklearn.kernel_ridge"</span>, <span class="at">convert =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>factory <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_func</span>(<span class="cf">function</span>() sk_kr<span class="sc">$</span><span class="fu">KernelRidge</span>(<span class="at">alpha =</span> <span class="fl">1.0</span>,</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>                                                             <span class="at">kernel =</span> <span class="st">"rbf"</span>,</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>                                                             <span class="at">gamma =</span> <span class="fl">2.0</span>))</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>booster <span class="ot">&lt;-</span> RieszBooster<span class="sc">$</span><span class="fu">new</span>(</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimand =</span> <span class="fu">ATE</span>(),</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">backend =</span> <span class="fu">SklearnBackend</span>(</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_learner_factory =</span> factory,</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_estimators =</span> <span class="dv">80</span>L,</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">learning_rate =</span> <span class="fl">0.05</span>,</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">early_stopping_rounds =</span> <span class="dv">10</span>L,</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">validation_fraction =</span> <span class="fl">0.2</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>booster<span class="sc">$</span><span class="fu">fit</span>(df)</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="ot">&lt;-</span> booster<span class="sc">$</span><span class="fu">predict</span>(df)</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="ot">&lt;-</span> a <span class="sc">/</span> pi <span class="sc">-</span> (<span class="dv">1</span> <span class="sc">-</span> a) <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">-</span> pi)</span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"corr = %.3f, RMSE = %.3f</span><span class="sc">\n</span><span class="st">"</span>,</span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>            <span class="fu">cor</span>(alpha_hat, true_alpha),</span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>            <span class="fu">sqrt</span>(<span class="fu">mean</span>((alpha_hat <span class="sc">-</span> true_alpha)<span class="sc">^</span><span class="dv">2</span>))))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">0</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>n  <span class="ot">&lt;-</span> <span class="dv">1000</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>x  <span class="ot">&lt;-</span> <span class="fu">runif</span>(n)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>pi <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">+</span> <span class="fu">exp</span>(<span class="sc">-</span>(<span class="dv">8</span> <span class="sc">*</span> x <span class="sc">-</span> <span class="dv">4</span>)))</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>a  <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pi)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">a =</span> <span class="fu">as.numeric</span>(a), <span class="at">x =</span> x)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the Python factory directly via reticulate so each round gets a</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># fresh sklearn object.</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>sk_kr <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">"sklearn.kernel_ridge"</span>, <span class="at">convert =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>factory <span class="ot">&lt;-</span> reticulate<span class="sc">::</span><span class="fu">py_func</span>(<span class="cf">function</span>() sk_kr<span class="sc">$</span><span class="fu">KernelRidge</span>(<span class="at">alpha =</span> <span class="fl">1.0</span>,</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>                                                             <span class="at">kernel =</span> <span class="st">"rbf"</span>,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>                                                             <span class="at">gamma =</span> <span class="fl">2.0</span>))</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>booster <span class="ot">&lt;-</span> RieszBooster<span class="sc">$</span><span class="fu">new</span>(</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimand =</span> <span class="fu">ATE</span>(),</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">backend =</span> <span class="fu">SklearnBackend</span>(</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_learner_factory =</span> factory,</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_estimators =</span> <span class="dv">80</span>L,</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">learning_rate =</span> <span class="fl">0.05</span>,</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">early_stopping_rounds =</span> <span class="dv">10</span>L,</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">validation_fraction =</span> <span class="fl">0.2</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>booster<span class="sc">$</span><span class="fu">fit</span>(df)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="ot">&lt;-</span> booster<span class="sc">$</span><span class="fu">predict</span>(df)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="ot">&lt;-</span> a <span class="sc">/</span> pi <span class="sc">-</span> (<span class="dv">1</span> <span class="sc">-</span> a) <span class="sc">/</span> (<span class="dv">1</span> <span class="sc">-</span> pi)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"corr = %.3f, RMSE = %.3f</span><span class="sc">\n</span><span class="st">"</span>,</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>            <span class="fu">cor</span>(alpha_hat, true_alpha),</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>            <span class="fu">sqrt</span>(<span class="fu">mean</span>((alpha_hat <span class="sc">-</span> true_alpha)<span class="sc">^</span><span class="dv">2</span>))))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>corr = 0.725, RMSE = 2.771</code></pre>
 </div>
