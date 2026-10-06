@@ -625,7 +625,7 @@ window.Quarto = {
 <tr class="odd">
 <td><strong>Scaling</strong></td>
 <td>Linear in <span class="math inline">\(n\)</span> via xgboost</td>
-<td><span class="math inline">\(O(n^3)\)</span> direct; Nyström + RFF + Falkon for larger <span class="math inline">\(n\)</span></td>
+<td><span class="math inline">\(O(n^3)\)</span> direct; Nyström + RFF for larger <span class="math inline">\(n\)</span></td>
 <td><span class="math inline">\(O(n \log n)\)</span> per tree</td>
 <td>Per-epoch cost is one forward pass over <span class="math inline">\(n + \sum_i k_i\)</span> points; scales to GPU</td>
 </tr>

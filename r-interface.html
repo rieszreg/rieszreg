@@ -586,62 +586,66 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><code>rieszreg.LocalShift(...)</code></td>
 </tr>
 <tr class="even">
+<td><code>OutcomeRegNormSq(covariates)</code></td>
+<td><code>rieszreg.OutcomeRegNormSq(covariates)</code></td>
+</tr>
+<tr class="odd">
 <td><code>SquaredLoss()</code></td>
 <td><code>rieszreg.SquaredLoss()</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>KLLoss(max_eta)</code></td>
 <td><code>rieszreg.KLLoss(max_eta)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>BernoulliLoss(max_abs_eta)</code></td>
 <td><code>rieszreg.BernoulliLoss(...)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>BoundedSquaredLoss(lo, hi, max_abs_eta)</code></td>
 <td><code>rieszreg.BoundedSquaredLoss(...)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>XGBoostBackend(hessian_floor, gradient_only)</code></td>
 <td><code>rieszboost.XGBoostBackend(...)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>SklearnBackend(base_learner_factory)</code></td>
 <td><code>rieszboost.SklearnBackend(...)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>RieszBooster$new(estimand, ...)</code></td>
 <td><code>rieszboost.RieszBooster(estimand, ...)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>&nbsp;&nbsp;<code>$fit(Z, y=, eval_set=, eval_y=)</code></td>
 <td><code>.fit(Z, y=, eval_set=, eval_y=)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>&nbsp;&nbsp;<code>$predict(Z)</code></td>
 <td><code>.predict(Z)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>&nbsp;&nbsp;<code>$score(Z, y=)</code></td>
 <td><code>.score(Z, y=)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>&nbsp;&nbsp;<code>$riesz_loss(Z, y=)</code></td>
 <td><code>.riesz_loss(Z, y=)</code></td>
 </tr>
-<tr class="odd">
-<td>&nbsp;&nbsp;<code>$diagnose(Z)</code></td>
-<td><code>.diagnose(Z)</code> (returns a list with <code>$summary</code> as a string)</td>
-</tr>
 <tr class="even">
+<td>&nbsp;&nbsp;<code>$diagnose(Z, y=)</code></td>
+<td><code>.diagnose(Z, y=)</code> (returns a list with <code>$summary</code> as a string)</td>
+</tr>
+<tr class="odd">
 <td>&nbsp;&nbsp;<code>$save(path)</code></td>
 <td><code>.save(path)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>load_riesz_booster(path)</code></td>
 <td><code>RieszBooster.load(path)</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>&nbsp;&nbsp;<code>$py</code></td>
 <td>the underlying Python object</td>
 </tr>
@@ -675,8 +679,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><code>krrr.Linear()</code> / <code>krrr.Polynomial(...)</code></td>
 </tr>
 <tr class="even">
-<td><code>KernelRidgeBackend(kernel, lambda_grid, solver, ...)</code></td>
-<td><code>krrr.KernelRidgeBackend(...)</code></td>
+<td><code>Tensor(a, cols_a, b, cols_b)</code></td>
+<td><code>krrr.Tensor(...)</code> (R column positions are 1-based)</td>
 </tr>
 <tr class="odd">
 <td><code>KernelRieszRegressor$new(estimand, kernel, ...)</code></td>
@@ -737,7 +741,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>The R wrapper exposes the moment-style <code>ForestRieszRegressor</code> (single-basis fits — handles ATE/ATT/TSM via the auto-resolved sieve in Python). The augmentation-style <code>AugForestRieszRegressor</code> is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.</p>
+<p>The R wrapper exposes the moment-style <code>ForestRieszRegressor</code>. It handles ATE, ATT and TSM through the default treatment-indicator basis. The augmentation-style <code>AugForestRieszRegressor</code> is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.</p>
 </section>
 <section id="api-surface-riesznet" class="level2">
 <h2 class="anchored" data-anchor-id="api-surface-riesznet">API surface (riesznet)</h2>
@@ -777,6 +781,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <p>The R wrapper exposes the simple-MLP convenience surface only. Custom torch architectures (custom <code>nn.Module</code> factory, custom optimizer, custom scheduler) are Python-only — define the factory in Python at module top level and call into Python via reticulate. <code>TorchBackend</code> direct construction is also Python-only in v1.</p>
 <p>R6’s <code>$method()</code> syntax maps to Python’s <code>.method()</code>. Integer-typed kwargs (<code>n_estimators</code>, <code>max_depth</code>, <code>random_state</code>, <code>early_stopping_rounds</code>, <code>n_landmarks</code>, <code>n_features</code>, <code>cg_max_iter</code>, <code>min_samples_leaf</code>, <code>subforest_size</code>, <code>epochs</code>, <code>batch_size</code>) take an <code>L</code> suffix in R: <code>n_estimators = 200L</code>. Other kwargs are auto-converted by reticulate.</p>
+<p>Data frames are converted to pandas column by column. Numeric and logical columns pass through as numbers. Factor columns are converted through their labels, so a treatment coded <code>factor(c("0", "1"))</code> arrives as 0/1. ATE and ATT need the treatment coded 0/1 and stop with an error otherwise.</p>
 </section>
 <section id="parity" class="level2">
 <h2 class="anchored" data-anchor-id="parity">Parity</h2>
@@ -801,8 +806,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>alpha_py <span class="op">=</span> booster_py.predict(df_py)</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>alpha_py[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>array([ 1.4076698,  1.4764098,  1.6470399, -1.1931754,  1.1374395],
-      dtype=float32)</code></pre>
+<pre><code>array([ 1.40766978,  1.47640979,  1.64703989, -1.19317544,  1.13743949])</code></pre>
 </div>
 </div>
 </div>

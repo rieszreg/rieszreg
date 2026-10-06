@@ -562,8 +562,9 @@ window.Quarto = {
 <section id="xgboostbackend" class="level2">
 <h2 class="anchored" data-anchor-id="xgboostbackend"><code>XGBoostBackend</code></h2>
 <p>The default. Boosts in η-space; the predictor applies the loss spec’s link to convert to α.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>XGBoostBackend(hessian_floor<span class="op">=</span><span class="fl">2.0</span>, gradient_only<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>hessian_floor</code> is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have <span class="math inline">\(H = 2a = 0\)</span>; without a floor, xgboost’s leaf-weight Newton step (<code>-G/(H+λ)</code>) is degenerate at those leaves. The default of 2.0 matches the natural Hessian on original rows.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>XGBoostBackend(hessian_floor<span class="op">=</span><span class="st">"auto"</span>, gradient_only<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>hessian_floor</code> is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have <span class="math inline">\(H = 0\)</span> (except under <code>BoundedSquaredLoss</code>, whose scaled-sigmoid link adds a term); without a floor, xgboost’s leaf-weight Newton step (<code>-G/(H+λ)</code>) is degenerate at those leaves. The default <code>"auto"</code> floors each row at the Gauss-Newton curvature of an observed row at the current prediction, <span class="math inline">\(h''(\hat\alpha)\,(d\alpha/d\eta)^2\)</span>, which is the exact curvature for every built-in loss except <code>BoundedSquaredLoss</code>. That is <span class="math inline">\(2\)</span> for <code>SquaredLoss</code>, <span class="math inline">\(\hat\alpha\)</span> for <code>KLLoss</code>, and <span class="math inline">\(\hat\alpha(1-\hat\alpha)\)</span> for <code>BernoulliLoss</code>. Each loss then takes Newton steps on its own scale. Pass a float for a fixed floor.</p>
+<p>With <code>BernoulliLoss</code> the <code>"auto"</code> steps are large, so a fit converges in far fewer trees. Use early stopping (<code>early_stopping_rounds</code> with <code>validation_fraction</code>) rather than a fixed <code>n_estimators</code>.</p>
 <p><code>gradient_only</code> short-circuits the second-order Hessian and uses <span class="math inline">\(H = 1\)</span> everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set <code>True</code> to reproduce the Lee-Schuler reference implementation exactly.</p>
 <p><code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code>, <code>learning_rate</code>, <code>n_estimators</code>, and <code>early_stopping_rounds</code> are passed through from the <code>RieszBooster</code> constructor.</p>
 </section>
@@ -605,9 +606,9 @@ window.Quarto = {
 </tr>
 <tr class="even">
 <td><code>validation_fraction</code></td>
-<td>0.0</td>
-<td>Set to 0.2 with <code>early_stopping_rounds</code></td>
-<td>Internal split for early stopping. Alternative: pass <code>eval_set=</code> explicitly.</td>
+<td>0.1</td>
+<td>Raise to 0.2 with <code>early_stopping_rounds</code></td>
+<td>Internal split for early stopping. Used only when <code>early_stopping_rounds</code> is set. Alternative: pass <code>eval_set=</code> explicitly.</td>
 </tr>
 <tr class="odd">
 <td><code>reg_lambda</code></td>
@@ -645,8 +646,8 @@ window.Quarto = {
 </tr>
 <tr class="even">
 <td><code>hessian_floor</code></td>
-<td><code>2.0</code></td>
-<td>Lower bound on the per-row Hessian. The default matches the natural Hessian of original-data rows.</td>
+<td><code>"auto"</code></td>
+<td>Lower bound on the per-row Hessian. <code>"auto"</code> uses an observed row’s curvature at the current prediction (2 for <code>SquaredLoss</code>); a float sets a fixed floor.</td>
 </tr>
 </tbody>
 </table>
@@ -656,6 +657,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="sklearnbackend"><code>SklearnBackend</code></h2>
 <p>To use a non-tree base learner, pass a <code>base_learner_factory</code>: a zero-arg callable returning a fresh sklearn-compatible regressor each round.</p>
 <p>The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction.</p>
+<p>Base learners with an unset <code>random_state</code> are seeded from the estimator’s <code>random_state</code>, so fits are reproducible. As with <code>XGBoostBackend</code>, the model is cut back to the best round only when <code>early_stopping_rounds</code> is set. Otherwise all <code>n_estimators</code> rounds are kept, even when you pass <code>eval_set=</code>. <code>max_depth</code>, <code>reg_lambda</code> and <code>subsample</code> on <code>RieszBooster</code> apply to <code>XGBoostBackend</code> only. Set tree settings on the base learner instead.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">R</a></li></ul>
 <div class="tab-content" data-group="lang">
