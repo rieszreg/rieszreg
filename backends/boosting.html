@@ -566,7 +566,7 @@ window.Quarto = {
 <p><code>hessian_floor</code> is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have <span class="math inline">\(H = 0\)</span> (except under <code>BoundedSquaredLoss</code>, whose scaled-sigmoid link adds a term); without a floor, xgboost’s leaf-weight Newton step (<code>-G/(H+λ)</code>) is degenerate at those leaves. The default <code>"auto"</code> floors each row at the Gauss-Newton curvature of an observed row at the current prediction, <span class="math inline">\(h''(\hat\alpha)\,(d\alpha/d\eta)^2\)</span>, which is the exact curvature for every built-in loss except <code>BoundedSquaredLoss</code>. That is <span class="math inline">\(2\)</span> for <code>SquaredLoss</code>, <span class="math inline">\(\hat\alpha\)</span> for <code>KLLoss</code>, and <span class="math inline">\(\hat\alpha(1-\hat\alpha)\)</span> for <code>BernoulliLoss</code>. Each loss then takes Newton steps on its own scale. Pass a float for a fixed floor.</p>
 <p>With <code>BernoulliLoss</code> the <code>"auto"</code> steps are large, so a fit converges in far fewer trees. Use early stopping (<code>early_stopping_rounds</code> with <code>validation_fraction</code>) rather than a fixed <code>n_estimators</code>.</p>
 <p><code>gradient_only</code> short-circuits the second-order Hessian and uses <span class="math inline">\(H = 1\)</span> everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set <code>True</code> to reproduce the Lee-Schuler reference implementation exactly.</p>
-<p><code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code>, <code>learning_rate</code>, <code>n_estimators</code>, and <code>early_stopping_rounds</code> are passed through from the <code>RieszBooster</code> constructor.</p>
+<p><code>max_depth</code>, <code>reg_lambda</code>, <code>subsample</code>, <code>learning_rate</code>, <code>n_estimators</code>, <code>early_stopping_rounds</code> and <code>validation_fraction</code> are <code>XGBoostBackend</code> fields; <code>RieszBooster</code> forwards its constructor args of the same names when it builds the backend.</p>
 </section>
 <section id="tuning-recipe" class="level2">
 <h2 class="anchored" data-anchor-id="tuning-recipe">Tuning recipe</h2>
@@ -656,7 +656,7 @@ window.Quarto = {
 <section id="sklearnbackend" class="level2">
 <h2 class="anchored" data-anchor-id="sklearnbackend"><code>SklearnBackend</code></h2>
 <p>To use a non-tree base learner, pass a <code>base_learner_factory</code>: a zero-arg callable returning a fresh sklearn-compatible regressor each round.</p>
-<p>The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction.</p>
+<p>The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction. As in <code>XGBoostBackend</code>’s <code>hessian_floor="auto"</code>, counterfactual rows count with an observed row’s curvature at the current prediction in that surrogate. Without this, the step size blew up wherever the base learner isolated rows that exist only as counterfactuals.</p>
 <p>Base learners with an unset <code>random_state</code> are seeded from the estimator’s <code>random_state</code>, so fits are reproducible. As with <code>XGBoostBackend</code>, the model is cut back to the best round only when <code>early_stopping_rounds</code> is set. Otherwise all <code>n_estimators</code> rounds are kept, even when you pass <code>eval_set=</code>. <code>max_depth</code>, <code>reg_lambda</code> and <code>subsample</code> on <code>RieszBooster</code> apply to <code>XGBoostBackend</code> only. Set tree settings on the base learner instead.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">R</a></li></ul>
@@ -691,7 +691,7 @@ window.Quarto = {
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"corr = </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(alpha_hat, true_alpha)[<span class="dv">0</span>,<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">, "</span></span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"RMSE = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(np.mean((alpha_hat <span class="op">-</span> true_alpha)<span class="op">**</span><span class="dv">2</span>))<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>corr = 0.913, RMSE = 1.663</code></pre>
+<pre><code>corr = 0.707, RMSE = 3.158</code></pre>
 </div>
 </div>
 </div>
@@ -729,7 +729,7 @@ window.Quarto = {
 <span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>            <span class="fu">cor</span>(alpha_hat, true_alpha),</span>
 <span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>            <span class="fu">sqrt</span>(<span class="fu">mean</span>((alpha_hat <span class="sc">-</span> true_alpha)<span class="sc">^</span><span class="dv">2</span>))))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>corr = 0.928, RMSE = 1.579</code></pre>
+<pre><code>corr = 0.725, RMSE = 2.771</code></pre>
 </div>
 </div>
 </div>

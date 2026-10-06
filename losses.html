@@ -622,6 +622,14 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
+<p>The loss must be able to represent the true α. The mean of α is known from the data, <span class="math inline">\(E[\alpha_0] = E[m(Z, 1)]\)</span>, and <code>fit</code> raises when that mean lies outside the loss’s range, since α can’t then stay inside it:</p>
+<ul>
+<li><strong><code>ATE</code>, <code>ATT</code>, <code>AdditiveShift</code> and <code>LocalShift</code></strong> have mean 0, because their functional subtracts, e.g.&nbsp;<span class="math inline">\(\alpha(0, x)\)</span> in <code>ATE</code>. So their α takes negative values, and <code>KLLoss</code>, <code>BernoulliLoss</code> and <code>BoundedSquaredLoss</code> with <code>lo ≥ 0</code> can’t fit them.</li>
+<li><strong><code>TSM</code></strong> has mean 1, so <code>BernoulliLoss</code> can’t fit it.</li>
+</ul>
+<p>The mean can lie inside the range while α leaves it somewhere. <code>fit</code> warns when some rows enter the functional with a negative coefficient, such as rows with <span class="math inline">\(y &lt; 0\)</span> under <code>OutcomeRegNormSq</code>, because α may then be negative where the loss keeps it above 0.</p>
+<p>Among the built-in estimands, only <code>OutcomeRegNormSq</code> with a binary outcome has α in <span class="math inline">\((0, 1)\)</span>: there α is <span class="math inline">\(P(Y = 1 \mid X)\)</span>. Otherwise <code>BernoulliLoss</code> is for custom estimands.</p>
+<p><code>KLLoss</code> needs good overlap. Where some covariate values have almost no treated rows, the empirical KL loss has no lower bound there. A flexible learner (<code>SklearnBackend</code>, <code>RieszNet</code>) can then push α̂ toward infinity at those points. Use <code>SquaredLoss</code>, or <code>RieszBooster</code>’s default XGBoost backend, when propensities get close to 0 or 1.</p>
 <p>Pass the loss instance to any learner via <code>loss=</code>:</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">R</a></li></ul>
@@ -642,19 +650,19 @@ window.Quarto = {
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Squared loss (default)</span></span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>RieszBooster(estimand<span class="op">=</span>ATE(), n_estimators<span class="op">=</span><span class="dv">100</span>).fit(df).predict(df)[:<span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>array([1.5734262, 2.5232608, 3.595529 ], dtype=float32)</code></pre>
+<pre><code>array([1.57342625, 2.52326083, 3.59552908])</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># KL loss for a density-ratio estimand</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>RieszBooster(estimand<span class="op">=</span>TSM(level<span class="op">=</span><span class="dv">1</span>), loss<span class="op">=</span>KLLoss(), n_estimators<span class="op">=</span><span class="dv">100</span>).fit(df).predict(df)[:<span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>array([1.550644, 2.55281 , 4.471114], dtype=float32)</code></pre>
+<pre><code>array([1.6228152 , 2.49242063, 4.05755093])</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bounded squared with prior bounds</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>RieszBooster(estimand<span class="op">=</span>ATE(),</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>             loss<span class="op">=</span>BoundedSquaredLoss(lo<span class="op">=-</span><span class="fl">5.0</span>, hi<span class="op">=</span><span class="fl">5.0</span>),</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>             n_estimators<span class="op">=</span><span class="dv">100</span>).fit(df).predict(df)[:<span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>array([1.5943003, 2.5617194, 4.412609 ], dtype=float32)</code></pre>
+<pre><code>array([1.57167941, 2.50903554, 3.74554245])</code></pre>
 </div>
 </div>
 </div>
@@ -676,14 +684,14 @@ window.Quarto = {
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>RieszBooster<span class="sc">$</span><span class="fu">new</span>(<span class="at">estimand =</span> <span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>), <span class="at">loss =</span> <span class="fu">KLLoss</span>(),</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">n_estimators =</span> <span class="dv">100</span>L)<span class="sc">$</span><span class="fu">fit</span>(df)<span class="sc">$</span><span class="fu">predict</span>(df)[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] 1.1560670 0.2848236 1.8298105</code></pre>
+<pre><code>[1] 1.169545675 0.009841453 1.751067194</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bounded squared with prior bounds</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>RieszBooster<span class="sc">$</span><span class="fu">new</span>(<span class="at">estimand =</span> <span class="fu">ATE</span>(),</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">loss =</span> <span class="fu">BoundedSquaredLoss</span>(<span class="at">lo =</span> <span class="sc">-</span><span class="fl">5.0</span>, <span class="at">hi =</span> <span class="fl">5.0</span>),</span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">n_estimators =</span> <span class="dv">100</span>L)<span class="sc">$</span><span class="fu">fit</span>(df)<span class="sc">$</span><span class="fu">predict</span>(df)[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1]  1.187630 -1.338935  2.180158</code></pre>
+<pre><code>[1]  1.173893 -1.336104  2.007336</code></pre>
 </div>
 </div>
 </div>
@@ -727,8 +735,7 @@ window.Quarto = {
 <span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>).fit(df)</span>
 <span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>booster.predict(df)[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>array([ 1.0391645,  1.1831129,  1.2119455, -0.9240942,  0.9052777],
-      dtype=float32)</code></pre>
+<pre><code>array([ 1.57145417,  2.95149994,  3.59623194, -1.2756505 ,  1.20341575])</code></pre>
 </div>
 </div>
 <p>For a quick experiment without writing a class, instantiate <code>Loss</code> directly with the potential and link as constructor arguments:</p>
@@ -816,7 +823,7 @@ window.Quarto = {
 <ul>
 <li><strong>Boosting</strong> (<a href="./backends/boosting.html"><code>rieszboost</code></a>): all four losses.</li>
 <li><strong>Kernel ridge</strong> (<a href="./backends/kernel.html"><code>krrr</code></a>): <code>SquaredLoss</code> only — non-quadratic losses need a Newton iteration on the kernel system.</li>
-<li><strong>Random forest, augmentation-style</strong> (<code>forestriesz.AugForestRieszRegressor</code>): all four losses. Tree structure from the squared MSE criterion, then a per-leaf Newton replaces each leaf’s stored θ with the Bregman optimum.</li>
+<li><strong>Random forest, augmentation-style</strong> (<code>forestriesz.AugForestRieszRegressor</code>): all four losses. Each tree picks splits by the gain in the loss you chose, and each leaf stores that loss’s closed-form optimum.</li>
 <li><strong>Random forest, moment-style</strong> (<code>forestriesz.ForestRieszRegressor</code>): <code>SquaredLoss</code> only.</li>
 <li><strong>Neural network</strong> (<a href="./backends/neural.html"><code>riesznet</code></a>): all four losses. Each loss’s per-row Bregman form is implemented in autograd-friendly torch ops; gradient parity vs the analytic loss is checked at 1e-8.</li>
 </ul>

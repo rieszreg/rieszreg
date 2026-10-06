@@ -558,7 +558,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>This stops the second runtime from aborting on <code>OMP: Error #15</code> and avoids a <code>fork()</code> crash from the Intel OpenMP 2019.5 bug. <code>setdefault</code> means a value the user already exported wins.</p>
 <p>These two flags do <strong>not</strong> prevent the threadpool deadlock above. That requires limiting OMP threads.</p>
 <p><code>rieszboost</code> and <code>riesznet</code> defer their <code>import xgboost</code> and <code>import torch</code> until the first attribute access, so <code>import rieszboost; import riesznet</code> (without instantiating estimators from both) does not load both <code>libomp</code> copies.</p>
-<p>When <code>RieszEstimator.fit()</code> runs and detects both <code>torch</code> and <code>xgboost</code> already loaded, it emits a one-time <code>RuntimeWarning</code> describing the situation.</p>
+<p>When <code>RieszEstimator.fit()</code> runs and detects both <code>torch</code> and <code>xgboost</code> already loaded, it emits a one-time <code>RuntimeWarning</code> describing the situation, unless <code>OMP_NUM_THREADS=1</code> is already set.</p>
 </section>
 <section id="fixing-the-deadlock" class="level3">
 <h3 class="anchored" data-anchor-id="fixing-the-deadlock">Fixing the deadlock</h3>
