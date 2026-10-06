@@ -115,20 +115,15 @@ Length-scale `"median"`, `"scott"`, and `"silverman"` heuristics resolve at fit 
 | Solver | When to use | Cost |
 |---|---|---|
 | `"direct"` | n_aug ≤ 3,000 | One eigendecomposition; entire λ-path is O(n²) per λ. Exact. |
-| `"nystrom_cg"` | n_aug ≤ 50,000 | Preconditioned CG on the o-block; m landmarks. |
+| `"nystrom_cg"` | n_aug > 3,000, if the dense o-block kernel matrix fits in memory | Preconditioned CG on the o-block; m landmarks. Skips the O(n³) eigendecomposition. Stores the n_o × n_o o-block kernel matrix (n_o original rows), so memory is O(n_o²) as for `"direct"`. |
 | `"rff"` | n_aug very large; shift-invariant kernel | Primal D × D solve via random Fourier features. |
-| `"falkon"` | n_aug very large; GPU available | Wraps the optional `falkon` package. |
-| `"auto"` | default | Dispatches by n_aug. |
+| `"auto"` | default | `"direct"` for n_aug ≤ 3,000, otherwise `"nystrom_cg"`. |
 
 The solver consumes the augmented dataset directly; you never deal with kernel matrices yourself.
 
-::: {.callout-warning title="Falkon limitation"}
-The Falkon backend currently drops the $K_{oc}\,b_c$ coupling on the o-block — Falkon's standalone API only solves vanilla KRR, not the modified-RHS system the augmentation produces. For estimands where $n_c$ is small or λ is moderate the bias is small; for tight overlap or extreme λ it is not. Use `solver="nystrom_cg"` if exactness matters more than scale.
-:::
-
 ## λ selection
 
-Pass a grid of λ values; the backend selects by validation Riesz loss when `validation_fraction > 0` or `eval_set` is given.
+Pass a grid of λ values; the backend selects by validation Riesz loss when `validation_fraction > 0` or `eval_set` is given. Without a validation set it uses the largest λ in the grid. `best_score_` is the validation Riesz loss of the selected fit.
 
 ```python
 krr = KernelRieszRegressor(
@@ -154,4 +149,3 @@ For non-quadratic losses today, use the [boosting backend](boosting.qmd).
 ## Sharp edges
 
 - **Median-heuristic bandwidth on the augmented dataset.** The median is computed on augmented points (originals + counterfactuals from $m$). For shift-style estimands this includes the shifted treatment values.
-- **`solver="falkon"` drops $K_{oc}\,b_c$.** See callout above.

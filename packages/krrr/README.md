@@ -2,7 +2,7 @@
 
 Kernel ridge Riesz regression, in **Python** and **R**. A learner package in the [RieszReg family](https://github.com/rieszreg/rieszreg): estimates the Riesz representer α of a linear estimand ψ = E[m(μ)(Z)] using kernel ridge regression.
 
-Implements [Singh, *Kernel Ridge Riesz Representers* (arXiv:2102.11076)](https://arxiv.org/abs/2102.11076) for the full set of estimands the rieszreg framework supports — not just TSM1 — by piping rieszreg's augmentation engine into a kernel solve. Includes scalable solvers (Nyström-preconditioned conjugate gradient; random Fourier features; optional Falkon for GPU / very large n).
+Implements [Singh, *Kernel Ridge Riesz Representers* (arXiv:2102.11076)](https://arxiv.org/abs/2102.11076) for the full set of estimands the rieszreg framework supports — not just TSM1 — by piping rieszreg's augmentation engine into a kernel solve. Includes scalable solvers (Nyström-preconditioned conjugate gradient and random Fourier features).
 
 ## Status
 
@@ -27,12 +27,6 @@ python3 -m venv .venv
 
 (Once both packages publish to PyPI, this collapses to `pip install krrr`.)
 
-Optional Falkon backend for very large n / GPU:
-
-```sh
-.venv/bin/pip install 'krrr[falkon]'
-```
-
 ## Quickstart (Python) — ATE
 
 ```python
@@ -53,7 +47,7 @@ krr = KernelRieszRegressor(
     estimand=ATE(treatment="a", covariates=("x",)),  # owns its input schema
     kernel=Gaussian(length_scale="median"),
     lambda_grid=np.logspace(-4, 0, 25),
-    solver="auto",  # picks "direct" for n_aug ≤ 3000, "nystrom_cg" for ≤ 50k, ...
+    solver="auto",  # "direct" for n_aug ≤ 3000, otherwise "nystrom_cg"
     validation_fraction=0.25,
 )
 
@@ -110,17 +104,16 @@ Gaussian() * Linear()                   # Product (Hadamard on Gram)
 Tensor(Gaussian(), [0, 1], Linear(), [2])   # tensor product over disjoint columns
 ```
 
-The kernel is fit on the augmented training points before any Gram evaluation, so `length_scale="median"` resolves to whatever scale matters for *this* dataset.
+The kernel is fit on the augmented training points before any Gram evaluation, so `length_scale="median"` resolves to whatever scale matters for *this* dataset. Each fit resolves its own copy of the kernel you pass, so one `Gaussian()` object can be shared across several regressors.
 
 ## Solver selection
 
 | Solver | When to use | Cost |
 |---|---|---|
 | `"direct"` | n_aug ≤ 3000 | One eigendecomposition per fit; entire λ-path is O(n²) per λ. Exact. |
-| `"nystrom_cg"` | n_aug ≤ 50 000 | Preconditioned CG on the symmetric o-block; m landmarks. |
+| `"nystrom_cg"` | n_aug > 3000, if the dense o-block Gram matrix fits in memory | Preconditioned CG on the symmetric o-block; m landmarks. Skips the O(n³) eigendecomposition. Stores the n_o × n_o o-block Gram matrix (n_o original rows), so memory is O(n_o²) as for `direct`. |
 | `"rff"` | n_aug very large; shift-invariant kernel | Primal D × D solve via random Fourier features. |
-| `"falkon"` | n_aug very large; GPU available | Wraps the `falkon` package. Optional dependency. |
-| `"auto"` | default | Picks `direct` / `nystrom_cg` / `falkon` by n_aug. |
+| `"auto"` | default | Picks `direct` for n_aug ≤ 3000, otherwise `nystrom_cg`. |
 
 The solver consumes the augmented dataset directly; you never deal with kernel matrices yourself.
 
@@ -180,7 +173,7 @@ The R6 wrapper exposes the same method with column names `"lambda=1e-03"`, etc.
 print(krr.diagnose(df).summary())
 ```
 
-The base `Diagnostics` (RMS magnitude, |α| quantiles, extreme-row count, held-out Riesz loss) is shared via rieszreg. `krr.diagnose(df)` adds KRR-specific extras: chosen λ, support size, effective degrees of freedom, condition number of the kernel system.
+The base `Diagnostics` (RMS magnitude, |α| quantiles, extreme-row count, held-out Riesz loss) is shared via rieszreg. `krr.diagnose(df)` adds KRR-specific extras: chosen λ, support size, and, for `solver="direct"`, the effective degrees of freedom and condition number of the training-time kernel system.
 
 ## Save and load
 
@@ -226,7 +219,7 @@ Includes a numerical-parity test against the dml-tmle krrr.R reference at 1e-8.
 ## On the roadmap
 
 - **`KLLoss` / `BernoulliLoss` / `BoundedSquaredLoss`** — Newton iteration on the kernel system. v0.2.
-- **KeOps lazy kernel ops** — for n_aug > 50k where even materializing the Gram matrix on the o-block is heavy.
+- **KeOps lazy kernel ops** — so `nystrom_cg` no longer materializes the o-block Gram matrix, whose O(n_o²) memory limits it today.
 - **Marginal-likelihood bandwidth selection** — Gaussian-process interpretation; differentiable.
 - **Benchmarks at n = 10⁵, 10⁶** — solver tier comparisons; documented speed-vs-accuracy curves.
 - **Custom kernel API** — formal `Kernel` Protocol so user-defined kernels slot into the solver registry.
@@ -236,7 +229,6 @@ Includes a numerical-parity test against the dml-tmle krrr.R reference at 1e-8.
 - [Singh, Kernel Ridge Riesz Representers (2102.11076)](https://arxiv.org/abs/2102.11076) — closed-form RKHS estimator for TSM1.
 - [Lee & Schuler, RieszBoost (2501.04871)](https://arxiv.org/abs/2501.04871) — gradient-boosted Riesz regression.
 - [Chernozhukov et al., Auto-DML via Riesz Regression (2104.14737)](https://arxiv.org/abs/2104.14737) — origin of the squared Riesz loss.
-- [Rudi-Carratino-Rosasco, FALKON (1705.10958)](https://arxiv.org/abs/1705.10958) — Nyström + preconditioned CG solver, optional backend.
 - [Rahimi-Recht, Random Features (NIPS 2007)](https://proceedings.neurips.cc/paper/2007/hash/013a006f03dbc5392effeb8f18fda755-Abstract.html) — RFF solver basis.
 
 ## License

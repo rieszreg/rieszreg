@@ -29,7 +29,7 @@ packages/<pkg>/
 └── CLAUDE.md                  # implementation-side notes (architecture, sharp edges)
 ```
 
-`pyproject.toml` declares `Depends: rieszreg`. setuptools build, Python ≥3.10. Optional-deps groups for heavy backends (`[lgb]`, `[jax]`, `[falkon]`, `[keops]`, `[torch]`).
+`pyproject.toml` declares `Depends: rieszreg`. setuptools build, Python ≥3.10. Optional-deps groups for heavy backends (`[lgb]`, `[jax]`, `[keops]`, `[torch]`).
 
 ## 2. Pick the backend Protocol
 
@@ -67,13 +67,13 @@ Encapsulate all backend-specific stability tricks inside the backend itself. Exa
 
 ## 6. Fast-default + customizable-internals
 
-Ship an automatic fast-path that "just works" at default settings. Concrete reference: krrr's solver dispatcher (`auto_choose(n_aug)`: direct ≤3k → nystrom_cg ≤50k → rff/falkon). Underneath the auto-path, expose the slower / more general / more customizable interfaces (explicit solver choice, raw kernel matrices, etc.). Document both surfaces and exercise both in tests.
+Ship an automatic fast-path that "just works" at default settings. Concrete reference: krrr's solver dispatcher (`auto_choose(n_aug)`: direct ≤3k → nystrom_cg ≤50k → rff). Underneath the auto-path, expose the slower / more general / more customizable interfaces (explicit solver choice, raw kernel matrices, etc.). Document both surfaces and exercise both in tests.
 
 ## 7. Public API surface (`__init__.py`)
 
 Re-export the rieszreg primitives a typical user needs (estimand factories, loss factories, top-level estimator class, `diagnose`, `LinearForm`, `Tracer`) plus your own backend factories and convenience class. The re-export list is invariant across the two backend Protocols — even moment-style packages re-export `LinearForm` and `Tracer`.
 
-Lazy-import optional heavy deps (xgboost, lightgbm, JAX, falkon, keops, torch) via `__getattr__` so the package is importable without them.
+Lazy-import optional heavy deps (xgboost, lightgbm, JAX, keops, torch) via `__getattr__` so the package is importable without them.
 
 ## 8. Serialization
 

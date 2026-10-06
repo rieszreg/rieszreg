@@ -31,7 +31,7 @@ python3 -m venv .venv
 brew install libomp
 ```
 
-Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed. `krrr` has no system prerequisites; an optional GPU backend uses [`falkon`](https://falkonml.github.io/falkon/) (`pip install -e 'krrr/python[falkon]'`). `forestriesz` depends on `econml`, which ships prebuilt wheels for macOS arm64+x86_64 and ubuntu — no compiler required. `riesznet` depends on `torch>=2.0`; CPU wheels are fetched automatically, GPU wheels need a `--index-url` per the PyTorch install matrix.
+Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed. `krrr` has no system prerequisites. `forestriesz` depends on `econml`, which ships prebuilt wheels for macOS arm64+x86_64 and ubuntu — no compiler required. `riesznet` depends on `torch>=2.0`; CPU wheels are fetched automatically, GPU wheels need a `--index-url` per the PyTorch install matrix.
 
 ### Combining `rieszboost` and `riesznet` in one process
 

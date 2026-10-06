@@ -6,7 +6,7 @@ into something that exposes `predict_eta(X)` / `predict_alpha(X)`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
@@ -15,7 +15,7 @@ import numpy as np
 from rieszreg.backends.base import register_predictor_loader
 from rieszreg.losses import Loss, loss_from_spec
 
-from .kernels import Kernel, kernel_from_spec
+from .kernels import Kernel, RFFFeatureMap, kernel_from_spec
 from .solvers import SolveResult
 
 
@@ -34,17 +34,16 @@ class KernelPredictor:
     loss: Loss
     result: SolveResult
     base_score: float = 0.0
-    feature_keys: tuple[str, ...] = ()
     solve_results: list[SolveResult] | None = None
     lambda_grid: tuple[float, ...] | None = None
 
     kind = "krrr"
+    chunk_size = 4096  # test rows per kernel block in predict
 
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
         X = np.atleast_2d(np.asarray(features, dtype=float))
         if self.result.kind == "dual":
-            K_new = self.kernel(X, self.result.support)
-            eta = K_new @ self.result.gamma
+            eta = self.kernel.matvec(X, self.result.support, self.result.gamma, self.chunk_size)
         elif self.result.kind == "primal":
             phi = self.result.feature_map(X)
             eta = phi @ self.result.weights
@@ -88,25 +87,17 @@ class KernelPredictor:
     ) -> np.ndarray:
         _, indices = self._resolve_lambda_indices(lambdas)
         X = np.atleast_2d(np.asarray(features, dtype=float))
-        n = X.shape[0]
-        out = np.empty((n, len(indices)), dtype=float)
-
-        # All current solvers return per-λ SolveResults sharing the same
-        # support (dual) or the same feature_map (primal) — exploit that to
-        # reuse the test-side kernel slab / feature map across λ.
-        first = self.solve_results[indices[0]]
-        kind = first.kind
-        if kind == "dual":
-            K_new = self.kernel(X, first.support)
-            for j, idx in enumerate(indices):
-                out[:, j] = K_new @ self.solve_results[idx].gamma + self.base_score
-        elif kind == "primal":
-            phi = first.feature_map(X)
-            for j, idx in enumerate(indices):
-                out[:, j] = phi @ self.solve_results[idx].weights + self.base_score
+        # Every per-λ SolveResult shares the support (dual) or feature map
+        # (primal), so one kernel slab / Φ(X) serves the whole path.
+        results = [self.solve_results[i] for i in indices]
+        first = results[0]
+        if first.kind == "dual":
+            eta = self.kernel.matvec(X, first.support, np.column_stack([r.gamma for r in results]), self.chunk_size)
+        elif first.kind == "primal":
+            eta = first.feature_map(X) @ np.column_stack([r.weights for r in results])
         else:
-            raise ValueError(f"Unknown SolveResult.kind: {kind!r}")
-        return out
+            raise ValueError(f"Unknown SolveResult.kind: {first.kind!r}")
+        return eta + self.base_score
 
     def predict_alpha_path(
         self, features: np.ndarray, lambdas: Sequence[float] | None = None
@@ -117,120 +108,68 @@ class KernelPredictor:
     # ---- Serialization ---------------------------------------------------
 
     def save(self, dir_path) -> None:
+        """Write ``predictor.json`` + ``predictor.npz``. The support (dual) or
+        feature map (primal) is stored once; with ``keep_path`` the per-λ
+        coefficients are stacked into ``path_coef``."""
         import json
 
         dir_path = Path(dir_path)
         dir_path.mkdir(parents=True, exist_ok=True)
-
+        r = self.result
         payload = {
             "kernel": self.kernel.to_spec(),
             "loss": self.loss.to_spec(),
             "base_score": float(self.base_score),
-            "feature_keys": list(self.feature_keys),
-            "result_kind": self.result.kind,
-            "result_extra": self.result.extra or {},
-            "lambda_grid": (
-                list(self.lambda_grid) if self.lambda_grid is not None else None
-            ),
+            "result_kind": r.kind,
+            "result_extra": r.extra or {},
+            "lambda_grid": list(self.lambda_grid) if self.lambda_grid is not None else None,
         }
         with open(dir_path / "predictor.json", "w") as f:
             json.dump(payload, f, indent=2)
 
-        if self.result.kind == "dual":
-            np.savez(
-                dir_path / "predictor.npz",
-                support=self.result.support,
-                gamma=self.result.gamma,
-            )
-        elif self.result.kind == "primal":
-            fm = self.result.feature_map
-            np.savez(
-                dir_path / "predictor.npz",
-                weights=self.result.weights,
-                rff_W=fm.W,
-                rff_b=fm.b,
-                rff_scale=np.asarray([fm.scale]),
-            )
-
+        coef_name = "gamma" if r.kind == "dual" else "weights"
+        arrays = {"coef": getattr(r, coef_name)}
+        if r.kind == "dual":
+            arrays["support"] = r.support
+        else:
+            fm = r.feature_map
+            arrays.update(rff_W=fm.W, rff_b=fm.b, rff_scale=np.asarray([fm.scale]))
+        if r.spectrum is not None:
+            arrays["spectrum"] = r.spectrum
         if self.solve_results is not None:
-            path_dir = dir_path / "solve_results"
-            path_dir.mkdir(exist_ok=True)
-            for idx, r in enumerate(self.solve_results):
-                if r.kind == "dual":
-                    np.savez(
-                        path_dir / f"lambda_{idx}.npz",
-                        support=r.support,
-                        gamma=r.gamma,
-                    )
-                elif r.kind == "primal":
-                    fm = r.feature_map
-                    np.savez(
-                        path_dir / f"lambda_{idx}.npz",
-                        weights=r.weights,
-                        rff_W=fm.W,
-                        rff_b=fm.b,
-                        rff_scale=np.asarray([fm.scale]),
-                    )
+            arrays["path_coef"] = np.stack([getattr(s, coef_name) for s in self.solve_results])
+        np.savez(dir_path / "predictor.npz", **arrays)
 
     @classmethod
     def load(cls, dir_path, base_score=None, loss=None, best_iteration=None):
         import json
 
-        from .solvers.rff import RFFFeatureMap
-
         dir_path = Path(dir_path)
         with open(dir_path / "predictor.json") as f:
             payload = json.load(f)
         npz = np.load(dir_path / "predictor.npz")
+        kind = payload["result_kind"]
+        spectrum = npz["spectrum"] if "spectrum" in npz else None
 
-        kernel = kernel_from_spec(payload["kernel"])
-        loss_loaded = loss if loss is not None else loss_from_spec(payload["loss"])
-        result_kind = payload["result_kind"]
-
-        def _load_solve_result(npz_data, kind: str) -> SolveResult:
+        def make(coef, extra) -> SolveResult:
             if kind == "dual":
-                return SolveResult(
-                    kind="dual",
-                    support=npz_data["support"],
-                    gamma=npz_data["gamma"],
-                    extra={},
-                )
-            if kind == "primal":
-                fm = RFFFeatureMap(
-                    W=npz_data["rff_W"],
-                    b=npz_data["rff_b"],
-                    scale=float(npz_data["rff_scale"][0]),
-                )
-                return SolveResult(
-                    kind="primal",
-                    weights=npz_data["weights"],
-                    feature_map=fm,
-                    extra={},
-                )
-            raise ValueError(f"Unknown result_kind: {kind!r}")
+                return SolveResult(kind="dual", support=npz["support"], gamma=coef,
+                                   spectrum=spectrum, extra=extra)
+            fm = RFFFeatureMap(W=npz["rff_W"], b=npz["rff_b"], scale=float(npz["rff_scale"][0]))
+            return SolveResult(kind="primal", weights=coef, feature_map=fm, extra=extra)
 
-        result = _load_solve_result(npz, result_kind)
-        result.extra = payload.get("result_extra", {}) or {}
-
-        # Optional path retention
-        path_dir = dir_path / "solve_results"
         lam_grid = payload.get("lambda_grid")
-        solve_results: list[SolveResult] | None = None
-        if path_dir.is_dir() and lam_grid is not None:
-            solve_results = []
-            for idx, lam in enumerate(lam_grid):
-                npz_path = np.load(path_dir / f"lambda_{idx}.npz")
-                r = _load_solve_result(npz_path, result_kind)
-                r.extra = {"lambda": float(lam)}
-                solve_results.append(r)
-
-        bs = payload["base_score"] if base_score is None else float(base_score)
+        solve_results = None
+        if "path_coef" in npz and lam_grid is not None:
+            solve_results = [
+                make(coef, {"lambda": float(lam)})
+                for coef, lam in zip(npz["path_coef"], lam_grid)
+            ]
         return cls(
-            kernel=kernel,
-            loss=loss_loaded,
-            result=result,
-            base_score=bs,
-            feature_keys=tuple(payload.get("feature_keys", ())),
+            kernel=kernel_from_spec(payload["kernel"]),
+            loss=loss if loss is not None else loss_from_spec(payload["loss"]),
+            result=make(npz["coef"], payload.get("result_extra") or {}),
+            base_score=payload["base_score"] if base_score is None else float(base_score),
             solve_results=solve_results,
             lambda_grid=tuple(lam_grid) if lam_grid is not None else None,
         )

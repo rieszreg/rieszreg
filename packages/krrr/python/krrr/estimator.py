@@ -15,10 +15,10 @@ import numpy as np
 
 from rieszreg.estimands.base import Estimand
 from rieszreg.estimator import RieszEstimator
-from rieszreg.losses import Loss, SquaredLoss
+from rieszreg.losses import Loss
 
-from .backend import KernelRidgeBackend
-from .kernels import Gaussian, Kernel
+from .backend import DEFAULT_LAMBDA_GRID, KernelRidgeBackend
+from .kernels import Gaussian, Kernel, kernel_from_spec
 
 
 class KernelRieszRegressor(RieszEstimator):
@@ -38,14 +38,14 @@ class KernelRieszRegressor(RieszEstimator):
         pairwise Euclidean distance on the augmented training points.
     lambda_grid : sequence of float, default=10**linspace(-4, 0, 21)
         Regularization path. Selection by validation Riesz loss when
-        `validation_fraction > 0` or `eval_set` is given.
-    solver : {"auto", "direct", "nystrom_cg", "rff", "falkon"}, default="auto"
-        "auto" picks "direct" for n_aug ≤ 3000, "nystrom_cg" for ≤ 50k,
-        else "falkon" if installed otherwise "nystrom_cg".
+        `validation_fraction > 0` or `eval_set` is given; otherwise the
+        largest λ is used.
+    solver : {"auto", "direct", "nystrom_cg", "rff"}, default="auto"
+        "auto" picks "direct" for n_aug ≤ 3000, otherwise "nystrom_cg".
     loss : rieszreg.Loss, default=SquaredLoss()
         Currently only SquaredLoss is supported in the kernel backend.
     n_landmarks : int or None
-        Nyström landmarks (for "nystrom_cg" / "falkon").
+        Nyström landmarks (for "nystrom_cg").
     n_features : int, default=1024
         Random Fourier features (for "rff").
     cg_tol : float, default=1e-6
@@ -100,18 +100,10 @@ class KernelRieszRegressor(RieszEstimator):
     def _resolved_kernel(self) -> Kernel:
         return self.kernel if self.kernel is not None else Gaussian()
 
-    def _resolved_lambda_grid(self) -> tuple[float, ...]:
-        if self.lambda_grid is None:
-            return tuple(10.0 ** np.linspace(-4, 0, 21))
-        return tuple(float(x) for x in self.lambda_grid)
-
-    def _resolved_loss(self) -> Loss:
-        return self.loss if self.loss is not None else SquaredLoss()
-
     def _resolved_backend(self) -> KernelRidgeBackend:
         return KernelRidgeBackend(
             kernel=self._resolved_kernel(),
-            lambda_grid=self._resolved_lambda_grid(),
+            lambda_grid=DEFAULT_LAMBDA_GRID if self.lambda_grid is None else self.lambda_grid,
             solver=self.solver,
             n_landmarks=self.n_landmarks,
             n_features=self.n_features,
@@ -119,22 +111,18 @@ class KernelRieszRegressor(RieszEstimator):
             cg_max_iter=self.cg_max_iter,
             validation_fraction=self.validation_fraction,
             keep_path=self.keep_path,
-            random_state=self.random_state,
         )
 
-    # ---- fit override exposes lambda_ ----
+    @property
+    def lambda_(self) -> float:
+        """The regularization strength λ selected from lambda_grid."""
+        return self.predictor_.result.extra["lambda"]
 
-    def fit(self, Z, y=None, eval_set=None, eval_y=None) -> "KernelRieszRegressor":
-        super().fit(Z, y=y, eval_set=eval_set, eval_y=eval_y)
-        # The regularization strength λ selected from lambda_grid.
-        self.lambda_ = (self.predictor_.result.extra or {}).get("lambda")
-        return self
-
-    def diagnose(self, Z, **kwargs):
+    def diagnose(self, Z, y=None, **kwargs):
         """Base diagnostics plus kernel extras: selected λ, number of
         support points, effective degrees of freedom, condition number."""
         from .diagnostics import diagnose_kernel
-        return diagnose_kernel(self, Z, **kwargs)
+        return diagnose_kernel(self, Z, y=y, **kwargs)
 
     def predict_path(
         self, Z, lambdas: Sequence[float] | None = None
@@ -143,8 +131,8 @@ class KernelRieszRegressor(RieszEstimator):
 
         Returns an array of shape ``(n_rows, n_lambdas)`` whose column ``j``
         is the prediction at ``lambdas[j]`` (or ``self.lambda_grid[j]`` if
-        ``lambdas`` is ``None``). Each column is bit-equal to a fresh fit at
-        a singleton lambda_grid containing that λ — same Cholesky / RHS / dual.
+        ``lambdas`` is ``None``). Each column matches, up to floating-point
+        rounding, a fresh fit at a singleton lambda_grid containing that λ.
 
         Requires ``keep_path=True`` (the default). Raises ``RuntimeError`` if
         the estimator was fit with ``keep_path=False``.
@@ -152,23 +140,17 @@ class KernelRieszRegressor(RieszEstimator):
         feats = self._features(Z)
         return self.predictor_.predict_alpha_path(feats, lambdas)
 
-    # ---- save/load: defer to base class via the registry ----
+    # ---- save/load: the base class handles every JSON-able param ----
 
     def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            validation_fraction=self.validation_fraction,
-            keep_path=self.keep_path,
-        )
-        return base
+        hp = super()._save_hyperparameters()
+        if self.kernel is not None:
+            hp["kernel"] = self.kernel.to_spec()
+        return hp
 
     @classmethod
     def _construct_for_load(cls, *, estimand, loss, hyperparameters: dict) -> "KernelRieszRegressor":
-        return cls(
-            estimand=estimand,
-            loss=loss,
-            init=hyperparameters.get("init"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.2),
-            keep_path=hyperparameters.get("keep_path", True),
-            random_state=hyperparameters.get("random_state", 0),
-        )
+        hp = dict(hyperparameters)
+        if isinstance(hp.get("kernel"), dict):
+            hp["kernel"] = kernel_from_spec(hp["kernel"])
+        return super()._construct_for_load(estimand=estimand, loss=loss, hyperparameters=hp)

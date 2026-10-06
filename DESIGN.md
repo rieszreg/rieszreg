@@ -239,7 +239,7 @@ This is the contract every implementation package must meet. Section structure f
 
 ### 2.2 Backend implementations
 - **[your package]** Concrete backends live in `<pkg>/backends/`. Examples in the wild: `XGBoostBackend(hessian_floor=2.0, gradient_only=False)` ([backends/xgboost.py:93](rieszboost/python/rieszboost/backends/xgboost.py:93)), `SklearnBackend(base_learner_factory)` ([backends/sklearn.py:93](rieszboost/python/rieszboost/backends/sklearn.py:93)), `KernelRidgeBackend` (krrr), `ForestRieszBackend` (forestriesz; moment-style, satisfies `MomentBackend.fit_rows`).
-- **[design rule]** Lazy-import optional heavy deps (xgboost, lightgbm, JAX, falkon, keops, torch) via `__getattr__` so the package is importable without them. Reference: [__init__.py:52-64](rieszboost/python/rieszboost/__init__.py:52).
+- **[design rule]** Lazy-import optional heavy deps (xgboost, lightgbm, JAX, keops, torch) via `__getattr__` so the package is importable without them. Reference: [__init__.py:52-64](rieszboost/python/rieszboost/__init__.py:52).
 
 ### 2.3 Hyperparameter tuning
 - **[design rule]** Tuning uses sklearn `GridSearchCV` / `HalvingGridSearchCV` / `RandomizedSearchCV`. No bespoke `tune_riesz()`.
@@ -252,7 +252,7 @@ This is the contract every implementation package must meet. Section structure f
 - **[design rule]** The meta-package does not impose stability tricks; the `Backend` is responsible.
 
 ### 2.5 Fast-default + customizable-internals
-- **[design rule]** Ship an automatic fast-path that "just works" at default settings. Concrete reference: krrr's solver dispatcher (`auto_choose(n_aug)`: direct ≤3k → nystrom_cg ≤50k → rff/falkon).
+- **[design rule]** Ship an automatic fast-path that "just works" at default settings. Concrete reference: krrr's solver dispatcher (`auto_choose(n_aug)`: direct ≤3k → nystrom_cg ≤50k → rff).
 - **[design rule]** Underneath the auto-path, expose the slower / more general / more customizable interfaces (explicit solver choice, raw kernel matrices, etc.). Users with unusual problems should not be locked out.
 - **[your package]** Document both surfaces in docs and exercise both in tests.
 
@@ -387,7 +387,7 @@ This is the contract every implementation package must meet. Section structure f
 
 ### 8.1 Package config
 - `pyproject.toml` per package. setuptools build, Python ≥3.10. Depend on `rieszreg>=X.Y`.
-- Optional-deps groups (`[test]`, `[lgb]`, `[jax]`, `[falkon]`, `[keops]`).
+- Optional-deps groups (`[test]`, `[lgb]`, `[jax]`, `[keops]`).
 - No lockfile; `.venv/` per package, gitignored.
 - R: `DESCRIPTION` with Roxygen2; `Imports: R6, reticulate, rieszreg`.
 

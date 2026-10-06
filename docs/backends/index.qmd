@@ -14,7 +14,7 @@ A backend fits the Riesz representer for a given estimand and loss. Five impleme
 | **Iterative?** | Yes (rounds + early stopping) | No (closed-form per λ) | No (single forest fit) | Yes (epochs + early stopping) |
 | **Hyperparameters** | `n_estimators`, `learning_rate`, `max_depth`, `reg_lambda`, `subsample` | `kernel`, `lambda_grid`, `solver` | `n_estimators`, `max_depth`, `min_samples_leaf`, plus `honest` / `riesz_feature_fns` for the moment-style flavor | `hidden_sizes`, `learning_rate`, `epochs`, `dropout`, or any `module_factory` / `optimizer_factory` |
 | **Loss support** | `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` | `SquaredLoss` only (today) | All four for the augmented flavor; `SquaredLoss` only for the moment flavor | `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` |
-| **Scaling** | Linear in $n$ via xgboost | $O(n^3)$ direct; Nyström + RFF + Falkon for larger $n$ | $O(n \log n)$ per tree | Per-epoch cost is one forward pass over $n + \sum_i k_i$ points; scales to GPU |
+| **Scaling** | Linear in $n$ via xgboost | $O(n^3)$ direct; Nyström + RFF for larger $n$ | $O(n \log n)$ per tree | Per-epoch cost is one forward pass over $n + \sum_i k_i$ points; scales to GPU |
 | **Confidence intervals** | No | No | Yes — `predict_interval` on single-basis fits (moment-style only) | No |
 | **Convenience class** | `rieszboost.RieszBooster` | `krrr.KernelRieszRegressor` | `forestriesz.AugForestRieszRegressor` (recommended; works on every estimand) and `forestriesz.ForestRieszRegressor` (the published ForestRiesz method, kept for comparison; supports CIs) | `riesznet.RieszNet` (default MLP); `riesznet.TorchBackend` for arbitrary `nn.Module` factories |
 

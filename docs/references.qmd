@@ -24,7 +24,7 @@ title: "References"
 
 ## Solver foundations (krrr)
 
-- **Rudi, Carratino & Rosasco (2017).** *FALKON: An Optimal Large Scale Kernel Method.* [arXiv:1705.10958](https://arxiv.org/abs/1705.10958) — Nyström + preconditioned CG, optional GPU backend.
+- **Rudi, Carratino & Rosasco (2017).** *FALKON: An Optimal Large Scale Kernel Method.* [arXiv:1705.10958](https://arxiv.org/abs/1705.10958) — Nyström-preconditioned conjugate gradient, the approach behind krrr's `nystrom_cg` solver.
 - **Rahimi & Recht (2007).** *Random Features for Large-Scale Kernel Machines.* NIPS — basis of the random Fourier features solver.
 
 ## Semiparametric estimation context

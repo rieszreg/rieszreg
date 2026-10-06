@@ -16,13 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=7", "pandas>=2.0"]
-# `falkon` and `pykeops` solvers are supported via lazy import in
-# krrr.solvers.falkon and krrr.solvers.keops. They are not declared as extras
-# here because falkon is not on PyPI (only on a torch-version-specific index
-# at https://falkonml.github.io/falkon/dist/) which uv's workspace lock
-# cannot resolve. To use them, install separately:
-#   pip install falkon -f https://falkonml.github.io/falkon/dist/torch2.5_cu118/index.html
-#   pip install pykeops
 
 [tool.setuptools.packages.find]
 where = ["."]

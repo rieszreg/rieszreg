@@ -3,12 +3,13 @@
 Consumes the `AugmentedDataset` produced by `Estimand.augment` and
 returns a `FitResult` whose `predictor` is a `KernelPredictor`. Iterates over
 `lambda_grid` and picks the best λ either by validation Riesz loss
-(`aug_valid` provided) or the smallest λ (no validation set).
+(`aug_valid` provided) or the largest λ (no validation set).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import copy
+from dataclasses import dataclass, field, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -19,38 +20,41 @@ from rieszreg.losses import Loss, SquaredLoss
 
 from .kernels import Gaussian, Kernel
 from .predictor import KernelPredictor
-from .solvers import SolveResult, auto_choose, get_solver
+from .solvers import auto_choose, get_solver
+
+DEFAULT_LAMBDA_GRID = tuple(10.0 ** np.linspace(-4, 0, 21))
 
 
 @dataclass
 class KernelRidgeBackend:
-    """Kernel ridge regression backend for the rieszboost framework.
+    """Kernel ridge regression backend for the rieszreg framework.
 
     Parameters
     ----------
     kernel : Kernel, default=Gaussian(length_scale="median")
+        Not modified by fitting: each fit resolves a copy, which the fitted
+        predictor keeps.
     lambda_grid : sequence of float
-        Regularization values to sweep. Selection by validation Riesz loss.
+        Regularization values to sweep. Selection by validation Riesz loss;
+        without a validation set, the largest λ is used.
     solver : str, default="auto"
-        One of "direct", "nystrom_cg", "rff", "falkon", "auto".
+        One of "direct", "nystrom_cg", "rff", "auto".
     n_landmarks : int or None
-        For "nystrom_cg" / "falkon". Defaults to `min(n_o, max(50, 4√n_o))`.
+        For "nystrom_cg". Defaults to `min(n_o, max(50, 4√n_o))`.
     n_features : int, default=1024
         For "rff" only.
     cg_tol, cg_max_iter : float, int
         For "nystrom_cg" only.
-    random_state : int
     """
 
     kernel: Kernel = field(default_factory=lambda: Gaussian())
-    lambda_grid: Sequence[float] = field(default_factory=lambda: tuple(10.0 ** np.linspace(-4, 0, 21)))
+    lambda_grid: Sequence[float] = DEFAULT_LAMBDA_GRID
     solver: str = "auto"
     n_landmarks: int | None = None
     n_features: int = 1024
     cg_tol: float = 1e-6
     cg_max_iter: int = 200
     validation_fraction: float = 0.2
-    random_state: int = 0
     keep_path: bool = True
 
     def fit_augmented(
@@ -73,72 +77,56 @@ class KernelRidgeBackend:
                 "on the kernel system; planned for a future release."
             )
 
-        # base_score (initial α) is folded into the targets: replace
-        # potential_deriv_coef with potential_deriv_coef + is_original · base_score
-        # so that predicting α̂ = base_score + (kernel part) minimizes the same loss.
+        # Fold base_score (initial α = b) into the targets: with α = b + f,
+        # D(b+f)² + 2C(b+f) = D f² + 2(C + D b) f + (D b² + 2 C b), so the
+        # kernel part f solves the same problem with C → C + D b. The dropped
+        # constant, the validation loss of α ≡ b, is added back to the
+        # reported validation losses.
+        val_offset = 0.0
         if base_score != 0.0:
-            aug_train = AugmentedDataset(
-                features=aug_train.features,
-                is_original=aug_train.is_original,
-                potential_deriv_coef=(
-                    aug_train.potential_deriv_coef + aug_train.is_original * base_score
-                ),
-                origin_index=aug_train.origin_index,
-                n_rows=aug_train.n_rows,
+            aug_train = replace(
+                aug_train,
+                potential_deriv_coef=aug_train.potential_deriv_coef + aug_train.is_original * base_score,
             )
             if aug_valid is not None:
-                aug_valid = AugmentedDataset(
-                    features=aug_valid.features,
-                    is_original=aug_valid.is_original,
-                    potential_deriv_coef=(
-                        aug_valid.potential_deriv_coef + aug_valid.is_original * base_score
-                    ),
-                    origin_index=aug_valid.origin_index,
-                    n_rows=aug_valid.n_rows,
+                val_offset = aug_valid.mean_loss(loss, np.full(aug_valid.features.shape[0], base_score))
+                aug_valid = replace(
+                    aug_valid,
+                    potential_deriv_coef=aug_valid.potential_deriv_coef + aug_valid.is_original * base_score,
                 )
 
-        solver_name = self.solver
-        if solver_name == "auto":
-            solver_name = auto_choose(aug_train.features.shape[0])
-        solver_fn = get_solver(solver_name)
-
-        seed = self.random_state if random_state is None else random_state
+        solver_name = auto_choose(aug_train.features.shape[0]) if self.solver == "auto" else self.solver
         kwargs: dict[str, Any] = {"aug_valid": aug_valid}
         if solver_name == "nystrom_cg":
             kwargs.update(
                 n_landmarks=self.n_landmarks,
                 cg_tol=self.cg_tol,
                 cg_max_iter=self.cg_max_iter,
-                random_state=seed,
+                random_state=random_state,
             )
         elif solver_name == "rff":
-            kwargs.update(n_features=self.n_features, random_state=seed)
-        elif solver_name == "falkon":
-            kwargs.update(
-                n_landmarks=self.n_landmarks or 1000,
-                cg_max_iter=self.cg_max_iter,
-                random_state=seed,
-            )
+            kwargs.update(n_features=self.n_features, random_state=random_state)
 
-        results, val_losses = solver_fn(aug_train, self.kernel, list(self.lambda_grid), **kwargs)
+        kernel = copy.deepcopy(self.kernel)  # solvers resolve data-dependent bandwidths in place
+        lambda_grid = tuple(float(lam) for lam in self.lambda_grid)
+        results, val_losses = get_solver(solver_name)(aug_train, kernel, list(lambda_grid), **kwargs)
 
-        if val_losses is not None and len(val_losses) > 0:
+        if val_losses is not None:
+            val_losses = val_losses + val_offset
             best_idx = int(np.argmin(val_losses))
             best_score = float(val_losses[best_idx])
         else:
-            # No validation data: fall back to the largest λ (most regularized,
-            # safest default). Users should pass a validation slice for tuning.
-            best_idx = int(len(results) - 1)
+            # No validation data: the most regularized fit is the safest default.
+            best_idx = int(np.argmax(lambda_grid))
             best_score = None
 
-        result = results[best_idx]
         predictor = KernelPredictor(
-            kernel=self.kernel,
+            kernel=kernel,
             loss=loss,
-            result=result,
+            result=results[best_idx],
             base_score=base_score,
             solve_results=list(results) if self.keep_path else None,
-            lambda_grid=tuple(self.lambda_grid) if self.keep_path else None,
+            lambda_grid=lambda_grid if self.keep_path else None,
         )
         return FitResult(
             predictor=predictor,

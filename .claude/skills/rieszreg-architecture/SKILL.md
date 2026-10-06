@@ -123,7 +123,7 @@ Hand-rolled fold loops are a code smell. Bespoke is reserved for things sklearn 
 
 ## 8. Lazy imports for optional heavy deps
 
-Optional heavy deps (xgboost, lightgbm, JAX, falkon, keops, torch) must lazy-load via `__getattr__` so the package is importable without them. Reference pattern: [packages/rieszboost/python/rieszboost/__init__.py](../../packages/rieszboost/python/rieszboost/__init__.py) (the `__getattr__` block near the bottom).
+Optional heavy deps (xgboost, lightgbm, JAX, keops, torch) must lazy-load via `__getattr__` so the package is importable without them. Reference pattern: [packages/rieszboost/python/rieszboost/__init__.py](../../packages/rieszboost/python/rieszboost/__init__.py) (the `__getattr__` block near the bottom).
 
 ## 9. Module separation of concerns
 

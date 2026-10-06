@@ -11,7 +11,7 @@ This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Los
 
 - `KernelRidgeBackend` — `Backend` Protocol implementation; closed-form solve over the augmented dataset.
 - `KernelRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with kernel-specific hyperparameters (`kernel`, `lambda_grid`, `solver`, ...) on the constructor.
-- Kernel algebra (`Gaussian`, `Matern`, `Linear`, `Polynomial`, `Tensor`, `Sum`, `Product`, `Scaled`) and four solvers (`direct`, `nystrom_cg`, `rff`, optional `falkon`).
+- Kernel algebra (`Gaussian`, `Matern`, `Linear`, `Polynomial`, `Tensor`, `Sum`, `Product`, `Scaled`) and three solvers (`direct`, `nystrom_cg`, `rff`).
 - R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
 
 This package depends only on `rieszreg`.
@@ -84,7 +84,7 @@ The representer theorem gives `α̂ = Σ_k γ_k k(·, p_k)` and the first-order 
 - Row k ∈ c reduces to `n λ γ_k = − b_k / 2`, so `γ_c = − b_c / (2 n λ)` is closed-form.
 - Row k ∈ o solves a symmetric PSD system via the substitution γ̃ = D^{1/2} γ:
 
-      (K̃_oo + n λ I) γ̃ = D^{−1/2} (−b_o/2 + K_oc b_c / (2 n λ))
+      (K̃_oo + n λ I) γ̃ = D^{−1/2} (−b_o/2 + D_o K_oc b_c / (2 n λ))
 
   with K̃_oo = D^{1/2} K_oo D^{1/2}, D = diag(a_o).
 
@@ -97,15 +97,14 @@ For TSM1 with a Gaussian kernel and `a_k ≡ 1`, this recovers the closed form i
 | Solver | Best for | Cost | Notes |
 |---|---|---|---|
 | `direct` | n_aug ≤ 3000 | O(n³) eigendecomposition once + O(n²) per λ | Exact. Default for small n. |
-| `nystrom_cg` | n_aug ≤ 50k | O(m² n) per λ + a few CG iterations | Nyström-preconditioned CG on the symmetric o-block. m landmarks. |
+| `nystrom_cg` | n_aug > 3000 while dense K_oo fits in memory | O(n_o²) memory (K_oo is materialized, as in `direct`); O(m³) preconditioner + O(n_o²) per CG iteration per λ | Nyström-preconditioned CG on the symmetric o-block. m landmarks. Avoids the O(n³) eigendecomposition, not the O(n_o²) Gram. |
 | `rff` | very large n, shift-invariant kernel | O(n D + D³) per λ | Random Fourier features (Rahimi-Recht); primal solve. |
-| `falkon` | very large n, GPU available | depends | Optional dependency `pip install krrr[falkon]`. Wraps the `falkon` package. |
 
 `solver="auto"` dispatches by `n_aug`.
 
 ### What's lazy-imported
 
-`falkon`, `pykeops`, and `pandas` are optional. The core path uses only numpy, scipy, scikit-learn, and rieszreg.
+`pandas` is optional. The core path uses only numpy, scipy, scikit-learn, and rieszreg.
 
 ## What works today (v0.0.1)
 
@@ -113,19 +112,18 @@ For TSM1 with a Gaussian kernel and `a_k ≡ 1`, this recovers the closed form i
 - **All five built-in estimands** via the rieszreg re-exports: `ATE`, `ATT`, `TSM`, `AdditiveShift`, `LocalShift`. Custom `FiniteEvalEstimand`s also work (the augmentation engine is identical).
 - **Kernels**: `Gaussian`, `Matern(nu={0.5, 1.5, 2.5})`, `Linear`, `Polynomial`, `Tensor` (tensor product over disjoint feature subsets), `Sum`, `Product`, `Scaled`. Spec-round-trippable.
 - **Bandwidth selection**: `length_scale={float, "median", "scott", "silverman"}`. Median heuristic (default) resolves on `fit_data`.
-- **Solvers**: `direct`, `nystrom_cg`, `rff`, optional `falkon`. `solver="auto"` dispatches by n_aug.
-- **λ selection** via validation Riesz loss (default: 20% holdout). `lambda_grid` is a sequence; the chosen value surfaces as `regressor.lambda_`.
+- **Solvers**: `direct`, `nystrom_cg`, `rff`. `solver="auto"` picks `direct` for n_aug ≤ 3000, else `nystrom_cg`.
+- **λ selection** via validation Riesz loss (default: 20% holdout). `lambda_grid` is a sequence; the chosen value surfaces as `regressor.lambda_`. Without a validation set the largest λ is used. The backend fits a deep copy of the user's kernel, so kernel objects never carry fit state.
 - **Loss**: `SquaredLoss` only (closed-form linear-system solve). KLLoss / BernoulliLoss / BoundedSquaredLoss require Newton iteration on the kernel system; planned for v0.2.
-- **Save / load**: directory format with JSON metadata + npz tensors. Round-trip works for built-in estimands automatically; custom estimands require `estimand=` on load.
-- **Diagnostics**: `KernelDiagnostics` extends `rieszreg.Diagnostics` with chosen λ, support size, effective d.o.f., condition number, and ill-conditioning warnings.
+- **Save / load**: directory format with JSON metadata + one npz (support stored once, per-λ coefficients stacked). Constructor params round-trip, including `kernel` (via its spec) and `lambda_grid`. Built-in estimands round-trip automatically; custom estimands require `estimand=` on load.
+- **Diagnostics**: `KernelDiagnostics` extends `rieszreg.Diagnostics` with chosen λ, support size, effective d.o.f., condition number, and ill-conditioning warnings. d.o.f. and condition number come from the training-time spectrum the `direct` solver keeps (`SolveResult.spectrum`); diagnosing never refits the kernel.
 - **R wrapper**: R6 mirror via reticulate. Built-in estimands only.
-- **31 Python tests** covering: backend protocol satisfaction, end-to-end ATE recovery, all six built-in estimands + custom, save/load round-trip, solver equivalence (direct vs nystrom_cg vs rff), kernel correctness (PSD, algebra, spec round-trip), sklearn integration (clone, GridSearchCV, cross_val_predict), and TSM1 numerical parity with the dml-tmle krrr.R reference.
+- **Python tests** cover: backend protocol satisfaction, end-to-end ATE recovery, all six built-in estimands + custom, save/load round-trip, solver equivalence (direct vs nystrom_cg vs rff), kernel correctness (PSD, algebra, spec round-trip), sklearn integration (clone, GridSearchCV, cross_val_predict), and TSM1 numerical parity with the dml-tmle krrr.R reference.
 
 ## Known sharp edges
 
 - **λ scaling.** For consistency theory the regularizer should scale O(1/n). The default grid `np.logspace(-4, 0, 21)` covers a wide range; cross-fitting users should re-tune per fold (sklearn's `cross_val_predict` does this if KRRR is wrapped in `GridSearchCV`).
 - **Median-heuristic bandwidth on the augmented dataset.** The median is computed on the *augmented* points (originals + counterfactuals from `m`). This adapts to the joint scale of `(treatment, covariates)` automatically; for shift-style estimands it includes the shifted treatment values, which is usually what you want.
-- **`solver="falkon"` drops the K_oc b_c coupling on the o-block.** The standalone Falkon API only solves vanilla KRR, not the modified-RHS system the augmentation produces. For estimands where n_c is small or λ is moderate, the bias is small; for tight overlap or extreme λ it is not. Use `solver="nystrom_cg"` if exactness matters more than scale.
 - **`KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` raise.** These need an iterative kernel Newton scheme that v0.1 doesn't implement. Planned for v0.2.
 
 ## What's next

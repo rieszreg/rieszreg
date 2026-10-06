@@ -52,7 +52,7 @@ def test_predict_path_best_column_matches_predict(binary_ate_data):
     krr = _krr(grid).fit(df)
     path = krr.predict_path(df)
     best_idx = int(krr.best_iteration_)
-    np.testing.assert_array_equal(path[:, best_idx], krr.predict(df))
+    np.testing.assert_allclose(path[:, best_idx], krr.predict(df), rtol=0, atol=1e-12)
 
 
 def test_predict_path_subset_lambdas(binary_ate_data):
@@ -62,8 +62,8 @@ def test_predict_path_subset_lambdas(binary_ate_data):
     full = krr.predict_path(df)
     subset = krr.predict_path(df, lambdas=[1e-3, 1e-1])
     assert subset.shape == (len(df), 2)
-    np.testing.assert_array_equal(subset[:, 0], full[:, 0])
-    np.testing.assert_array_equal(subset[:, 1], full[:, 2])
+    np.testing.assert_allclose(subset[:, 0], full[:, 0], rtol=0, atol=1e-12)
+    np.testing.assert_allclose(subset[:, 1], full[:, 2], rtol=0, atol=1e-12)
 
 
 def test_predict_path_unknown_lambda_raises(binary_ate_data):

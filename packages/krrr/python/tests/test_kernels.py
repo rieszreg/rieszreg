@@ -49,13 +49,6 @@ def test_gram_psd(kernel_factory, X):
     assert eigs.min() > -1e-7
 
 
-def test_diag_consistent_with_full_gram(X):
-    k = Gaussian(length_scale=1.0)
-    G = k(X)
-    d = k.diag(X)
-    np.testing.assert_allclose(d, np.diag(G))
-
-
 def test_kernel_algebra(X):
     k1 = Gaussian(length_scale=1.0)
     k2 = Linear()
@@ -86,7 +79,7 @@ def test_spec_roundtrip(X):
 def test_random_features_approx(X):
     k = Gaussian(length_scale=1.0)
     rng = np.random.default_rng(0)
-    Phi = k.random_features(X, n_features=4096, rng=rng)
+    Phi = k.random_features(X.shape[1], n_features=4096, rng=rng)(X)
     K_approx = Phi @ Phi.T
     K_true = k(X, X)
     err = np.abs(K_approx - K_true).max()

@@ -12,6 +12,7 @@ in which case it resolves itself against the training data on first use.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Sequence
 
@@ -28,20 +29,45 @@ def _as2d(X: np.ndarray) -> np.ndarray:
     return X
 
 
+@dataclass
+class RFFFeatureMap:
+    """Random Fourier feature map Φ(x) = scale · cos(x W + b), with
+    Φ(x) · Φ(y) ≈ k(x, y). Stored on primal fits so prediction recomputes Φ."""
+
+    W: np.ndarray   # (d, D)
+    b: np.ndarray   # (D,)
+    scale: float    # sqrt(2/D)
+
+    def __call__(self, X: np.ndarray) -> np.ndarray:
+        return self.scale * np.cos(_as2d(X) @ self.W + self.b)
+
+
 class Kernel:
     """Base class. Subclasses implement `_gram(X, Y)` returning a (nX, nY)
-    matrix and (optionally) `random_features(n_features, rng)` for RFF."""
+    matrix and, for the "rff" solver, `random_features(d, n_features, rng)`
+    returning an `RFFFeatureMap`."""
 
     def __call__(self, X: np.ndarray, Y: np.ndarray | None = None) -> np.ndarray:
         X = _as2d(X)
         Y = X if Y is None else _as2d(Y)
         return self._gram(X, Y)
 
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        """Diagonal `K(x_i, x_i)`. Default: extract from full Gram. Override
-        for kernels with cheap diagonals (Gaussian: all 1.0)."""
-        X = _as2d(X)
-        return np.diag(self._gram(X, X))
+    def matvec(self, X: np.ndarray, Y: np.ndarray, v: np.ndarray, chunk_size: int = 4096) -> np.ndarray:
+        """``K(X, Y) @ v`` computed in row blocks of ``X``, so memory stays at
+        ``chunk_size × len(Y)`` instead of the full ``len(X) × len(Y)`` Gram."""
+        X, Y = _as2d(X), _as2d(Y)
+        out = np.empty((X.shape[0],) + np.shape(v)[1:])
+        for start in range(0, X.shape[0], chunk_size):
+            stop = start + chunk_size
+            out[start:stop] = self._gram(X[start:stop], Y) @ v
+        return out
+
+    def random_features(self, d: int, n_features: int, rng: np.random.Generator) -> RFFFeatureMap:
+        raise NotImplementedError(
+            f"{type(self).__name__} has no random_features method, so the \"rff\" "
+            "solver cannot use it. Add one (sampling from the kernel's spectral "
+            "density) or pick another solver."
+        )
 
     def fit_data(self, X: np.ndarray) -> "Kernel":
         """Resolve any data-dependent hyperparameters (e.g. median heuristic)
@@ -84,7 +110,7 @@ class Gaussian(Kernel):
     """
 
     length_scale: float | str = "median"
-    _resolved: float = field(init=False, default=float("nan"))
+    _resolved: float = field(init=False, default=float("nan"), compare=False, repr=False)
 
     def fit_data(self, X: np.ndarray) -> "Gaussian":
         self._resolved = resolve_length_scale(self.length_scale, X)
@@ -105,25 +131,12 @@ class Gaussian(Kernel):
         d2 = cdist(X, Y, "sqeuclidean")
         return np.exp(-d2 / (2.0 * ls * ls))
 
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return np.ones(_as2d(X).shape[0])
-
-    def random_features(
-        self, X: np.ndarray, n_features: int, rng: np.random.Generator
-    ) -> np.ndarray:
-        """Rahimi-Recht random Fourier features for the Gaussian kernel.
-
-        Returns a `(n, n_features)` real-valued matrix Φ so that
-        Φ @ Φ.T ≈ K(X, X) (in expectation, up to small bias).
-        """
-        X = _as2d(X)
-        d = X.shape[1]
-        ls = self._ls()
-        # spectral density of RBF is N(0, 1/ls²) per coordinate
-        W = rng.normal(0.0, 1.0 / ls, size=(d, n_features))
+    def random_features(self, d: int, n_features: int, rng: np.random.Generator) -> RFFFeatureMap:
+        """Rahimi-Recht features: the Gaussian's spectral density is
+        N(0, 1/σ²) per coordinate."""
+        W = rng.normal(0.0, 1.0 / self._ls(), size=(d, n_features))
         b = rng.uniform(0.0, 2.0 * np.pi, size=n_features)
-        Z = np.sqrt(2.0 / n_features) * np.cos(X @ W + b)
-        return Z
+        return RFFFeatureMap(W=W, b=b, scale=np.sqrt(2.0 / n_features))
 
     def to_spec(self) -> dict:
         # Persist the resolved length scale (post-fit) so loaded kernels
@@ -142,7 +155,7 @@ class Matern(Kernel):
 
     nu: float = 2.5
     length_scale: float | str = "median"
-    _resolved: float = field(init=False, default=float("nan"))
+    _resolved: float = field(init=False, default=float("nan"), compare=False, repr=False)
 
     def fit_data(self, X: np.ndarray) -> "Matern":
         if self.nu not in (0.5, 1.5, 2.5):
@@ -170,9 +183,6 @@ class Matern(Kernel):
             return (1.0 + r + r * r / 3.0) * np.exp(-r)
         raise ValueError(f"Unsupported nu: {self.nu!r}")
 
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return np.ones(_as2d(X).shape[0])
-
     def to_spec(self) -> dict:
         ls = self._resolved if np.isfinite(self._resolved) else self.length_scale
         return {"type": "Matern", "args": {"nu": self.nu, "length_scale": ls}}
@@ -186,10 +196,6 @@ class Linear(Kernel):
 
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         return self.bias + X @ Y.T
-
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        X = _as2d(X)
-        return self.bias + np.einsum("ij,ij->i", X, X)
 
     def to_spec(self) -> dict:
         return {"type": "Linear", "args": {"bias": self.bias}}
@@ -232,9 +238,6 @@ class Scaled(Kernel):
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         return self.scale * self.base._gram(X, Y)
 
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return self.scale * self.base.diag(X)
-
     def to_spec(self) -> dict:
         return {"type": "Scaled", "args": {"scale": self.scale, "base": self.base.to_spec()}}
 
@@ -254,9 +257,6 @@ class Sum(Kernel):
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         return self.a._gram(X, Y) + self.b._gram(X, Y)
 
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return self.a.diag(X) + self.b.diag(X)
-
     def to_spec(self) -> dict:
         return {"type": "Sum", "args": {"a": self.a.to_spec(), "b": self.b.to_spec()}}
 
@@ -275,9 +275,6 @@ class Product(Kernel):
 
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         return self.a._gram(X, Y) * self.b._gram(X, Y)
-
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return self.a.diag(X) * self.b.diag(X)
 
     def to_spec(self) -> dict:
         return {"type": "Product", "args": {"a": self.a.to_spec(), "b": self.b.to_spec()}}
@@ -299,6 +296,13 @@ class Tensor(Kernel):
     b: Kernel
     cols_b: Sequence[int]
 
+    def __post_init__(self):
+        # Each factor resolves its own bandwidth on its own columns, so the
+        # factors must share no kernel objects, even nested ones. Copy each
+        # separately: one deepcopy of both would keep their shared parts shared.
+        self.a = copy.deepcopy(self.a)
+        self.b = copy.deepcopy(self.b)
+
     def fit_data(self, X: np.ndarray) -> "Tensor":
         X = _as2d(X)
         self.a.fit_data(X[:, self.cols_a])
@@ -309,9 +313,6 @@ class Tensor(Kernel):
         Ka = self.a._gram(X[:, self.cols_a], Y[:, self.cols_a])
         Kb = self.b._gram(X[:, self.cols_b], Y[:, self.cols_b])
         return Ka * Kb
-
-    def diag(self, X: np.ndarray) -> np.ndarray:
-        return self.a.diag(X[:, self.cols_a]) * self.b.diag(X[:, self.cols_b])
 
     def to_spec(self) -> dict:
         return {
