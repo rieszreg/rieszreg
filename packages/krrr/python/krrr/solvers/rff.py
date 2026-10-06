@@ -6,7 +6,7 @@ For shift-invariant kernels, sample D random Fourier features so that
     L_n(w) = (1/n) Σ_r [D_r (φ_r · w)² + 2 C_r (φ_r · w)] + λ ‖w‖²
     ⇒  (Φ̃_o^T Φ̃_o + n λ I) w = − Φ^T C
 
-with Φ̃_o = diag(√D_o) Φ_o. The system is D × D (the feature dimension), so
+with Φ̃_o = diag(D_o) Φ_o (D ∈ {0, 1}). The system is D × D (the feature dimension), so
 cost is O(n D + D³) regardless of n_aug. Storage: just `w` (length D) and the
 random projection spec (frequencies + biases). Suitable for very large n with
 shift-invariant kernels; the kernel supplies the features through
@@ -35,11 +35,10 @@ def solve_rff(
     n_features: int = 1024,
     random_state: int = 0,
 ) -> tuple[list[SolveResult], np.ndarray | None]:
-    kernel.fit_data(aug.features)
     feat_map = kernel.random_features(aug.features.shape[1], n_features, np.random.default_rng(random_state))
 
     Phi = feat_map(aug.features)
-    Phi_w = np.sqrt(aug.is_original)[:, None] * Phi
+    Phi_w = aug.is_original[:, None] * Phi  # D ∈ {0, 1}, so √D = D
     G = Phi_w.T @ Phi_w                      # (D × D, λ-independent)
     rhs = -(Phi.T @ aug.potential_deriv_coef)
     n_rows = aug.n_rows

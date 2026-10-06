@@ -156,9 +156,8 @@ def test_rieszboost_matches_lee_schuler(
         estimand=factory(treatment="a", covariates=("x",)),
         backend=XGBoostBackend(
             gradient_only=True, learning_rate=lr_ref / 2.0, n_estimators=n_estimators,
+            max_depth=max_depth, reg_lambda=0.0,
         ),
-        max_depth=max_depth,
-        reg_lambda=0.0,
         random_state=0,
         init=0.0,
     ).fit(df)

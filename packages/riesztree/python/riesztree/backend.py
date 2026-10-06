@@ -13,8 +13,6 @@ NotImplementedError from the leaf-solver dispatcher.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
-
 import numpy as np
 
 from rieszreg import AugmentedDataset, FitResult, Loss
@@ -104,11 +102,10 @@ class RieszTreeBackend:
         *,
         base_score: float,
         random_state: int | None,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
         # Leaves store the loss-optimal α directly, so there is no boosting
         # offset: base_score (and hence `init`) has no effect on a tree.
-        del hyperparams, base_score
+        del base_score
         check_categorical(aug_train.features, self.categorical_features)
         X_binned, mapper = self._bin(aug_train.features, random_state)
         return self._fit_binned(
@@ -154,10 +151,7 @@ class RieszTreeBackend:
             max_features=self.max_features,
             min_impurity_decrease=self.min_impurity_decrease,
             min_weight_fraction_leaf=self.min_weight_fraction_leaf,
-            valid=(
-                (aug_valid.features, aug_valid.is_original, aug_valid.potential_deriv_coef)
-                if has_valid else None
-            ),
+            aug_valid=aug_valid if has_valid else None,
             early_stopping_rounds=self.early_stopping_rounds,
             random_state=random_state,
             splitter=self.splitter,
@@ -174,11 +168,7 @@ class RieszTreeBackend:
         if self.ccp_alpha > 0:
             tree = cost_complexity_prune(tree, loss, ccp_alpha=self.ccp_alpha)
 
-        # feature_keys is filled in by the convenience class after fit.
-        predictor = RieszTreePredictor(
-            tree=tree, loss=loss, base_score=0.0, feature_keys=(),
-            categorical_features=cat_feats,
-        )
+        predictor = RieszTreePredictor(tree=tree, loss=loss, categorical_features=cat_feats)
         return FitResult(
             predictor=predictor,
             best_score=(

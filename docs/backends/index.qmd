@@ -147,7 +147,7 @@ class MyLearnerBackend:
         self.validation_fraction = validation_fraction
 
     def fit_augmented(self, aug_train, aug_valid, loss,
-                      *, base_score, random_state, hyperparams):
+                      *, base_score, random_state):
         # Each augmented row contributes D · h_tilde(α) + C · h'(α) to the loss.
         # Translate (features, D, C) into whatever your learner consumes.
         params = my_learner_fit(
@@ -174,7 +174,7 @@ class MyMomentBackend:
         self.learning_rate = learning_rate
 
     def fit_rows(self, X_train, X_valid, estimand, loss,
-                 *, aug_train, aug_valid, base_score, random_state, hyperparams):
+                 *, aug_train, aug_valid, base_score, random_state):
         # m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). The augmented rows carry every
         # point a_j, its coefficient c_j = -C_r, and the row i it came from.
         points = aug_train.features

@@ -35,8 +35,6 @@ from .tree import Node, check_categorical, from_dict, to_dict
 class RieszTreePredictor:
     tree: Node
     loss: Loss
-    base_score: float
-    feature_keys: tuple[str, ...]
     categorical_features: tuple[int, ...] = ()
     _flat_tree: FlatTree | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -78,8 +76,6 @@ class RieszTreePredictor:
         payload = {
             "kind": self.kind,
             "loss": self.loss.to_spec(),
-            "base_score": float(self.base_score),
-            "feature_keys": list(self.feature_keys),
             "categorical_features": list(int(i) for i in self.categorical_features),
             "tree": to_dict(self.tree),
         }
@@ -88,15 +84,13 @@ class RieszTreePredictor:
 
     @classmethod
     def load(cls, dir_path, *, base_score, loss, best_iteration):
-        del best_iteration
+        del base_score, best_iteration
         path = Path(dir_path)
         with open(path / "predictor.json") as f:
             payload = json.load(f)
         return cls(
             tree=from_dict(payload["tree"]),
             loss=loss if loss is not None else loss_from_spec(payload["loss"]),
-            base_score=float(payload["base_score"]) if base_score is None else float(base_score),
-            feature_keys=tuple(payload["feature_keys"]),
             categorical_features=tuple(int(i) for i in payload.get("categorical_features", [])),
         )
 

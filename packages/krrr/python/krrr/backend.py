@@ -65,11 +65,7 @@ class KernelRidgeBackend:
         *,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
-        # KRR is non-iterative; ignore the catch-all hyperparams dict.
-        del hyperparams
-
         if not isinstance(loss, SquaredLoss):
             raise NotImplementedError(
                 f"KernelRidgeBackend currently supports SquaredLoss only "
@@ -107,7 +103,8 @@ class KernelRidgeBackend:
         elif solver_name == "rff":
             kwargs.update(n_features=self.n_features, random_state=random_state)
 
-        kernel = copy.deepcopy(self.kernel)  # solvers resolve data-dependent bandwidths in place
+        # Resolve data-dependent bandwidths (e.g. "median") on a copy.
+        kernel = copy.deepcopy(self.kernel).fit_data(aug_train.features)
         lambda_grid = tuple(float(lam) for lam in self.lambda_grid)
         results, val_losses = get_solver(solver_name)(aug_train, kernel, list(lambda_grid), **kwargs)
 

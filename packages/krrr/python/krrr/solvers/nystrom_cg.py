@@ -59,7 +59,6 @@ def solve_nystrom_cg(
     jitter: float = 1e-10,
 ) -> tuple[list[SolveResult], np.ndarray | None]:
     rng = np.random.default_rng(random_state)
-    kernel.fit_data(aug.features)
     system = OBlockSystem(aug, kernel, aug_valid, jitter)
     n_o = system.n_o
 

@@ -46,10 +46,8 @@ def test_xgboost_backend_parity_with_xgbregressor():
         loss=SquaredLoss(),
         backend=XGBoostBackend(
             n_estimators=common["n_estimators"], learning_rate=common["learning_rate"],
+            max_depth=3, reg_lambda=0.0, subsample=1.0,
         ),
-        max_depth=3,
-        reg_lambda=0.0,
-        subsample=1.0,
         random_state=common["random_state"],
     ).fit(df, y)
 

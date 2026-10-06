@@ -160,14 +160,6 @@ class RieszTreeRegressor(RieszEstimator):
             max_bins=self.max_bins,
         )
 
-    def fit(self, Z, y=None, eval_set=None, eval_y=None) -> "RieszTreeRegressor":
-        """Fit the tree. After dispatch, we patch the predictor's
-        ``feature_keys`` from the resolved estimand so save/load round-trips
-        carry the column ordering."""
-        super().fit(Z, y=y, eval_set=eval_set, eval_y=eval_y)
-        self.predictor_.feature_keys = tuple(self.estimand_.feature_keys)
-        return self
-
     def get_n_leaves(self) -> int:
         """Number of leaves of the fitted tree (as in sklearn trees)."""
         check_is_fitted(self, "predictor_")

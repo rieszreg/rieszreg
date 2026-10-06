@@ -13,7 +13,7 @@ in which case it resolves itself against the training data on first use.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Sequence
 
 import numpy as np
@@ -95,12 +95,39 @@ class Kernel:
 
 
 # ---------------------------------------------------------------------------
-# Shift-invariant kernels (RBF / Matern). All admit RFF.
+# Shift-invariant kernels (RBF / Matern).
 # ---------------------------------------------------------------------------
 
 
+class _LengthScaleKernel(Kernel):
+    """Shared ``length_scale`` handling: a positive float, or a rule
+    (``"median"``, ``"scott"``, ``"silverman"``) resolved by `fit_data`."""
+
+    def fit_data(self, X: np.ndarray) -> "_LengthScaleKernel":
+        self._resolved = resolve_length_scale(self.length_scale, X)
+        return self
+
+    def _ls(self) -> float:
+        if np.isfinite(self._resolved):
+            return self._resolved
+        if isinstance(self.length_scale, (int, float)):
+            return float(self.length_scale)
+        raise RuntimeError(
+            f"{type(self).__name__}.length_scale={self.length_scale!r} is "
+            "data-dependent; call .fit_data(X) before evaluating the kernel."
+        )
+
+    def to_spec(self) -> dict:
+        # Persist the resolved length scale (post-fit) so loaded kernels
+        # don't need to re-resolve the median heuristic without their data.
+        args = {f.name: getattr(self, f.name) for f in fields(self) if f.init}
+        if np.isfinite(self._resolved):
+            args["length_scale"] = self._resolved
+        return {"type": type(self).__name__, "args": args}
+
+
 @dataclass
-class Gaussian(Kernel):
+class Gaussian(_LengthScaleKernel):
     """Gaussian / RBF kernel: k(x, y) = exp(-||x - y||² / (2 σ²)).
 
     `length_scale` may be a positive float, the string ``"median"`` (median
@@ -111,20 +138,6 @@ class Gaussian(Kernel):
 
     length_scale: float | str = "median"
     _resolved: float = field(init=False, default=float("nan"), compare=False, repr=False)
-
-    def fit_data(self, X: np.ndarray) -> "Gaussian":
-        self._resolved = resolve_length_scale(self.length_scale, X)
-        return self
-
-    def _ls(self) -> float:
-        if np.isfinite(self._resolved):
-            return self._resolved
-        if isinstance(self.length_scale, (int, float)):
-            return float(self.length_scale)
-        raise RuntimeError(
-            f"Gaussian.length_scale={self.length_scale!r} is data-dependent; "
-            "call .fit_data(X) before evaluating the kernel."
-        )
 
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         ls = self._ls()
@@ -138,15 +151,9 @@ class Gaussian(Kernel):
         b = rng.uniform(0.0, 2.0 * np.pi, size=n_features)
         return RFFFeatureMap(W=W, b=b, scale=np.sqrt(2.0 / n_features))
 
-    def to_spec(self) -> dict:
-        # Persist the resolved length scale (post-fit) so loaded kernels
-        # don't need to re-resolve the median heuristic without their data.
-        ls = self._resolved if np.isfinite(self._resolved) else self.length_scale
-        return {"type": "Gaussian", "args": {"length_scale": ls}}
-
 
 @dataclass
-class Matern(Kernel):
+class Matern(_LengthScaleKernel):
     """Matern kernel of half-integer smoothness ν ∈ {1/2, 3/2, 5/2}.
 
     ν=1/2 is the Laplace kernel (least smooth); ν=5/2 is twice differentiable.
@@ -160,15 +167,7 @@ class Matern(Kernel):
     def fit_data(self, X: np.ndarray) -> "Matern":
         if self.nu not in (0.5, 1.5, 2.5):
             raise ValueError(f"Matern.nu must be 0.5, 1.5, or 2.5; got {self.nu!r}.")
-        self._resolved = resolve_length_scale(self.length_scale, X)
-        return self
-
-    def _ls(self) -> float:
-        if np.isfinite(self._resolved):
-            return self._resolved
-        if isinstance(self.length_scale, (int, float)):
-            return float(self.length_scale)
-        raise RuntimeError("Matern.length_scale is data-dependent; call fit_data first.")
+        return super().fit_data(X)
 
     def _gram(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         ls = self._ls()
@@ -181,11 +180,8 @@ class Matern(Kernel):
         if self.nu == 2.5:
             r = np.sqrt(5.0) * d
             return (1.0 + r + r * r / 3.0) * np.exp(-r)
-        raise ValueError(f"Unsupported nu: {self.nu!r}")
-
-    def to_spec(self) -> dict:
-        ls = self._resolved if np.isfinite(self._resolved) else self.length_scale
-        return {"type": "Matern", "args": {"nu": self.nu, "length_scale": ls}}
+        # Reachable: a kernel can be evaluated without fit_data.
+        raise ValueError(f"Matern.nu must be 0.5, 1.5, or 2.5; got {self.nu!r}.")
 
 
 @dataclass

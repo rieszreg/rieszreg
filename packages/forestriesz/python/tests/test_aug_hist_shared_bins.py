@@ -145,10 +145,7 @@ def test_hist_shared_bins_matches_kernel_level_reference():
             max_depth, min_split, min_leaf, 0.0,
             int(loss_kind), float(lo), float(hi),
         )
-        pred = RieszTreePredictor(
-            tree=node_from_growable_flat_tree(g, loss=loss),
-            loss=loss, base_score=0.0, feature_keys=(),
-        )
+        pred = RieszTreePredictor(tree=node_from_growable_flat_tree(g, loss=loss), loss=loss)
         ref_preds.append(pred.predict_alpha(aug_train.features))
 
     assert len(forest_preds) == len(ref_preds) == n_estimators

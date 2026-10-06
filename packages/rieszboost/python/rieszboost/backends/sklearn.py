@@ -121,9 +121,7 @@ class SklearnBackend:
         *,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
-        del hyperparams  # SklearnBackend consumes no passthrough params.
         seeds = np.random.default_rng(random_state).integers(2**31 - 1, size=self.n_estimators)
 
         is_original = aug_train.is_original

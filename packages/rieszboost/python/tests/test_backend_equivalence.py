@@ -76,8 +76,7 @@ def test_xgb_vs_sklearn_backend_predictions_track(
     )
     xgb_b = RieszBooster(
         estimand=estimand,
-        backend=XGBoostBackend(gradient_only=True),
-        max_depth=3, reg_lambda=0.0,
+        backend=XGBoostBackend(gradient_only=True, max_depth=3, reg_lambda=0.0),
         **common,
     ).fit(df)
     skl_b = RieszBooster(
@@ -116,8 +115,8 @@ def test_xgb_vs_sklearn_additive_shift_continuous():
         random_state=0,
     )
     xgb_b = RieszBooster(
-        backend=XGBoostBackend(gradient_only=True),
-        max_depth=3, reg_lambda=0.0, **common,
+        backend=XGBoostBackend(gradient_only=True, max_depth=3, reg_lambda=0.0),
+        **common,
     ).fit(df)
     skl_b = RieszBooster(
         backend=SklearnBackend(lambda: DecisionTreeRegressor(max_depth=3, random_state=0)),

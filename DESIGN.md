@@ -48,9 +48,8 @@ The `Backend` / `MomentBackend` Protocol method signatures pass only:
 - the `loss` spec.
 - `base_score` (η-space init, computed by the orchestrator from `init` + `loss.alpha_to_eta`).
 - `random_state`.
-- `hyperparams` — a dict for backend-specific passthrough (e.g. xgboost's `max_depth`, `reg_lambda`).
 
-Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. For example: `RieszBooster(n_estimators=200, learning_rate=0.05, early_stopping_rounds=10)` builds `XGBoostBackend(n_estimators=200, learning_rate=0.05, early_stopping_rounds=10)` in `_resolved_backend()`. The orchestrator does not see `n_estimators`.
+Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. For example: `RieszBooster(n_estimators=200, max_depth=3, early_stopping_rounds=10)` builds `XGBoostBackend(n_estimators=200, max_depth=3, early_stopping_rounds=10)` in `_resolved_backend()`. The orchestrator does not see `n_estimators` or `max_depth`.
 
 `validation_fraction` is per-package, not tier-1. Backends that use a held-out slice for fit-time logic (early stopping in `XGBoostBackend` / `SklearnBackend` / `TorchBackend`, λ selection in `KernelRidgeBackend`) expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr(backend, "validation_fraction", 0.0)` and produces the row-level split before augmentation. Backends that don't use a holdout for fit-time logic (`ForestRieszBackend`, `AugForestRieszBackend`) don't expose it; users wanting held-out loss reporting on a forest pass `eval_set=` at fit time.
 
@@ -287,7 +286,7 @@ This is the contract every implementation package must meet. Section structure f
 ### 3.5 Serialization & persistence
 - **[design rule]** Mimic sklearn's serialization story as closely as possible — joblib-compatible pickling for the estimator object, plus a directory-format `save(path)` / `load(path)` that round-trips metadata cleanly.
 - **[from rieszreg]** `factory_spec` registry for built-in estimands and `loss_from_spec(spec)` for losses are inherited.
-- **[your package]** Implement directory-format save/load: binary payload (booster.ubj, predictor.joblib, kernel coefficients) + `metadata.json` with loss spec, estimand factory_spec, feature_keys, base_score, best_iteration, hyperparams. `load(path, estimand=None)` accepts a re-passed custom `m()` for the non-built-in case.
+- **[your package]** Implement directory-format save/load: binary payload (booster.ubj, predictor.joblib, kernel coefficients) + `metadata.json` with loss spec, estimand factory_spec, feature_keys, base_score, best_iteration, and `hyperparameters` (the estimator's constructor params). `load(path, estimand=None)` accepts a re-passed custom `m()` for the non-built-in case.
 - **[design rule]** Custom `m()` cannot be serialized in the metadata path; document as a limitation.
 
 ### 3.6 Data-flow conventions

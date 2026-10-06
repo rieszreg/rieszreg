@@ -53,14 +53,13 @@ class SolveResult:
 class OBlockSystem:
     """The λ-independent pieces of the dual system shared by the dual solvers.
 
-    Partition augmented rows into o = {D > 0} (rows carrying the squared term)
-    and c = {D = 0} (counterfactual points). Row r ∈ c gives
-    ``n λ γ_r = −C_r`` in closed form; substituting back, γ_o = D^{1/2} γ̃ with
+    Partition augmented rows into o = {D = 1} (rows carrying the squared term)
+    and c = {D = 0} (counterfactual points); D ∈ {0, 1} by construction. Row
+    r ∈ c gives ``n λ γ_r = −C_r`` in closed form; substituting back, γ_o solves
 
-        (K̃_oo + n λ I) γ̃ = D^{-1/2} (−C_o + D_o K_oc C_c / (n λ)),
-        K̃_oo = D^{1/2} K_oo D^{1/2}.
+        (K_oo + n λ I) γ_o = −C_o + K_oc C_c / (n λ).
 
-    ``self.K_tilde`` is K̃_oo plus ``jitter`` on the diagonal; solvers factor
+    ``self.K_tilde`` is K_oo plus ``jitter`` on the diagonal; solvers factor
     or iterate on it.
     """
 
@@ -69,15 +68,11 @@ class OBlockSystem:
         self.o_mask = aug.is_original > 0
         p_o = aug.features[self.o_mask]
         p_c = aug.features[~self.o_mask]
-        self.d_o = aug.is_original[self.o_mask]
         self.pdc_o = aug.potential_deriv_coef[self.o_mask]
         self.pdc_c = aug.potential_deriv_coef[~self.o_mask]
         self.n_o, self.n_c = p_o.shape[0], p_c.shape[0]
 
         self.K_tilde = kernel(p_o, p_o)
-        self.sqrt_d = np.sqrt(self.d_o)
-        self.K_tilde *= self.sqrt_d[:, None]
-        self.K_tilde *= self.sqrt_d[None, :]
         self.K_tilde[np.diag_indices(self.n_o)] += jitter
 
         # K_oc C_c and K_vc C_c are all γ_c ever multiplies (γ_c ∝ C_c).
@@ -87,14 +82,13 @@ class OBlockSystem:
             self.K_vc_pdc_c = kernel.matvec(aug_valid.features, p_c, self.pdc_c)
 
     def rhs_tilde(self, n_lam: float) -> np.ndarray:
-        rhs = -self.pdc_o + self.d_o * self.K_oc_pdc_c / n_lam
-        return rhs / self.sqrt_d
+        return -self.pdc_o + self.K_oc_pdc_c / n_lam
 
     def result(self, gamma_tilde: np.ndarray, lam: float, **extra) -> tuple[SolveResult, float | None]:
         """Pack γ̃ into a full-length dual `SolveResult` and, with a validation
         set, return its mean validation Riesz loss (squared loss)."""
         n_lam = self.aug.n_rows * float(lam)
-        gamma_o = self.sqrt_d * gamma_tilde
+        gamma_o = gamma_tilde
         gamma = np.empty(self.aug.features.shape[0])
         gamma[self.o_mask] = gamma_o
         gamma[~self.o_mask] = -self.pdc_c / n_lam

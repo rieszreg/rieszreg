@@ -47,7 +47,6 @@ def solve_direct(
     val_losses : np.ndarray | None
         Per-λ validation Riesz loss if `aug_valid` is given, else None.
     """
-    kernel.fit_data(aug.features)  # resolve e.g. the "median" length scale
     system = OBlockSystem(aug, kernel, aug_valid, jitter)
     eigvals, eigvecs = np.linalg.eigh(system.K_tilde)
 

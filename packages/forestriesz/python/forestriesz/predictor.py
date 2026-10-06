@@ -31,7 +31,6 @@ class ForestPredictor:
     forest: object  # _RieszGRF; declared opaquely to avoid an import cycle
     loss: Loss
     riesz_feature_fns: list[Callable] | None
-    feature_keys: tuple[str, ...]
     split_feature_indices: tuple[int, ...]
 
     kind: ClassVar[str] = "forestriesz"
@@ -100,7 +99,6 @@ class ForestPredictor:
         extras = {
             "kind": self.kind,
             "loss": self.loss.to_spec(),
-            "feature_keys": list(self.feature_keys),
             "split_feature_indices": list(self.split_feature_indices),
             "has_sieve": self.riesz_feature_fns is not None,
         }
@@ -120,7 +118,6 @@ class ForestPredictor:
             forest=forest,
             loss=loss if loss is not None else loss_from_spec(extras["loss"]),
             riesz_feature_fns=None,  # caller patches in via ForestRieszRegressor.load
-            feature_keys=tuple(extras["feature_keys"]),
             split_feature_indices=tuple(int(i) for i in extras["split_feature_indices"]),
         )
 

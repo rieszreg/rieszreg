@@ -137,22 +137,17 @@ def _resolve_fast_loss_args(splitter: str, loss) -> tuple[int, float, float, int
 # ---------------------------------------------------------------------------
 # Holdout-loss bookkeeping for early stopping.
 
-def _holdout_loss(root: Node, valid, loss) -> float:
-    """Held-out augmented Bregman loss of the tree rooted at ``root``,
-    normalised by the number of original validation rows."""
-    features_v, D_v, C_v = valid
+def _holdout_loss(root: Node, aug_valid, loss) -> float:
+    """Held-out mean Riesz loss of the tree rooted at ``root``."""
     from .fast import flat_tree_from_node, predict_alpha as _flat_predict
-    alpha_hat = _flat_predict(flat_tree_from_node(root), features_v)
-    return float(
-        np.sum(loss.aug_loss_alpha(D_v, C_v, alpha_hat)) / float((D_v > 0).sum())
-    )
+    return aug_valid.mean_loss(loss, _flat_predict(flat_tree_from_node(root), aug_valid.features))
 
 
 class _EarlyStopping:
     """Tracks held-out loss after each accepted split and rolls the tree back
     to the best partial tree once ``rounds`` splits in a row fail to improve."""
 
-    def __init__(self, rounds: int | None, valid: tuple | None, loss):
+    def __init__(self, rounds: int | None, valid, loss):
         self.rounds, self.valid, self.loss = rounds, valid, loss
         self.active = rounds is not None and valid is not None
         self.best_loss = float("inf")
@@ -209,7 +204,7 @@ class _Grower:
         features, D, C, loss, *,
         max_depth, min_samples_split, min_orig_leaf, categorical_features,
         max_features, min_impurity_decrease, min_weight_fraction_leaf,
-        valid, early_stopping_rounds, random_state, splitter,
+        aug_valid, early_stopping_rounds, random_state, splitter,
         X_binned=None, mapper=None,
     ):
         self.features, self.D, self.C, self.loss = features, D, C, loss
@@ -233,7 +228,7 @@ class _Grower:
         self.min_orig_leaf = _effective_min_orig_leaf(
             min_orig_leaf, min_weight_fraction_leaf, int((D > 0).sum())
         )
-        self.es = _EarlyStopping(early_stopping_rounds, valid, loss)
+        self.es = _EarlyStopping(early_stopping_rounds, aug_valid, loss)
         self._features_T = None
 
     @property

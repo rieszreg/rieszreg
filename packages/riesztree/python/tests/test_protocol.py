@@ -16,7 +16,7 @@ def test_backend_returns_fitresult(linear_gaussian_ate, covariate_keys):
     from rieszreg import SquaredLoss
     out = RieszTreeBackend(max_depth=3).fit_augmented(
         aug, None, SquaredLoss(),
-        base_score=0.0, random_state=0, hyperparams={},
+        base_score=0.0, random_state=0,
     )
     assert isinstance(out, FitResult)
     assert isinstance(out.predictor, RieszTreePredictor)

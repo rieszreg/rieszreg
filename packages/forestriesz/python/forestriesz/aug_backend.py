@@ -18,7 +18,7 @@ where the augmented Bregman-Riesz setting allows.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Sequence
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -205,9 +205,8 @@ class AugForestRieszBackend:
         *,
         base_score: float,
         random_state: int | None,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
-        del hyperparams, base_score  # forest leaves store loss-aware α directly.
+        del base_score  # forest leaves store loss-aware α directly.
         check_categorical(aug_train.features, self.categorical_features or ())
 
         if not self.bootstrap and self.max_samples is not None:

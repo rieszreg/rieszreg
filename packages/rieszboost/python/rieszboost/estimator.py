@@ -98,52 +98,34 @@ class RieszBooster(RieszEstimator):
         feats = self._features(Z)
         return self.predictor_.predict_alpha_path(feats, n_estimators_grid)
 
-    # Boosting-loop knobs that only take effect when RieszBooster itself
-    # builds the backend (backend=None). An explicit backend owns these
-    # itself, so setting them alongside one is a silent no-op -- see the
-    # guard in _resolved_backend.
-    _BOOSTING_LOOP_PARAMS = (
-        "n_estimators", "learning_rate", "early_stopping_rounds", "validation_fraction",
+    # Knobs that only take effect when RieszBooster builds the backend
+    # (backend=None); an explicit backend is used as-is.
+    _BACKEND_PARAMS = (
+        "n_estimators", "learning_rate", "max_depth", "reg_lambda", "subsample",
+        "early_stopping_rounds", "validation_fraction",
     )
-    # Tree knobs routed via `hyperparams`; only XGBoostBackend consumes them.
-    _TREE_PARAMS = ("max_depth", "reg_lambda", "subsample")
 
     def _resolved_backend(self) -> Backend:
         if self.backend is not None:
             defaults = inspect.signature(RieszBooster.__init__).parameters
-            checked = self._BOOSTING_LOOP_PARAMS
-            if not isinstance(self.backend, XGBoostBackend):
-                checked = checked + self._TREE_PARAMS
-            overridden = [
-                name for name in checked
-                if getattr(self, name) != defaults[name].default
-            ]
+            overridden = [n for n in self._BACKEND_PARAMS if getattr(self, n) != defaults[n].default]
             if overridden:
                 raise ValueError(
-                    f"RieszBooster(backend={self.backend!r}) was given explicitly "
-                    f"along with non-default {overridden}, but these boosting-loop "
-                    "knobs are only applied when RieszBooster builds its own "
-                    "backend (backend=None), and max_depth / reg_lambda / "
-                    "subsample only reach an XGBoostBackend -- an explicit "
-                    "backend is used as-is, so they'd be silently ignored. Set "
-                    "them on the backend object itself instead, e.g. "
-                    "XGBoostBackend(n_estimators=..., learning_rate=..., "
-                    "early_stopping_rounds=..., validation_fraction=...), or on "
-                    "the base learner of a SklearnBackend."
+                    f"RieszBooster(backend={self.backend!r}) uses the backend as "
+                    f"given, so the non-default {overridden} would be ignored. "
+                    "Set them on the backend object instead, e.g. "
+                    "XGBoostBackend(n_estimators=..., max_depth=...), or on the "
+                    "base learner of a SklearnBackend."
                 )
             return self.backend
         return XGBoostBackend(
             n_estimators=self.n_estimators,
             learning_rate=self.learning_rate,
+            max_depth=self.max_depth,
+            reg_lambda=self.reg_lambda,
+            subsample=self.subsample,
             early_stopping_rounds=self.early_stopping_rounds,
             validation_fraction=(
                 self.validation_fraction if self.early_stopping_rounds is not None else 0.0
             ),
         )
-
-    def _backend_hyperparams(self) -> dict:
-        return {
-            "max_depth": self.max_depth,
-            "reg_lambda": self.reg_lambda,
-            "subsample": self.subsample,
-        }

@@ -40,9 +40,8 @@ The `Backend` / `MomentBackend` Protocol method signatures pass only:
 - the `loss` spec
 - `base_score` (η-space init, computed by the orchestrator from `init` + `loss.alpha_to_eta`)
 - `random_state`
-- `hyperparams` — a dict for backend-specific passthrough
 
-Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. Example: `RieszBooster(n_estimators=200, learning_rate=0.05)` builds `XGBoostBackend(n_estimators=200, learning_rate=0.05)` in `_resolved_backend()`. The orchestrator does not see `n_estimators`.
+Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. Example: `RieszBooster(n_estimators=200, max_depth=3)` builds `XGBoostBackend(n_estimators=200, max_depth=3)` in `_resolved_backend()`. The orchestrator does not see `n_estimators` or `max_depth`.
 
 `validation_fraction` is per-backend, not tier-1. Backends that use a held-out slice for fit-time logic expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr(backend, "validation_fraction", 0.0)` and produces the row-level split before augmentation. Backends that don't use a holdout for fit-time logic don't expose it; users wanting held-out loss reporting on those backends pass `eval_set=` at fit time.
 

@@ -9,7 +9,7 @@ as a linear-moment problem for EconML's ``BaseGRF``, and returns a
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 
@@ -106,7 +106,6 @@ class ForestRieszBackend:
         aug_valid: AugmentedDataset | None,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
         if not isinstance(loss, SquaredLoss):
             raise NotImplementedError(
@@ -119,7 +118,7 @@ class ForestRieszBackend:
                 "different per-leaf gradients than the loss API exposes; "
                 "planned for v3."
             )
-        del hyperparams, base_score  # each leaf solves for α directly
+        del base_score  # each leaf solves for α directly
 
         # Sieve: "auto" => default_riesz_features(estimand) when one exists;
         # None (or no default) => constant basis.
@@ -199,7 +198,6 @@ class ForestRieszBackend:
             loss=loss,
             # Always store the resolved sieve, never the "auto" sentinel.
             riesz_feature_fns=sieve if sieve else None,
-            feature_keys=tuple(estimand.feature_keys),
             split_feature_indices=split_idx,
         )
 

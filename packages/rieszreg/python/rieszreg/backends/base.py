@@ -78,9 +78,8 @@ class Backend(Protocol):
     coefficients at evaluation points. The orchestrator builds the augmented
     dataset with ``estimand.augment`` before calling.
 
-    Method kwargs are universal: data, ``base_score``, ``random_state``,
-    and ``hyperparams`` (a dict for backend-specific passthrough). All
-    learner-specific knobs (``n_estimators``, ``learning_rate``,
+    Method kwargs are universal: data, ``base_score`` and ``random_state``.
+    All learner-specific knobs (``n_estimators``, ``learning_rate``,
     ``early_stopping_rounds``, kernel choice, …) live on the concrete
     backend's constructor — see DESIGN.md §A.1.
     """
@@ -93,7 +92,6 @@ class Backend(Protocol):
         *,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
         ...
 
@@ -107,9 +105,9 @@ class MomentBackend(Protocol):
     ``(n, len(estimand.feature_keys))`` float arrays with columns in
     ``feature_keys`` order; ``aug_train`` / ``aug_valid`` are their
     augmentations (``estimand.augment``, outcome included). The validation
-    arguments are ``None`` without a validation set. ``base_score``,
-    ``random_state`` and ``hyperparams`` are as in ``Backend.fit_augmented``;
-    learner-specific knobs live on the concrete backend.
+    arguments are ``None`` without a validation set. ``base_score`` and
+    ``random_state`` are as in ``Backend.fit_augmented``; learner-specific
+    knobs live on the concrete backend.
     """
 
     def fit_rows(
@@ -123,7 +121,6 @@ class MomentBackend(Protocol):
         aug_valid: AugmentedDataset | None,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
         ...
 

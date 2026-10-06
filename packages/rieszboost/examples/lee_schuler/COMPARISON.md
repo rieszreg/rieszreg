@@ -15,7 +15,7 @@ The script generates one dataset, fits both models on it (no early stopping, no 
 | Side | What it does |
 |---|---|
 | Reference | Lee-Schuler `ATE_ES_stochastic` / `ATT_ES_stochastic` with `early_stopping_rounds=10**9` (effectively off), `sample_prop=1.0`. Each iteration: fit a sklearn `DecisionTreeRegressor` on negative gradients, update F by `learning_rate * predictions`. |
-| Ours | `RieszBooster(backend=XGBoostBackend(gradient_only=True, learning_rate=lr_ref/2, n_estimators=...), reg_lambda=0)`. Uses xgboost as the tree backend with `hess=ones_like(grad)` (first-order step) and per-row gradient `2aF + b`. |
+| Ours | `RieszBooster(backend=XGBoostBackend(gradient_only=True, learning_rate=lr_ref/2, n_estimators=..., reg_lambda=0))`. Uses xgboost as the tree backend with `hess=ones_like(grad)` (first-order step) and per-row gradient `2aF + b`. |
 
 ## Results
 

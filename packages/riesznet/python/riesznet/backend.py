@@ -446,9 +446,7 @@ class TorchBackend:
         *,
         base_score: float,
         random_state: int,
-        hyperparams: dict[str, Any],
     ) -> FitResult:
-        del hyperparams  # torch backend has no string-keyed passthrough
         torch_loss = TorchRieszLoss(loss)
         if aug_valid is None and self.early_stopping_rounds is not None:
             raise ValueError(

@@ -20,7 +20,7 @@ XGBoostBackend(hessian_floor=2.0, gradient_only=False)
 
 `gradient_only` short-circuits the second-order Hessian and uses $H = 1$ everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set `True` to reproduce the Lee-Schuler reference implementation exactly.
 
-`max_depth`, `reg_lambda`, `subsample`, `learning_rate`, `n_estimators`, and `early_stopping_rounds` are passed through from the `RieszBooster` constructor.
+`max_depth`, `reg_lambda`, `subsample`, `learning_rate`, `n_estimators`, `early_stopping_rounds` and `validation_fraction` are `XGBoostBackend` fields; `RieszBooster` forwards its constructor args of the same names when it builds the backend.
 
 ## `SklearnBackend`
 

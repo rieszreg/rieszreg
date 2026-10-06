@@ -44,11 +44,8 @@ class KernelPredictor:
         X = np.atleast_2d(np.asarray(features, dtype=float))
         if self.result.kind == "dual":
             eta = self.kernel.matvec(X, self.result.support, self.result.gamma, self.chunk_size)
-        elif self.result.kind == "primal":
-            phi = self.result.feature_map(X)
-            eta = phi @ self.result.weights
         else:
-            raise ValueError(f"Unknown SolveResult.kind: {self.result.kind!r}")
+            eta = self.result.feature_map(X) @ self.result.weights
         return eta + self.base_score
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
@@ -56,17 +53,14 @@ class KernelPredictor:
 
     # ---- Path predict (keep_path=True only) ------------------------------
 
-    def _resolve_lambda_indices(
-        self, lambdas: Sequence[float] | None
-    ) -> tuple[list[float], list[int]]:
+    def _resolve_lambda_indices(self, lambdas: Sequence[float] | None) -> list[int]:
         if self.solve_results is None or self.lambda_grid is None:
             raise RuntimeError(
                 "predict_path requires keep_path=True at fit time."
             )
         if lambdas is None:
-            return list(self.lambda_grid), list(range(len(self.lambda_grid)))
+            return list(range(len(self.lambda_grid)))
         out_idx: list[int] = []
-        out_lam: list[float] = []
         for lam in lambdas:
             lam_f = float(lam)
             matches = [
@@ -79,13 +73,12 @@ class KernelPredictor:
                     f"{tuple(self.lambda_grid)}."
                 )
             out_idx.append(matches[0])
-            out_lam.append(self.lambda_grid[matches[0]])
-        return out_lam, out_idx
+        return out_idx
 
     def predict_eta_path(
         self, features: np.ndarray, lambdas: Sequence[float] | None = None
     ) -> np.ndarray:
-        _, indices = self._resolve_lambda_indices(lambdas)
+        indices = self._resolve_lambda_indices(lambdas)
         X = np.atleast_2d(np.asarray(features, dtype=float))
         # Every per-λ SolveResult shares the support (dual) or feature map
         # (primal), so one kernel slab / Φ(X) serves the whole path.
@@ -93,10 +86,8 @@ class KernelPredictor:
         first = results[0]
         if first.kind == "dual":
             eta = self.kernel.matvec(X, first.support, np.column_stack([r.gamma for r in results]), self.chunk_size)
-        elif first.kind == "primal":
-            eta = first.feature_map(X) @ np.column_stack([r.weights for r in results])
         else:
-            raise ValueError(f"Unknown SolveResult.kind: {first.kind!r}")
+            eta = first.feature_map(X) @ np.column_stack([r.weights for r in results])
         return eta + self.base_score
 
     def predict_alpha_path(

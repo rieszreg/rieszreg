@@ -85,3 +85,11 @@ def test_random_features_approx(X):
     err = np.abs(K_approx - K_true).max()
     # 4096 features should give ~0.05 max error on n=20.
     assert err < 0.1
+
+
+def test_matern_rejects_unsupported_nu_without_fit_data():
+    X = np.zeros((3, 1))
+    with pytest.raises(ValueError, match="Matern.nu"):
+        Matern(nu=1.0, length_scale=1.0)(X)
+    with pytest.raises(ValueError, match="Matern.nu"):
+        Matern(nu=1.0).fit_data(X)

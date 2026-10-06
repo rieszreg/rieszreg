@@ -79,7 +79,7 @@ Lazy-import optional heavy deps (xgboost, lightgbm, JAX, keops, torch) via `__ge
 
 Mimic sklearn's serialization story as closely as possible — joblib-compatible pickling for the estimator object, plus a directory-format `save(path)` / `load(path)` that round-trips metadata cleanly.
 
-Implement directory-format save/load: binary payload (booster.ubj, predictor.joblib, kernel coefficients) + `metadata.json` with loss spec, estimand factory_spec, feature_keys, base_score, best_iteration, hyperparams. `load(path, estimand=None)` accepts a re-passed custom `m()` for the non-built-in case. Custom `m()` cannot be serialized in the metadata path; document as a limitation.
+Implement directory-format save/load: binary payload (booster.ubj, predictor.joblib, kernel coefficients) + `metadata.json` with loss spec, estimand factory_spec, feature_keys, base_score, best_iteration, and `hyperparameters` (the estimator's constructor params). `load(path, estimand=None)` accepts a re-passed custom `m()` for the non-built-in case. Custom `m()` cannot be serialized in the metadata path; document as a limitation.
 
 ## 9. R wrapper (~50 lines)
 
