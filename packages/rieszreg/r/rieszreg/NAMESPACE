@@ -12,7 +12,6 @@ export(ATT)
 export(TSM)
 export(AdditiveShift)
 export(LocalShift)
-export(OutcomeRegNormSq)
 
 # Loss specs
 export(SquaredLoss)
