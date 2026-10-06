@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -80,9 +80,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b626d73c4c936ccc3cb08be7d45d1df6.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-890df4807d457dbc410f87df85df408d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -671,7 +671,7 @@ h''(\alpha_\ell) \cdot (D_\ell\, \alpha_\ell + C_\ell) = 0.
 <p><span class="math display">\[
 \Delta_{\text{sq}} \;=\; \frac{C_\ell^2}{D_\ell} + \frac{C_r^2}{D_r} - \frac{C_p^2}{D_p}.
 \]</span></p>
-<p>Since the augmented rows include <span class="math inline">\(D_r = 0\)</span> counterfactual points contributing only to <span class="math inline">\(C_\ell\)</span> — these add a <em>linear</em> shift in <span class="math inline">\(\alpha\)</span> to the within-leaf objective rather than a quadratic — the gain cannot be encoded as a vanilla weighted regression target. A custom Cython criterion plugged into sklearn’s tree builder would work; the package hand-rolls the splitter in pure NumPy, which is fast enough at the <span class="math inline">\(n\)</span> a single tree is sensible for.</p>
+<p>Since the augmented rows include <span class="math inline">\(D_r = 0\)</span> counterfactual points contributing only to <span class="math inline">\(C_\ell\)</span> — these add a <em>linear</em> shift in <span class="math inline">\(\alpha\)</span> to the within-leaf objective rather than a quadratic — the gain cannot be encoded as a vanilla weighted regression target. A custom Cython criterion plugged into sklearn’s tree builder would work; <code>riesztree</code> hand-rolls its splitter in Cython instead.</p>
 <p>For other losses the gain has its own analytic form. KL (<span class="math inline">\(h(t) = t \log t - t\)</span>), for instance, gives <span class="math inline">\(\hat L_\ell(\alpha_\ell^*) = -C_\ell + C_\ell \log(-C_\ell / D_\ell)\)</span> when <span class="math inline">\(C_\ell &lt; 0\)</span>, and the gain is</p>
 <p><span class="math display">\[
 \Delta_{\text{KL}} \;=\; -C_\ell \log\!\frac{-C_\ell}{D_\ell} - C_r \log\!\frac{-C_r}{D_r} + C_p \log\!\frac{-C_p}{D_p}.
@@ -1118,8 +1118,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10af9d4b30&gt;,
-                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10af9d4b30&gt;,
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26ab0178f0&gt;,
+                   max_depth=4)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26ab0178f0&gt;,
                    max_depth=4)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> est.predict(df)</span>
@@ -1192,7 +1192,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <p>Two regularisation paths are available:</p>
 <ul>
 <li><strong>Cost-complexity pruning</strong> via <code>ccp_alpha &gt; 0</code>. Standard Breiman et al.&nbsp;weakest-link algorithm: walk the tree bottom-up, computing per-subtree <span class="math inline">\(R_\alpha(T) = R(T) + \alpha\, |\text{leaves}(T)|\)</span>, and collapse the weakest link until <span class="math inline">\(g_{\min} \geq \alpha\)</span>. <span class="math inline">\(R(T)\)</span> is the augmented Bregman training loss summed over leaves.</li>
-<li><strong>Early stopping</strong> via <code>early_stopping_rounds</code> + <code>validation_fraction</code>. Stops growing when the held-out augmented loss has not improved for that many consecutive accepted splits, mirroring <code>rieszboost</code> / <code>riesznet</code>.</li>
+<li><strong>Early stopping</strong> via <code>early_stopping_rounds</code> + <code>validation_fraction</code>. Stops growing when the held-out augmented loss has not improved for that many consecutive accepted splits, mirroring <code>rieszboost</code> / <code>riesznet</code>. The fitted tree is then rolled back to the partial tree with the best held-out loss.</li>
 </ul>
 <p>Both are off by default. Combine freely with either growth policy.</p>
 <div class="cell">
@@ -1216,7 +1216,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"early-stop: </span><span class="sc">{</span>est_es<span class="sc">.</span>get_n_leaves()<span class="sc">}</span><span class="ss"> leaves"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>early-stop: 9 leaves</code></pre>
+<pre><code>early-stop: 6 leaves</code></pre>
 </div>
 </div>
 </section>
@@ -1690,11 +1690,11 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10af72c290&gt;),
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26aaff7a40&gt;),
              n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item sk-dashed-wrapped"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox"><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>GridSearchCV</div></div><div><a class="sk-estimator-doc-link fitted" rel="noreferrer" target="_blank" href="https://scikit-learn.org/1.6/modules/generated/sklearn.model_selection.GridSearchCV.html">?<span>Documentation for GridSearchCV</span></a><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>GridSearchCV(cv=3,
-             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10af72c290&gt;),
-             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10b0807320&gt;,
-                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f10b0807320&gt;,
+             estimator=RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26aaff7a40&gt;),
+             n_jobs=1, param_grid={'max_depth': [2, 4, 6, 8]})</pre></div> </div></div><div class="sk-parallel"><div class="sk-parallel-item"><div class="sk-item"><div class="sk-label-container"><div class="sk-label fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox"><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>best_estimator_: RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26ad273fb0&gt;,
+                   max_depth=4)</pre></div> </div></div><div class="sk-serial"><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox"><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszTreeRegressor</div></div></label><div class="sk-toggleable__content fitted"><pre>RieszTreeRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f26ad273fb0&gt;,
                    max_depth=4)</pre></div> </div></div></div></div></div></div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"best max_depth = </span><span class="sc">{</span>gs<span class="sc">.</span>best_params_[<span class="st">'max_depth'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1723,7 +1723,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="odd">
 <td><code>max_depth</code></td>
 <td>8</td>
-<td>Cap on tree depth.</td>
+<td>Cap on tree depth; <code>None</code> means no cap.</td>
 </tr>
 <tr class="even">
 <td><code>min_samples_split</code></td>
@@ -1743,7 +1743,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="odd">
 <td><code>max_leaf_nodes</code></td>
 <td>31</td>
-<td>Cap for leafwise growth. Ignored when <code>growth_policy="depthwise"</code>.</td>
+<td>Cap for leafwise growth; <code>None</code> means no cap. Ignored when <code>growth_policy="depthwise"</code>.</td>
 </tr>
 <tr class="even">
 <td><code>max_features</code></td>
@@ -1768,7 +1768,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="even">
 <td><code>early_stopping_rounds</code></td>
 <td>None</td>
-<td>Stop when held-out augmented loss has not improved for that many accepted splits.</td>
+<td>Stop when held-out augmented loss has not improved for that many accepted splits, then roll back to the best partial tree.</td>
 </tr>
 <tr class="odd">
 <td><code>validation_fraction</code></td>
@@ -1786,16 +1786,21 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <td>Bregman-Riesz loss.</td>
 </tr>
 <tr class="even">
-<td><code>random_state</code></td>
-<td>0</td>
-<td>Seeds the per-split feature subsample (<code>max_features</code>) and the per-feature random threshold (<code>splitter='random'</code>).</td>
+<td><code>init</code></td>
+<td>None</td>
+<td>No effect on a tree. Each leaf stores its loss-optimal α directly.</td>
 </tr>
 <tr class="odd">
-<td><code>splitter</code></td>
-<td><code>"exact"</code></td>
-<td>One of <code>"exact"</code> (Cython per-feature sweep), <code>"hist"</code> (Cython quantile-binned histogram, fastest at large <span class="math inline">\(n\)</span>), <code>"random"</code> (sklearn ExtraTrees-style), <code>"python"</code> (legacy; deprecated, removed in v0.0.3).</td>
+<td><code>random_state</code></td>
+<td>0</td>
+<td>Seeds the per-split feature subsample (<code>max_features</code>), the per-feature random threshold (<code>splitter='random'</code>) and the histogram bin subsample.</td>
 </tr>
 <tr class="even">
+<td><code>splitter</code></td>
+<td><code>"exact"</code></td>
+<td>One of <code>"exact"</code> (Cython per-feature sweep), <code>"hist"</code> (Cython quantile-binned histogram, fastest at large <span class="math inline">\(n\)</span>), or <code>"random"</code> (sklearn ExtraTrees-style).</td>
+</tr>
+<tr class="odd">
 <td><code>max_bins</code></td>
 <td>255</td>
 <td>Quantile bins per feature when <code>splitter="hist"</code>. Sklearn HGB convention; fits in <code>uint8</code>.</td>
@@ -1805,7 +1810,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </section>
 <section id="sec-splitters" class="level2" data-number="9">
 <h2 data-number="9" class="anchored" data-anchor-id="sec-splitters"><span class="header-section-number">9</span> Splitter modes</h2>
-<p><code>riesztree</code> ships three Cython splitter paths plus a legacy Python fallback:</p>
+<p><code>riesztree</code> ships three Cython splitter paths:</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare splitter modes on the same data — predictions and timings.</span></span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
@@ -1821,15 +1826,15 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <div class="cell-output cell-output-stdout">
 <pre><code>splitter=exact   fit=   1.9 ms  leaves=14
 splitter=hist    fit=   3.5 ms  leaves=14
-splitter=random  fit=   1.3 ms  leaves=12</code></pre>
+splitter=random  fit=   1.4 ms  leaves=12</code></pre>
 </div>
 </div>
 <ul>
-<li><code>"exact"</code> (default): per-feature linear scan over distinct values. Best partition; same byte-for-byte as the legacy Python splitter on the four built-in losses.</li>
+<li><code>"exact"</code> (default): per-feature linear scan over distinct values. Best partition.</li>
 <li><code>"hist"</code>: pre-binned (default 255 quantile bins per feature). <code>O(n_{\text{leaf}} + \text{max\_bins})</code> per feature per leaf instead of <code>O(n_{\text{leaf}} \log n_{\text{leaf}})</code>. Fastest at large <span class="math inline">\(n\)</span>; threshold lands on a bin boundary so split-ranking is approximate but the leaf <span class="math inline">\(\alpha^\star\)</span> itself is exact.</li>
 <li><code>"random"</code>: sklearn ExtraTrees-style. One uniform threshold per feature per leaf; useful for forest decorrelation when combined with <code>max_features="sqrt"</code>.</li>
 </ul>
-<p>For losses outside the four built-ins (<code>SquaredLoss</code>, <code>KLLoss</code>, <code>BernoulliLoss</code>, <code>BoundedSquaredLoss</code>), the Cython splitter routes through a registered Numba <code>@cfunc</code> if one was registered via <code>riesztree.fast.register_fast_leaf_solver</code> — otherwise it falls back to the Python path with a one-time <code>UserWarning</code>.</p>
+<p>For losses outside the four built-ins (<code>SquaredLoss</code>, <code>KLLoss</code>, <code>BernoulliLoss</code>, <code>BoundedSquaredLoss</code>), register a Numba <code>@cfunc</code> via <code>riesztree.fast.register_fast_leaf_solver</code>. Registered losses run on <code>splitter="exact"</code>. The registry is checked before the built-ins, so registering a subclass of a built-in loss overrides its kernel for both split search and leaf values. Unregistered custom losses raise <code>NotImplementedError</code> at fit.</p>
 </section>
 <section id="sec-extension-hook" class="level2" data-number="10">
 <h2 data-number="10" class="anchored" data-anchor-id="sec-extension-hook"><span class="header-section-number">10</span> Custom-loss extension hook</h2>

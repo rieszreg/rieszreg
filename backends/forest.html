@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.10.19">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -80,9 +80,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b626d73c4c936ccc3cb08be7d45d1df6.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-890df4807d457dbc410f87df85df408d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
@@ -596,9 +596,10 @@ window.Quarto = {
 <h3 class="anchored" data-anchor-id="moment-style-forestrieszregressor">Moment-style (<code>ForestRieszRegressor</code>)</h3>
 <p>The user supplies a list of functions <span class="math inline">\(\varphi = (\varphi_1, \dots, \varphi_p)\)</span> of the data. Inside each leaf <span class="math inline">\(\ell\)</span> the per-leaf parameter <span class="math inline">\(\theta_\ell \in \mathbb R^p\)</span> solves the linear-moment equation</p>
 <p><span class="math display">\[
-\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top}\big)^{-1}
+\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top} + n_\ell\,\lambda I\big)^{-1}
                  \textstyle\sum_{i\in\ell} m(\varphi)(Z_i, Y_i),
 \]</span></p>
+<p>where <span class="math inline">\(n_\ell\)</span> is the leaf size and <span class="math inline">\(\lambda\)</span> is the <code>l2</code> ridge (default <span class="math inline">\(0\)</span>).</p>
 <p>and predictions are <span class="math inline">\(\hat\alpha(z) = \hat\theta(z_{\text{split}}) \cdot \varphi(z)\)</span>. The forest is fit on the <span class="math inline">\(n\)</span> original rows, and the MSE splitting criterion picks splits to minimize the sum of in-leaf residuals against this leaf optimum.</p>
 <p>The list <span class="math inline">\(\varphi\)</span> has to be chosen per estimand. The default <code>riesz_feature_fns="auto"</code> picks defaults for built-in estimands:</p>
 <table class="caption-top table">
@@ -1125,10 +1126,10 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f495386aae0&gt;,
-                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f495386acc0&gt;,
-                        min_samples_leaf=10, n_estimators=200)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f495386aae0&gt;,
-                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f495386acc0&gt;,
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f72faeb8a10&gt;,
+                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f7305f55100&gt;,
+                        min_samples_leaf=10, n_estimators=200)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f72faeb8a10&gt;,
+                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f7305f55100&gt;,
                         min_samples_leaf=10, n_estimators=200)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> est.predict(df_tsm)</span>
@@ -1579,8 +1580,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f49538e8980&gt;,
-                     min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f49538e8980&gt;,
+</style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f72f999b6e0&gt;,
+                     min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f72f999b6e0&gt;,
                      min_samples_leaf=10, n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> fr.predict(df)</span>
@@ -2057,8 +2058,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f4952488b90&gt;,
-                        min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f4952488b90&gt;,
+</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f72faef62a0&gt;,
+                        min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f72faef62a0&gt;,
                         min_samples_leaf=10, n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> afr.predict(df_cont)</span>
@@ -2502,8 +2503,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-4" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f49538f0e60&gt;,
-                     honest=True, inference=True, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox" checked=""><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f49538f0e60&gt;,
+</style><div id="sk-container-id-4" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f72f999b5c0&gt;,
+                     honest=True, inference=True, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox" checked=""><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f72f999b5c0&gt;,
                      honest=True, inference=True, n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> fr.predict(df)</span>
@@ -2585,7 +2586,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="even">
 <td><code>max_leaf_nodes</code></td>
 <td>None</td>
-<td>Cap on per-tree leaf count.</td>
+<td>Cap on per-tree leaf count. When set, trees grow best-first, as in sklearn.</td>
 </tr>
 <tr class="odd">
 <td><code>min_impurity_decrease</code></td>
@@ -2615,7 +2616,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="even">
 <td><code>splitter</code></td>
 <td><code>"exact"</code></td>
-<td><code>"exact"</code>, <code>"hist"</code>, <code>"random"</code>, or <code>"python"</code> — riesztree splitter dispatch.</td>
+<td><code>"exact"</code>, <code>"hist"</code>, or <code>"random"</code> — riesztree splitter dispatch.</td>
 </tr>
 <tr class="odd">
 <td><code>max_bins</code></td>
@@ -2629,7 +2630,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </tr>
 </tbody>
 </table>
-<p>When <code>splitter="hist"</code> and the configuration is “simple” (no categoricals, no <code>max_features</code> subsampling, no <code>ccp_alpha</code>, no leaf-count cap, built-in loss), the bin mapper is fitted <strong>once</strong> on the full augmented training data and the binned matrix is shared across joblib workers — sklearn-<code>HistGradientBoostingRegressor</code> convention. The win is largest at shallow depths where per-tree binning dominates tree-build wall time (~2× speedup at <code>max_depth=8</code>).</p>
+<p>With <code>splitter="hist"</code>, the bin mapper is fitted once on the full augmented training data and every tree slices the shared binned matrix (the sklearn <code>HistGradientBoostingRegressor</code> convention). The win is largest at shallow depths, where per-tree binning dominates tree-build time.</p>
+<p><code>init</code> has no effect on <code>AugForestRieszRegressor</code>: each leaf stores its loss-optimal α directly.</p>
 </section>
 <section id="forestrieszregressor" class="level3">
 <h3 class="anchored" data-anchor-id="forestrieszregressor"><code>ForestRieszRegressor</code></h3>
@@ -2690,8 +2692,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </tr>
 <tr class="odd">
 <td><code>l2</code></td>
-<td>0.01</td>
-<td>Ridge added to the per-leaf Jacobian.</td>
+<td>0</td>
+<td>Ridge added to the per-leaf Jacobian: each leaf solves <span class="math inline">\((\bar J + \lambda I)\theta = \bar A\)</span>. For <code>TSM</code> this gives <span class="math inline">\(\hat\theta = 1 / (\hat P(A = \text{level} \mid \text{leaf}) + \lambda)\)</span>. With <span class="math inline">\(\lambda &gt; 0\)</span> the forest can grow leaves with no treated rows, whose <span class="math inline">\(\hat\theta \approx \bar A / \lambda\)</span> gives very large weights out of sample. Leave it at 0 unless you need it.</td>
 </tr>
 <tr class="even">
 <td><code>n_jobs</code></td>
