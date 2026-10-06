@@ -135,6 +135,22 @@ def _backend_spec(backend) -> dict | None:
     return {"module": cls.__module__, "qualname": cls.__qualname__, "params": params} if _jsonable(params) else None
 
 
+@dataclasses.dataclass
+class _UnsavedBackend:
+    """Stands in, after `load`, for a backend `save` could not write as JSON
+    (e.g. a `SklearnBackend` with a callable base-learner factory), so a
+    refit raises instead of silently falling back to the default backend."""
+
+    qualname: str
+
+    def fit_augmented(self, *args, **kwargs):
+        raise ValueError(
+            f"This estimator was loaded without its {self.qualname} backend, "
+            "which could not be saved. Set it with set_params(backend=...) "
+            "before refitting."
+        )
+
+
 def _backend_from_spec(spec: dict):
     obj = import_module(spec["module"])
     for part in spec["qualname"].split("."):
@@ -439,12 +455,16 @@ class RieszEstimator(BaseEstimator):
     def _save_hyperparameters(self) -> dict:
         """JSON-serializable constructor args for round-trip. Params that
         can't be written as JSON (callables, custom objects) are skipped and
-        come back as their defaults; subclasses add special cases."""
+        come back as their defaults, except a backend, which comes back as an
+        `_UnsavedBackend` placeholder; subclasses add special cases."""
         params = self.get_params(deep=False)
         hp = {k: v for k, v in params.items() if k not in ("estimand", "loss", "backend") and _jsonable(v)}
-        backend = _backend_spec(params.get("backend"))
+        backend = params.get("backend")
         if backend is not None:
-            hp["backend"] = backend
+            cls = type(backend)
+            hp["backend"] = _backend_spec(backend) or _backend_spec(
+                _UnsavedBackend(f"{cls.__module__}.{cls.__qualname__}")
+            )
         return hp
 
     @classmethod

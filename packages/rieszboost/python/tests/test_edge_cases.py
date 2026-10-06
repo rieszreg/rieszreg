@@ -77,17 +77,20 @@ def test_early_stopping_without_validation_fraction_raises():
         booster.fit(df)
 
 
-def test_eval_set_overrides_internal_split():
+def test_eval_set_drives_early_stopping():
+    """With validation_fraction=0, early stopping scores on eval_set: it stops
+    before n_estimators, and best_score_ is the Riesz loss on eval_set."""
     df = _df(n=400, seed=3)
     df_valid = _df(n=100, seed=4)
     booster = RieszBooster(
         estimand=ATE(),
         n_estimators=100, early_stopping_rounds=10,
-        validation_fraction=0.0,  # ignored when eval_set provided
+        validation_fraction=0.0,
         learning_rate=0.1, max_depth=3,
     ).fit(df, eval_set=df_valid)
-    # eval_set was used → best_iteration_ should be set (or model finished).
-    assert booster.predict(df).shape == (len(df),)
+    assert booster.best_iteration_ is not None
+    assert booster.best_iteration_ < 99
+    assert booster.best_score_ == pytest.approx(booster.riesz_loss(df_valid), rel=1e-5)
 
 
 def test_predict_on_unseen_extreme_x():

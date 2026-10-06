@@ -77,18 +77,25 @@ def test_sklearn_backend_score_matches_negative_loss():
 
 
 def test_sklearn_backend_requires_validation_for_early_stopping():
+    """Early stopping with no validation data raises. With
+    validation_fraction>0, RieszEstimator.fit() splits off a holdout, and
+    training stops `early_stopping_rounds` past the best round."""
     from sklearn.tree import DecisionTreeRegressor
-    df, _ = _df_pi(50, seed=0)
-    # validation_fraction>0 + early_stopping_rounds=N: RieszEstimator.fit()
-    # auto-splits off a validation slice before augmentation, so no
-    # eval_set is needed here for early stopping to kick in.
-    booster = RieszBooster(
-        estimand=rieszboost.ATE(),
-        backend=SklearnBackend(
-            lambda: DecisionTreeRegressor(max_depth=3),
-            n_estimators=10,
-            early_stopping_rounds=2,
-            validation_fraction=0.2,
-        ),
-    ).fit(df)
-    assert booster.best_iteration_ is not None or len(booster.predictor_.learners) > 0
+    df, _ = _df_pi(400, seed=0)
+
+    def booster(validation_fraction):
+        return RieszBooster(
+            estimand=rieszboost.ATE(),
+            backend=SklearnBackend(
+                lambda: DecisionTreeRegressor(max_depth=3, random_state=0),
+                n_estimators=200,
+                early_stopping_rounds=5,
+                validation_fraction=validation_fraction,
+            ),
+        )
+
+    with pytest.raises(ValueError, match="validation"):
+        booster(0.0).fit(df)
+    fitted = booster(0.2).fit(df)
+    assert fitted.best_iteration_ < 199
+    assert len(fitted.predictor_.learners) == fitted.best_iteration_ + 1 + 5

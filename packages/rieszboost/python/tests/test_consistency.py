@@ -33,8 +33,9 @@ def test_linear_gaussian_ate_consistency():
         ).fit(train)
         return booster.predict(test)
 
+    # Predicting α̂ ≡ 0 scores about 2.06; fits at n=2000 score 0.21-0.33.
     rmses = dgps.assert_consistency(
-        fit_predict, dgp=dgp, n_grid=(500, 2000), tol_at_max_n=2.0,
+        fit_predict, dgp=dgp, n_grid=(500, 2000), tol_at_max_n=0.6,
     )
     # RMSE at n=2000 must be at least as small as at n=500 (modulo noise).
     assert rmses[-1] <= rmses[0] + 0.1

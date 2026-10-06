@@ -33,7 +33,8 @@ class RieszBooster(RieszEstimator):
         Where the actual tree fitting happens. Swap to `SklearnBackend(...)`
         to use a non-tree base learner (KernelRidge, MLPs, etc.).
     loss : Loss, default=SquaredLoss()
-        The Bregman-Riesz loss to minimize. `KLLoss()` is the alternative.
+        The Bregman-Riesz loss to minimize. `KLLoss()`, `BernoulliLoss()` and
+        `BoundedSquaredLoss(lo, hi)` keep α̂ in a restricted range.
     n_estimators : int, default=200
     learning_rate : float, default=0.05
     max_depth : int, default=4
@@ -46,6 +47,9 @@ class RieszBooster(RieszEstimator):
         Fraction of the training rows held out for early stopping. Only used
         when ``early_stopping_rounds`` is set and no ``eval_set`` is passed
         to ``fit``.
+    n_jobs : int or None, default=None
+        Threads xgboost uses. ``None`` uses all cores. Set 1 when fits
+        already run in parallel.
     init : float or None
         α-space starting value. ``None`` (default) starts from the constant
         that minimizes the Riesz loss.
@@ -64,6 +68,7 @@ class RieszBooster(RieszEstimator):
         subsample: float = 1.0,
         early_stopping_rounds: int | None = None,
         validation_fraction: float = 0.1,
+        n_jobs: int | None = None,
         init: float | None = None,
         random_state: int = 0,
     ):
@@ -81,6 +86,7 @@ class RieszBooster(RieszEstimator):
         self.max_depth = max_depth
         self.reg_lambda = reg_lambda
         self.subsample = subsample
+        self.n_jobs = n_jobs
 
     def predict_path(
         self, Z, n_estimators_grid: Sequence[int]
@@ -88,21 +94,28 @@ class RieszBooster(RieszEstimator):
         """Predict α̂ at every tree count in `n_estimators_grid` from one fit.
 
         Returns an array of shape ``(n_rows, len(n_estimators_grid))`` whose
-        column ``j`` is the prediction obtained by truncating the booster to
-        ``n_estimators_grid[j]`` trees. xgboost's ``iteration_range`` makes
-        column ``j`` bit-equal to a fresh fit with ``n_estimators=
+        column ``j`` is the prediction from the first ``n_estimators_grid[j]``
+        trees, bit-equal to a fresh fit with ``n_estimators=
         n_estimators_grid[j]`` (same training data, same seed).
 
-        Each grid entry must satisfy ``1 ≤ k ≤ booster.num_boosted_rounds()``.
+        Each grid entry must lie between 1 and the number of fitted trees,
+        which after early stopping includes the rounds past the best one.
         """
         feats = self._features(Z)
-        return self.predictor_.predict_alpha_path(feats, n_estimators_grid)
+        grid = [int(k) for k in n_estimators_grid]
+        cap = self.predictor_.n_trees
+        if not grid or min(grid) < 1 or max(grid) > cap:
+            raise ValueError(
+                f"n_estimators_grid entries must satisfy 1 ≤ k ≤ {cap} "
+                f"(the model has {cap} trees); got {grid}."
+            )
+        return self.predictor_.predict_alpha_path(feats, grid)
 
     # Knobs that only take effect when RieszBooster builds the backend
     # (backend=None); an explicit backend is used as-is.
     _BACKEND_PARAMS = (
         "n_estimators", "learning_rate", "max_depth", "reg_lambda", "subsample",
-        "early_stopping_rounds", "validation_fraction",
+        "early_stopping_rounds", "validation_fraction", "n_jobs",
     )
 
     def _resolved_backend(self) -> Backend:
@@ -128,4 +141,5 @@ class RieszBooster(RieszEstimator):
             validation_fraction=(
                 self.validation_fraction if self.early_stopping_rounds is not None else 0.0
             ),
+            n_jobs=self.n_jobs,
         )

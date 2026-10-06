@@ -64,10 +64,6 @@ SKIP_CHECKS = {
     "check_estimators_fit_returns_self",       # we do return self, but the check
                                                # uses random data; covered by the
                                                # above shape-mismatch problem.
-    "check_estimators_unfitted",
-    "check_no_attributes_set_in_init",
-    "check_set_params",
-    "check_get_params_invariance",
     "check_estimator_get_tags_default_keys",   # tag system varies by sklearn version
     "check_positive_only_tag_during_fit",      # passes random ndarray X, hits feature-shape mismatch
     "check_estimator_sparse_tag",              # same — fits on sparse random matrices

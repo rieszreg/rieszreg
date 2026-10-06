@@ -49,7 +49,7 @@ test_that("predict_path columns equal independent shorter fits (bit-equal)", {
 })
 
 
-test_that("predict_path output equals Python predict_path bit-for-bit", {
+test_that("predict_path gives bit-identical results from R and pandas input", {
   df <- simulate(300L, seed = 4L)
   booster <- RieszBooster$new(estimand = ATE("a", "x"),
                               n_estimators = 40L, learning_rate = 0.05,

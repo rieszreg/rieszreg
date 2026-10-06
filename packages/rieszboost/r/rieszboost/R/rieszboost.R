@@ -46,20 +46,33 @@ use_python_rieszboost <- function(python = NULL, required = TRUE) {
 # ---- Backends (rieszboost-specific) ----
 
 #' Default backend: data augmentation + xgboost custom objective.
+#' @param n_estimators,learning_rate,max_depth,reg_lambda,subsample
+#'   Boosting and tree settings.
+#' @param early_stopping_rounds,validation_fraction Early stopping: stop after
+#'   `early_stopping_rounds` rounds without held-out improvement, holding out
+#'   `validation_fraction` of the rows.
 #' @param hessian_floor Lower bound on per-row Hessian. `"auto"` (default)
 #'   uses an observed row's curvature at the current prediction (2 for
 #'   `SquaredLoss()`); a number sets a fixed floor.
 #' @param gradient_only If TRUE, disable second-order Newton step (Friedman 2001 mode).
+#' @param n_jobs Number of xgboost threads. NULL uses all cores.
 #' @export
 XGBoostBackend <- function(n_estimators = 200L,
                            learning_rate = 0.05,
+                           max_depth = 4L,
+                           reg_lambda = 1.0,
+                           subsample = 1.0,
                            early_stopping_rounds = NULL,
                            validation_fraction = 0.0,
                            hessian_floor = "auto",
-                           gradient_only = FALSE) {
+                           gradient_only = FALSE,
+                           n_jobs = NULL) {
   args <- list(
     n_estimators = as.integer(n_estimators),
     learning_rate = learning_rate,
+    max_depth = as.integer(max_depth),
+    reg_lambda = reg_lambda,
+    subsample = subsample,
     validation_fraction = validation_fraction,
     hessian_floor = hessian_floor,
     gradient_only = gradient_only
@@ -67,6 +80,7 @@ XGBoostBackend <- function(n_estimators = 200L,
   if (!is.null(early_stopping_rounds)) {
     args$early_stopping_rounds <- as.integer(early_stopping_rounds)
   }
+  if (!is.null(n_jobs)) args$n_jobs <- as.integer(n_jobs)
   do.call(.module()$XGBoostBackend, args)
 }
 
@@ -117,6 +131,7 @@ RieszBooster <- R6::R6Class(
     #' @param early_stopping_rounds,validation_fraction Early stopping: stop after
     #'   `early_stopping_rounds` rounds without held-out improvement, holding
     #'   out `validation_fraction` of the rows (only used when early stopping is on).
+#' @param n_jobs Number of xgboost threads. NULL uses all cores.
     #' @param init Initial alpha (NULL: the loss-minimizing constant; or a number).
     #' @param random_state Random seed.
     initialize = function(estimand,
@@ -125,6 +140,7 @@ RieszBooster <- R6::R6Class(
                           max_depth = 4L, reg_lambda = 1.0, subsample = 1.0,
                           early_stopping_rounds = NULL,
                           validation_fraction = 0.1,
+                          n_jobs = NULL,
                           init = NULL,
                           random_state = 0L) {
       args <- list(
@@ -141,6 +157,7 @@ RieszBooster <- R6::R6Class(
       if (!is.null(loss)) args$loss <- loss
       if (!is.null(early_stopping_rounds))
         args$early_stopping_rounds <- as.integer(early_stopping_rounds)
+      if (!is.null(n_jobs)) args$n_jobs <- as.integer(n_jobs)
       if (!is.null(init)) args$init <- init
       py_object <- do.call(.module()$RieszBooster, args)
       super$initialize(py_object = py_object, estimand = estimand)

@@ -49,7 +49,8 @@ def test_local_shift_recovers_truth_on_continuous_dgp():
     density_ratio = np.exp((2 * (a - x**2) + 1) / 4)
     alpha_true = (a < t + delta).astype(float) * density_ratio - (a < t).astype(float)
     rmse = float(np.sqrt(np.mean((alpha_hat - alpha_true) ** 2)))
-    assert rmse < 0.6
+    # Predicting α̂ ≡ 0 scores 0.60 here; fits across seeds score 0.13-0.16.
+    assert rmse < 0.3
 
 
 def test_local_shift_augmentation_skips_above_threshold():

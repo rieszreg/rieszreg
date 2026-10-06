@@ -47,7 +47,8 @@ def test_diagnose_with_booster_includes_riesz_loss():
     df = pd.DataFrame({"a": a.astype(float), "x": x.astype(float)})
     booster = RieszBooster(estimand=rieszboost.ATE(), n_estimators=20).fit(df)
     d = diagnose(estimator=booster, Z=df)
-    assert d.riesz_loss is not None
+    assert d.riesz_loss == pytest.approx(booster.riesz_loss(df), rel=1e-9)
+    assert d.rms == pytest.approx(float(np.sqrt(np.mean(booster.predict(df) ** 2))), rel=1e-9)
     assert d.n == n
 
 
@@ -60,6 +61,8 @@ def test_booster_diagnose_method():
     booster = RieszBooster(estimand=rieszboost.ATE(), n_estimators=10).fit(df)
     d = booster.diagnose(df)
     assert d.n == n
+    assert d.riesz_loss == pytest.approx(booster.riesz_loss(df), rel=1e-9)
+    assert d.max == pytest.approx(float(booster.predict(df).max()), rel=1e-9)
 
 
 def test_diagnose_requires_alpha_or_booster():

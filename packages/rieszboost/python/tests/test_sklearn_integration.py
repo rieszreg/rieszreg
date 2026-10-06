@@ -83,3 +83,77 @@ def test_get_set_params_round_trip():
     booster.set_params(n_estimators=200, learning_rate=0.1)
     assert booster.n_estimators == 200
     assert booster.learning_rate == 0.1
+
+
+def test_n_jobs_sets_threads_without_changing_the_fit():
+    import json
+
+    df, _ = _simulate_df(500, seed=3)
+    one = RieszBooster(estimand=rieszboost.ATE(), n_estimators=30, n_jobs=1).fit(df)
+    every = RieszBooster(estimand=rieszboost.ATE(), n_estimators=30).fit(df)
+    config = json.loads(one.predictor_.booster.save_config())
+    assert config["learner"]["generic_param"]["nthread"] == "1"
+    np.testing.assert_array_equal(one.predict(df), every.predict(df))
+
+
+def test_booster_settings_match_explicit_backend():
+    """RieszBooster forwards every tree setting to the XGBoostBackend it
+    builds: the same settings set on the backend give the same fit."""
+    import dataclasses
+
+    from rieszboost import XGBoostBackend
+
+    settings = dict(
+        n_estimators=40, learning_rate=0.1, max_depth=2, reg_lambda=0.0,
+        subsample=0.7, early_stopping_rounds=5, validation_fraction=0.2, n_jobs=1,
+    )
+    # Every setting RieszBooster forwards is covered here and is a backend field.
+    assert set(settings) == set(RieszBooster._BACKEND_PARAMS)
+    assert set(settings) <= {f.name for f in dataclasses.fields(XGBoostBackend)}
+
+    df, _ = _simulate_df(500, seed=4)
+    via_booster = RieszBooster(estimand=rieszboost.ATE(), **settings).fit(df)
+    via_backend = RieszBooster(
+        estimand=rieszboost.ATE(), backend=XGBoostBackend(**settings)
+    ).fit(df)
+    assert via_booster.best_iteration_ == via_backend.best_iteration_
+    np.testing.assert_array_equal(via_booster.predict(df), via_backend.predict(df))
+
+
+def test_gridsearchcv_tunes_xgboost_backend_fields():
+    """backend__<field> reaches XGBoostBackend settings RieszBooster doesn't
+    expose, such as hessian_floor. The backend passed in is left unchanged."""
+    from rieszboost import XGBoostBackend
+
+    df, _ = _simulate_df(600, seed=5)
+    backend = XGBoostBackend(n_estimators=20)
+    grid = GridSearchCV(
+        RieszBooster(estimand=rieszboost.ATE(), backend=backend),
+        param_grid={"backend__hessian_floor": ["auto", 2.0], "backend__max_depth": [2, 3]},
+        cv=3,
+    ).fit(df)
+    best = grid.best_estimator_.backend
+    assert best.hessian_floor == grid.best_params_["backend__hessian_floor"]
+    assert best.max_depth == grid.best_params_["backend__max_depth"]
+    assert backend == XGBoostBackend(n_estimators=20)
+    assert grid.best_estimator_.best_iteration_ is None  # fitted, all 20 trees kept
+
+
+def test_gridsearchcv_tunes_sklearn_backend_fields():
+    from sklearn.tree import DecisionTreeRegressor
+
+    from rieszboost import SklearnBackend
+
+    df, _ = _simulate_df(400, seed=6)
+    grid = GridSearchCV(
+        RieszBooster(
+            estimand=rieszboost.ATE(),
+            backend=SklearnBackend(
+                lambda: DecisionTreeRegressor(max_depth=2, random_state=0), n_estimators=15
+            ),
+        ),
+        param_grid={"backend__learning_rate": [0.05, 0.2]},
+        cv=3,
+    ).fit(df)
+    assert grid.best_estimator_.backend.learning_rate == grid.best_params_["backend__learning_rate"]
+    assert len(grid.best_estimator_.predictor_.learners) == 15

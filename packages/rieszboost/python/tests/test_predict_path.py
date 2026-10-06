@@ -63,8 +63,27 @@ def test_predict_path_validates_grid_range():
         booster.predict_path(df, [0])
     with pytest.raises(ValueError, match="must satisfy"):
         booster.predict_path(df, [21])
-    with pytest.raises(ValueError, match="non-empty"):
+    with pytest.raises(ValueError, match="must satisfy"):
         booster.predict_path(df, [])
+
+
+def test_predict_path_sklearn_backend_matches_single_fit():
+    from sklearn.tree import DecisionTreeRegressor
+
+    def booster(k):
+        return RieszBooster(
+            estimand=rieszboost.ATE(),
+            backend=rieszboost.SklearnBackend(
+                lambda: DecisionTreeRegressor(max_depth=3, random_state=0),
+                n_estimators=k,
+            ),
+        )
+
+    df = _simulate(300, seed=6)
+    grid = [3, 12, 30]
+    path = booster(30).fit(df).predict_path(df, grid)
+    for j, k in enumerate(grid):
+        np.testing.assert_array_equal(path[:, j], booster(k).fit(df).predict(df))
 
 
 def test_predict_path_unfitted_raises():

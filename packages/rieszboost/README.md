@@ -90,6 +90,18 @@ alpha_hat = best.predict(df)
 
 Score is negative held-out Riesz loss — higher is better, as sklearn expects.
 
+To tune a setting that lives only on the backend, pass the backend and name the field as `backend__<field>`. Both `XGBoostBackend` and `SklearnBackend` support this:
+
+```python
+from rieszboost import XGBoostBackend
+
+grid = GridSearchCV(
+    RieszBooster(estimand=ATE(), backend=XGBoostBackend(n_estimators=300)),
+    param_grid={"backend__hessian_floor": ["auto", 2.0], "backend__max_depth": [3, 4]},
+    cv=5,
+).fit(df)
+```
+
 ## Cross-fitting for downstream inference
 
 When plugging α̂ into a TMLE / one-step / DML estimator, use cross-fitting so predictions are out-of-fold. `cross_val_predict` does it for any sklearn estimator:
@@ -109,7 +121,7 @@ Each fold's `RieszBooster` does its own internal validation split for early stop
 
 ## Predicting at every tree count from one fit
 
-`predict_path` returns α̂ at each `n_estimators` value in a grid, extracted from a single fit using xgboost's `iteration_range`. Column `j` is bit-equal to a fresh fit with `n_estimators=n_estimators_grid[j]`.
+`predict_path` returns α̂ at each `n_estimators` value in a grid, extracted from a single fit. It works with `XGBoostBackend` and `SklearnBackend`. Column `j` is bit-equal to a fresh fit with `n_estimators=n_estimators_grid[j]`. After early stopping, the grid can reach past the best round, up to every tree that was fit.
 
 ```python
 booster = RieszBooster(estimand=ATE(), n_estimators=200).fit(df)
@@ -174,9 +186,11 @@ R-side `RieszBooster$save(path)` and `load_riesz_booster(path)` use the same dir
 
 Both formats handle built-in estimands automatically; custom user-defined `Estimand`s with non-importable `m()` callables need `cloudpickle` for the joblib path or `estimand=...` re-passed to `RieszBooster.load(...)` for the directory path.
 
+The directory format can't store a `SklearnBackend`'s `base_learner_factory`. A loaded model predicts as before, but refitting it raises until you set the backend again with `loaded.set_params(backend=SklearnBackend(...))`.
+
 ## Backends
 
-The default `XGBoostBackend` uses xgboost's custom-objective interface (fast). Swap to `SklearnBackend` to use any sklearn-compatible base learner. When you supply `backend=` explicitly, the backend is used as given: boost-loop and tree knobs (`n_estimators`, `learning_rate`, `max_depth`, `reg_lambda`, `subsample`, `early_stopping_rounds`, `validation_fraction`) live on the backend itself (`XGBoostBackend(max_depth=3, ...)`; for `SklearnBackend`, tree settings go on the base learner). `RieszBooster`'s matching ctor args only apply to the default-XGBoost path, and setting them alongside an explicit backend raises an error.
+The default `XGBoostBackend` uses xgboost's custom-objective interface (fast). Swap to `SklearnBackend` to use any sklearn-compatible base learner. When you supply `backend=` explicitly, the backend is used as given: boost-loop and tree knobs (`n_estimators`, `learning_rate`, `max_depth`, `reg_lambda`, `subsample`, `early_stopping_rounds`, `validation_fraction`, `n_jobs`) live on the backend itself (`XGBoostBackend(max_depth=3, ...)`; for `SklearnBackend`, tree settings go on the base learner). `RieszBooster`'s matching ctor args only apply to the default-XGBoost path, and setting them alongside an explicit backend raises an error.
 
 ```python
 from sklearn.kernel_ridge import KernelRidge

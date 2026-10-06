@@ -86,7 +86,7 @@ test_that("save / load round-trips a RieszBooster from R", {
 })
 
 
-test_that("Python-saved RieszBooster loads in R with bitwise-identical predictions", {
+test_that("R-saved RieszBooster loads in Python with identical predictions", {
   s <- simulate(400L, seed = 9L)
   booster <- RieszBooster$new(estimand = ATE("a", "x"),
                               n_estimators = 30L, learning_rate = 0.1,
@@ -110,7 +110,7 @@ test_that("Python-saved RieszBooster loads in R with bitwise-identical predictio
 })
 
 
-test_that("R and Python predictions are bitwise-identical on the same data", {
+test_that("R data.frame and pandas input give identical predictions", {
   s <- simulate(400L, seed = 4L)
   booster <- RieszBooster$new(estimand = ATE("a", "x"),
                               n_estimators = 50L, learning_rate = 0.1,
@@ -123,4 +123,16 @@ test_that("R and Python predictions are bitwise-identical on the same data", {
   py_df <- py_pd$DataFrame(list(a = s$df$a, x = s$df$x))
   py_preds <- as.numeric(booster$py$predict(py_df))
   expect_equal(r_preds, py_preds, tolerance = 1e-10)
+})
+
+
+test_that("XGBoostBackend() takes the tree settings RieszBooster forwards", {
+  s <- simulate(500L, seed = 4L)
+  settings <- list(n_estimators = 40L, max_depth = 2L, reg_lambda = 0, subsample = 0.7)
+  via_booster <- do.call(RieszBooster$new, c(list(estimand = ATE("a", "x")), settings))
+  via_backend <- RieszBooster$new(
+    estimand = ATE("a", "x"),
+    backend = do.call(XGBoostBackend, c(settings, list(n_jobs = 1L)))
+  )
+  expect_equal(via_backend$fit(s$df)$predict(s$df), via_booster$fit(s$df)$predict(s$df))
 })

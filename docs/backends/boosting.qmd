@@ -22,7 +22,17 @@ With `BernoulliLoss` the `"auto"` steps are large, so a fit converges in far few
 
 `gradient_only` short-circuits the second-order Hessian and uses $H = 1$ everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set `True` to reproduce the Lee-Schuler reference implementation exactly.
 
-`max_depth`, `reg_lambda`, `subsample`, `learning_rate`, `n_estimators`, `early_stopping_rounds` and `validation_fraction` are `XGBoostBackend` fields; `RieszBooster` forwards its constructor args of the same names when it builds the backend.
+`max_depth`, `reg_lambda`, `subsample`, `learning_rate`, `n_estimators`, `early_stopping_rounds`, `validation_fraction` and `n_jobs` are `XGBoostBackend` fields; `RieszBooster` forwards its constructor args of the same names when it builds the backend.
+
+Both backends have sklearn's `get_params` and `set_params`. In Python, `GridSearchCV` tunes any backend field through `backend__<field>`. This reaches `hessian_floor` and `gradient_only`, which `RieszBooster` does not take directly:
+
+```python
+GridSearchCV(
+    RieszBooster(estimand=ATE(), backend=XGBoostBackend(n_estimators=300)),
+    param_grid={"backend__hessian_floor": ["auto", 2.0], "backend__max_depth": [3, 4]},
+    cv=5,
+)
+```
 
 ## Tuning recipe
 
@@ -34,6 +44,7 @@ With `BernoulliLoss` the `"auto"` steps are large, so a fit converges in far few
 | `validation_fraction` | 0.1 | Raise to 0.2 with `early_stopping_rounds` | Internal split for early stopping. Used only when `early_stopping_rounds` is set. Alternative: pass `eval_set=` explicitly. |
 | `reg_lambda` | 1.0 | Bump to 5–10 for low-overlap data | xgboost L2 on leaf weights; damps the magnitude of any single leaf. |
 | `subsample` | 1.0 | Try 0.5–0.8 with very large $n$ | Stochastic boosting. Each round draws this fraction of individuals and keeps all of their augmented rows. |
+| `n_jobs` | `None` | Set 1 when fits already run in parallel | Number of xgboost threads. `None` uses all cores. The fit is the same at any thread count. |
 
 `XGBoostBackend` exposes two more knobs:
 
@@ -50,7 +61,9 @@ To use a non-tree base learner, pass a `base_learner_factory`: a zero-arg callab
 
 The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction. As in `XGBoostBackend`'s `hessian_floor="auto"`, counterfactual rows count with an observed row's curvature at the current prediction in that surrogate. Without this, the step size blew up wherever the base learner isolated rows that exist only as counterfactuals.
 
-Base learners with an unset `random_state` are seeded from the estimator's `random_state`, so fits are reproducible. As with `XGBoostBackend`, the model is cut back to the best round only when `early_stopping_rounds` is set. Otherwise all `n_estimators` rounds are kept, even when you pass `eval_set=`. `max_depth`, `reg_lambda` and `subsample` on `RieszBooster` apply to `XGBoostBackend` only. Set tree settings on the base learner instead.
+Base learners with an unset `random_state` are seeded from the estimator's `random_state`, so fits are reproducible. As with `XGBoostBackend`, the model is cut back to the best round only when `early_stopping_rounds` is set. Otherwise all `n_estimators` rounds are kept, even when you pass `eval_set=`. `max_depth`, `reg_lambda`, `subsample` and `n_jobs` on `RieszBooster` apply to `XGBoostBackend` only. Set tree settings on the base learner instead. `predict_path` works as it does with `XGBoostBackend`.
+
+`save` can't store the `base_learner_factory`. A loaded model predicts as before. To refit it, set the backend again with `set_params(backend=SklearnBackend(...))`.
 
 ::: {.panel-tabset group="lang"}
 

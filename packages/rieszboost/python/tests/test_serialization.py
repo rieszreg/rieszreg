@@ -102,6 +102,12 @@ def test_round_trip_with_sklearn_backend(tmp_path):
     b.save(tmp_path / "sk")
     loaded = RieszBooster.load(tmp_path / "sk")
     np.testing.assert_array_equal(pre, loaded.predict(df))
+    # The callable base learner can't be saved; a refit must not silently
+    # switch to the default XGBoost backend.
+    with pytest.raises(ValueError, match="loaded without its"):
+        loaded.fit(df)
+    loaded.set_params(backend=b.backend)
+    np.testing.assert_array_equal(pre, loaded.fit(df).predict(df))
 
 
 def test_custom_estimand_requires_explicit_estimand_on_load(tmp_path):

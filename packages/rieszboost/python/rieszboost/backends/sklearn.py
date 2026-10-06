@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
+from sklearn.base import BaseEstimator
 
 from rieszreg.augmentation import AugmentedDataset
 from rieszreg.backends.base import FitResult, register_predictor_loader
@@ -43,6 +44,25 @@ class SklearnPredictor:
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
+
+    @property
+    def n_trees(self) -> int:
+        """Rounds fitted, including any past the best early-stopping round."""
+        return len(self.learners)
+
+    def predict_eta_path(self, features: np.ndarray, n_estimators_grid) -> np.ndarray:
+        X = np.asarray(features, dtype=float)
+        eta = np.full(X.shape[0], self.base_score)
+        at = {}
+        for k, (h, step) in enumerate(zip(self.learners[:max(n_estimators_grid)], self.steps), 1):
+            eta = eta + step * np.asarray(h.predict(X))
+            if k in n_estimators_grid:
+                at[k] = eta
+        return np.column_stack([at[k] for k in n_estimators_grid])
+
+    def predict_alpha_path(self, features: np.ndarray, n_estimators_grid) -> np.ndarray:
+        eta = self.predict_eta_path(features, n_estimators_grid)
+        return np.asarray(self.loss.link_to_alpha(eta))
 
     def save(self, dir_path):
         """Pickle the per-round learners + steps via joblib.
@@ -100,12 +120,13 @@ def _line_search(
     return num / denom
 
 
-@dataclass
-class SklearnBackend:
+@dataclass(repr=False)
+class SklearnBackend(BaseEstimator):
     """Friedman gradient boosting backend. `base_learner_factory()` is a
     zero-arg callable returning a fresh sklearn-compatible regressor. Base
     learners that expose an unset ``random_state`` are seeded from the
-    estimator's ``random_state``."""
+    estimator's ``random_state``. Has sklearn's ``get_params`` /
+    ``set_params``, so ``GridSearchCV`` can tune ``backend__<field>``."""
 
     base_learner_factory: Callable[[], Any]
     n_estimators: int = 200
