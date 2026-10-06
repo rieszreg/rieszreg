@@ -67,8 +67,8 @@ class RieszNet(RieszEstimator):
     snapshot_epochs : sequence of int or None, default None
         Epoch ticks at which to snapshot ``state_dict`` during training so
         ``predict_path(Z, epochs=...)`` can return α̂ at each tick. ``None``
-        builds an auto-grid of ~20 log-spaced ticks across ``[1, epochs]``
-        (see :func:`riesznet.backend.auto_snapshot_epochs`). Pass an empty
+        builds an auto-grid of about 20 ticks: epochs 1, 2, 5, 10, then every
+        ``epochs // 20`` epochs up to ``epochs`` (see :func:`riesznet.backend.auto_snapshot_epochs`). Pass an empty
         sequence to disable snapshotting entirely.
     random_state : int, default 0
     """

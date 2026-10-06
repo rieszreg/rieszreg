@@ -182,8 +182,8 @@ print(f"α̂ range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 
 | Knob | Default | Notes |
 |---|---|---|
-| `module_factory` | required | `Callable[[int], nn.Module]` returning a model with scalar output. |
-| `optimizer_factory` | required | `Callable[[Iterable[Parameter]], Optimizer]`. |
+| `module_factory` | placeholder | `Callable[[int], nn.Module]` returning a model with scalar output. The default placeholder raises at `fit`, so set it when you build `TorchBackend` yourself. `RieszNet` fills in an MLP (`riesznet.modules.build_mlp`). |
+| `optimizer_factory` | placeholder | `Callable[[Iterable[Parameter]], Optimizer]`. The default placeholder raises at `fit`. `RieszNet` fills in Adam (`riesznet.modules.build_adam`). |
 | `scheduler_factory` | `None` | Optional `Callable[[Optimizer], LRScheduler]`. Stepped per epoch. |
 | `epochs` | `200` | |
 | `batch_size` | `None` | Original-row batch size. `None` is full-batch. |
@@ -218,7 +218,7 @@ For built-in estimands the metadata round-trips automatically. For a custom `Est
 |---|---|---|---|
 | `SquaredLoss` | ✅ | identity | Default. Works on every estimand. |
 | `KLLoss` | ✅ | exp | Density-ratio targets only (TSM, IPSI). Requires non-negative m-coefficients. |
-| `BernoulliLoss` | ✅ | sigmoid | Forces α̂ ∈ (0, 1). Density-ratio targets only. |
+| `BernoulliLoss` | ✅ | sigmoid | Forces α̂ ∈ (0, 1), so the true Riesz representer must lie in (0, 1). Among the built-in estimands, only `OutcomeRegNormSq` with a binary outcome satisfies this. Otherwise use it for custom estimands whose representer does. |
 | `BoundedSquaredLoss(lo, hi)` | ✅ | scaled-sigmoid | Forces α̂ ∈ (lo, hi). Works on every estimand. |
 
 The autograd implementation matches the analytic gradient in the loss spec exactly — verified per loss in the test suite.

@@ -8,7 +8,7 @@ engine: knitr
 
 ![](banner.svg){.hero-banner fig-alt="RieszReg — Riesz regression for semiparametric inference"}
 
-`rieszreg` estimates the Riesz representer $\alpha$ of a linear estimand $\psi = \mathbb{E}[m(\mu)(Z,Y)]$ — the building block of one-step, TMLE, and DML inference — with gradient boosting ([`rieszboost`](backends/boosting.qmd)), kernel ridge ([`krrr`](backends/kernel.qmd)), random forests ([`forestriesz`](backends/forest.qmd)), or neural nets ([`riesznet`](backends/neural.qmd)). Think of it as the `sklearn`, `tidymodels` or `superlearner` for Riesz regression.
+`rieszreg` estimates the Riesz representer $\alpha$ of a linear estimand $\psi = \mathbb{E}[m(\mu)(Z,Y)]$ — the building block of one-step, TMLE, and DML inference — with gradient boosting ([`rieszboost`](backends/boosting.qmd)), kernel ridge ([`krrr`](backends/kernel.qmd)), random forests ([`forestriesz`](backends/forest.qmd)), a single decision tree ([`riesztree`](backends/tree.qmd)), or neural nets ([`riesznet`](backends/neural.qmd)). Think of it as the `sklearn`, `tidymodels` or `superlearner` for Riesz regression.
 
 `rieszreg` ships built-in factories for ATE, ATT, TSM, additive shifts, local shifts, stochastic interventions, and arbitrary user-defined estimands; the squared Riesz loss plus the wider Bregman family (KL, Bernoulli, bounded squared); and sklearn-native tuning, model selection, and cross-fitting. Python and R, with bitwise-identical predictions on the same input.
 
@@ -20,7 +20,7 @@ $$
 \alpha(a, x) \;=\; \frac{a}{\pi(x)} - \frac{1-a}{1-\pi(x)},
 $$
 
-Under the [Riesz representation theorem](intro.qmd), similar weights exist for many different estimands. `rieszreg` learns these weights directly from data: no propensity model, no truncation, etc. The same machinery handles continuous shifts, stochastic interventions, and many custom estimands a user can write down — for which closed-form weights could otherwise involve tricky or slow density estimates. These weights are then suitable for downstream use in weighting estimators or 
+Under the [Riesz representation theorem](intro.qmd), similar weights exist for many different estimands. `rieszreg` learns these weights directly from data: no propensity model, no truncation, etc. The same machinery handles continuous shifts, stochastic interventions, and many custom estimands a user can write down — for which closed-form weights could otherwise involve tricky or slow density estimates. You can then plug these weights into weighting, one-step, DML, or TMLE estimators.
 
 For the longer derivation and a survey of the closed-form weights for each built-in estimand, see [What is Riesz regression?](intro.qmd). 
 
@@ -105,25 +105,29 @@ plt.show()
 
 ### DML point estimate and CI
 
+Cross-fit the outcome regression $\hat\mu$ on the same folds. In each fold, fit on the training rows and predict the held-out rows at their observed treatment and at $A = 1$ and $A = 0$:
+
 ```{python}
 #| code-fold: true
 #| code-summary: "Cross-fit outcome regression"
+from sklearn.base import clone
 from sklearn.ensemble import GradientBoostingRegressor
 
 mu_model = GradientBoostingRegressor(
     n_estimators=300, learning_rate=0.05, max_depth=3, random_state=0,
 )
-Z_full = df[["a", "x"]].to_numpy()
-mu_oof = cross_val_predict(mu_model, Z_full, df["y"].to_numpy(), cv=cv)
-
-# Counterfactual predictions need a model fit on the full data.
-mu_full = mu_model.fit(Z_full, df["y"].to_numpy())
-mu1 = mu_full.predict(np.column_stack([np.ones(n), x]))
-mu0 = mu_full.predict(np.column_stack([np.zeros(n), x]))
+Z_obs = df[["a", "x"]]
+yv = df["y"].to_numpy()
+mu_obs, mu1, mu0 = np.zeros(n), np.zeros(n), np.zeros(n)
+for train, test in cv.split(df):
+    fit_k = clone(mu_model).fit(Z_obs.iloc[train], yv[train])
+    mu_obs[test] = fit_k.predict(Z_obs.iloc[test])
+    mu1[test]    = fit_k.predict(Z_obs.iloc[test].assign(a=1.0))
+    mu0[test]    = fit_k.predict(Z_obs.iloc[test].assign(a=0.0))
 ```
 
 ```{python}
-eif  = (mu1 - mu0) + alpha_hat * (df["y"].to_numpy() - mu_oof)
+eif  = (mu1 - mu0) + alpha_hat * (yv - mu_obs)
 psi  = float(eif.mean())
 se   = float(np.sqrt(np.var(eif, ddof=1) / n))
 ci   = (psi - 1.96 * se, psi + 1.96 * se)
@@ -201,7 +205,7 @@ plot(true_alpha, alpha_hat, pch = 16, cex = 0.4, col = adjustcolor("black", 0.4)
 abline(0, 1, lty = 2)
 ```
 
-Cross-fit outcome regression $\hat\mu$ via xgboost, then assemble the DML estimate and Wald CI:
+Cross-fit outcome regression $\hat\mu$ via xgboost on the same folds, predicting each held-out fold at its observed treatment and at $A = 1$ and $A = 0$. Then assemble the DML estimate and Wald CI:
 
 ```{r}
 #| code-fold: true
@@ -210,7 +214,7 @@ suppressPackageStartupMessages(library(xgboost))
 
 xgb_params <- list(objective = "reg:squarederror", eta = 0.05,
                    max_depth = 3, lambda = 1, verbosity = 0)
-mu_oof <- numeric(nrow(df))
+mu_obs <- mu1 <- mu0 <- numeric(nrow(df))
 for (split in cv_outer$splits) {
   tr <- analysis(split); te <- assessment(split); te_idx <- complement(split)
   bst <- xgb.train(
@@ -218,19 +222,15 @@ for (split in cv_outer$splits) {
     data = xgb.DMatrix(as.matrix(tr[, c("a", "x")]), label = tr$y),
     nrounds = 300
   )
-  mu_oof[te_idx] <- predict(bst, as.matrix(te[, c("a", "x")]))
+  X_te <- as.matrix(te[, c("a", "x")])
+  mu_obs[te_idx] <- predict(bst, X_te)
+  mu1[te_idx]    <- predict(bst, cbind(a = 1, X_te[, "x", drop = FALSE]))
+  mu0[te_idx]    <- predict(bst, cbind(a = 0, X_te[, "x", drop = FALSE]))
 }
-mu_full <- xgb.train(
-  params = xgb_params,
-  data = xgb.DMatrix(as.matrix(df[, c("a", "x")]), label = df$y),
-  nrounds = 300
-)
-mu1 <- predict(mu_full, cbind(a = 1, as.matrix(df[, "x", drop = FALSE])))
-mu0 <- predict(mu_full, cbind(a = 0, as.matrix(df[, "x", drop = FALSE])))
 ```
 
 ```{r}
-eif <- (mu1 - mu0) + alpha_hat * (df$y - mu_oof)
+eif <- (mu1 - mu0) + alpha_hat * (df$y - mu_obs)
 psi <- mean(eif)
 se  <- sqrt(var(eif) / length(eif))
 ci  <- c(psi - 1.96 * se, psi + 1.96 * se)
@@ -243,5 +243,5 @@ cat(sprintf("psi_ATE = %.3f\nSE      = %.3f\n95%% CI  = [%.3f, %.3f]\n",
 For TMLE on top of these nuisances, and integration with `DoubleML` and other downstream packages, see [Estimation](estimation/index.qmd). For backend-specific tuning, see [Backends](backends/index.qmd).
 
 ::: {.callout-tip title="Code execution"}
-Every code block on this page ran at build time. The numbers and figures came from the version of `rieszreg`, `rieszboost`, `krrr`, `forestriesz`, and `riesznet` that produced this page.
+Every code block on this page ran at build time. The numbers and figures came from the version of `rieszreg`, `rieszboost`, `krrr`, `forestriesz`, `riesztree`, and `riesznet` that produced this page.
 :::

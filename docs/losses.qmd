@@ -187,7 +187,7 @@ Subclasses can implement any link — just override `link_to_alpha` and `alpha_t
 ::: {.callout-note title="Which backends accept which losses"}
 - **Boosting** ([`rieszboost`](backends/boosting.qmd)): all four losses.
 - **Kernel ridge** ([`krrr`](backends/kernel.qmd)): `SquaredLoss` only — non-quadratic losses need a Newton iteration on the kernel system.
-- **Random forest, augmentation-style** (`forestriesz.AugForestRieszRegressor`): all four losses. Tree structure from the squared MSE criterion, then a per-leaf Newton replaces each leaf's stored θ with the Bregman optimum.
+- **Random forest, augmentation-style** (`forestriesz.AugForestRieszRegressor`): all four losses. Each tree picks splits by the gain in the loss you chose, and each leaf stores that loss's closed-form optimum.
 - **Random forest, moment-style** (`forestriesz.ForestRieszRegressor`): `SquaredLoss` only.
 - **Neural network** ([`riesznet`](backends/neural.qmd)): all four losses. Each loss's per-row Bregman form is implemented in autograd-friendly torch ops; gradient parity vs the analytic loss is checked at 1e-8.
 

@@ -316,7 +316,7 @@ register_fast_leaf_solver(MyLoss, my_leaf_loss, my_alpha)
 # Subsequent fits with loss=MyLoss() use the C-speed Cython splitter.
 ```
 
-The cfunc is called from the Cython splitter's tight loop without the GIL — same per-evaluation cost as the four built-in losses. See [riesztree's BENCH_BASELINE.md](https://github.com/rieszreg/riesztree/blob/main/BENCH_BASELINE.md) for the locked baselines and a comparison vs sklearn / LightGBM / XGBoost.
+The cfunc is called from the Cython splitter's tight loop without the GIL — same per-evaluation cost as the four built-in losses. See [riesztree's BENCH_BASELINE.md](https://github.com/rieszreg/rieszreg/blob/main/packages/riesztree/BENCH_BASELINE.md) for the locked baselines and a comparison vs sklearn / LightGBM / XGBoost.
 
 ## Loss-aware splits {#sec-loss-aware}
 

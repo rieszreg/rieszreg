@@ -14,18 +14,15 @@ Singh (2021) gives a closed-form RKHS estimator for the Riesz representer when t
 
 ## Install
 
-`krrr` depends on the [rieszreg](https://github.com/rieszreg/rieszreg) meta-package. Clone both as siblings:
+`krrr` lives in the [rieszreg monorepo](https://github.com/rieszreg/rieszreg) and depends on the `rieszreg` package there. Install the whole workspace from the repo root:
 
 ```sh
-git clone https://github.com/rieszreg/krrr.git
 git clone https://github.com/rieszreg/rieszreg.git
-cd krrr
-python3 -m venv .venv
-.venv/bin/pip install -e ../rieszreg/python
-.venv/bin/pip install -e python/
+cd rieszreg
+uv sync --all-packages --all-extras
 ```
 
-(Once both packages publish to PyPI, this collapses to `pip install krrr`.)
+Worked examples for each estimand are in [`examples/`](examples/).
 
 ## Quickstart (Python) — ATE
 
@@ -74,14 +71,14 @@ Re-exported from rieszreg — same API, same semantics:
 Custom `m()` works too (write the functional opaquely; `LinearForm` tracing extracts the points and coefficients):
 
 ```python
-from krrr import KernelRieszRegressor, Estimand
+from krrr import KernelRieszRegressor, FiniteEvalEstimand
 
 def m_my_thing(alpha):
-    def inner(z):
+    def inner(z, y=None):
         return 0.7 * alpha(a=1, x=z["x"]) - 0.3 * alpha(a=0, x=z["x"])
     return inner
 
-est = Estimand(feature_keys=("a", "x"), m=m_my_thing, name="MyMix")
+est = FiniteEvalEstimand(feature_keys=("a", "x"), m=m_my_thing, name="MyMix")
 krr = KernelRieszRegressor(estimand=est).fit(df)
 ```
 
@@ -173,7 +170,7 @@ The R6 wrapper exposes the same method with column names `"lambda=1e-03"`, etc.
 print(krr.diagnose(df).summary())
 ```
 
-The base `Diagnostics` (RMS magnitude, |α| quantiles, extreme-row count, held-out Riesz loss) is shared via rieszreg. `krr.diagnose(df)` adds KRR-specific extras: chosen λ, support size, and, for `solver="direct"`, the effective degrees of freedom and condition number of the training-time kernel system.
+The base `Diagnostics` (RMS magnitude, |α| quantiles, extreme-row count, Riesz loss on the rows you pass) is shared via rieszreg. `krr.diagnose(df)` adds KRR-specific extras: chosen λ, support size, and, for `solver="direct"`, the effective degrees of freedom and condition number of the training-time kernel system.
 
 ## Save and load
 
@@ -187,11 +184,12 @@ Built-in estimands round-trip from metadata. Custom user-defined estimands requi
 
 ## Quickstart (R)
 
-R6-style wrapper. Install both Python packages into a venv first, then point R at it:
+R6-style wrapper. Install the Python workspace first (see [Install](#install)), then point R at its venv. Run from the repo root:
 
 ```r
 Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), ".venv/bin/python"))
-pkgload::load_all("r/krrr")
+pkgload::load_all("packages/rieszreg/r/rieszreg")  # rieszreg first
+pkgload::load_all("packages/krrr/r/krrr")          # or: Rscript tools/r/install.R krrr
 
 df <- data.frame(a = ..., x = ...)
 krr <- KernelRieszRegressor$new(
@@ -211,7 +209,7 @@ R-side and Python-side predictions are bitwise-identical on the same data.
 ## Tests
 
 ```sh
-.venv/bin/python -m pytest python/tests -v
+uv run pytest packages/krrr/python/tests -q   # from the repo root
 ```
 
 Includes a numerical-parity test against the dml-tmle krrr.R reference at 1e-8.

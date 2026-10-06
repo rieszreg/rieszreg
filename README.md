@@ -24,10 +24,14 @@ Each package has a Python module under `python/` and an R6 wrapper under `r/`. T
 ```sh
 git clone https://github.com/rieszreg/rieszreg.git
 cd rieszreg
-uv sync --all-packages --all-extras
+uv sync --all-packages --all-extras --all-groups
 ```
 
-`rieszboost` needs OpenMP; on macOS, run `brew install libomp` once.
+`--all-groups` adds the `docs` dependency group, which includes `causaldata`. The real-data examples (`packages/rieszboost/examples/lalonde_ate.py`, `nhefs_shift.py`) and the docs site need it.
+
+`rieszboost` needs OpenMP; on macOS, run `brew install libomp` once. `riesztree` builds a Cython extension, so you need a C compiler.
+
+R users: after the Python install, run `Rscript tools/r/install.R` from the repo root to install the six R packages. See the [install page](https://rieszreg.github.io/rieszreg/install.html) for details.
 
 ## Quickstart
 

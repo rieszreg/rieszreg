@@ -18,21 +18,23 @@ Forests (`forestriesz`) and gradient boosting (`rieszboost`) are the right learn
 
 ## Install
 
+`riesztree` lives in the [rieszreg monorepo](https://github.com/rieszreg/rieszreg). Install the whole workspace from the repo root:
+
 ```sh
-pip install -e python/   # from this directory
+uv sync --all-packages --all-extras
 ```
 
 `riesztree` ships a small Cython extension (`riesztree.fast._tree_c`) that
-backs the prediction tight loop. `pip install -e python/` builds it
-automatically — you need a C compiler on the build machine
-(gcc / clang / MSVC). Editing a `.pyx` file requires re-running
-`pip install -e python/` to recompile.
+backs the prediction tight loop. The install builds it
+automatically, so you need a C compiler on the build machine
+(gcc / clang / MSVC). After editing a `.pyx` file, rebuild with
+`python setup.py build_ext --inplace` from `packages/riesztree/python/`.
 
-R:
+R, from the repo root (load `rieszreg` first):
 
 ```r
-pkgload::load_all("../rieszreg/r/rieszreg")
-pkgload::load_all("r/riesztree")
+pkgload::load_all("packages/rieszreg/r/rieszreg")
+pkgload::load_all("packages/riesztree/r/riesztree")
 ```
 
 ## Quickstart

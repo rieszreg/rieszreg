@@ -18,12 +18,15 @@ In semiparametric estimation (ATE, treatment-specific means, shift interventions
 
 ## Install
 
+`rieszboost` lives in the [rieszreg monorepo](https://github.com/rieszreg/rieszreg). Install the whole workspace from the repo root:
+
 ```sh
-git clone https://github.com/rieszreg/rieszboost.git
-cd rieszboost
-python3 -m venv .venv
-.venv/bin/pip install -e python/
+git clone https://github.com/rieszreg/rieszreg.git
+cd rieszreg
+uv sync --all-packages --all-extras --all-groups
 ```
+
+`--all-groups` pulls in `causaldata`, which the real-data examples (`examples/lalonde_ate.py`, `examples/nhefs_shift.py`) need.
 
 On macOS, `xgboost` requires `libomp`:
 
@@ -208,13 +211,16 @@ Plug in your own by subclassing `Loss`. The framework follows Hines & Miles ([25
 
 [`examples/lee_schuler/`](examples/) reproduces Section 4 of Lee & Schuler (2025): ATE, ATT, ASE, and LASE under their two simulation DGPs, with EEE estimators and coverage. See [examples/README.md](examples/README.md).
 
+[`examples/lalonde_ate.py`](examples/lalonde_ate.py) (ATE on the LaLonde job-training data) and [`examples/nhefs_shift.py`](examples/nhefs_shift.py) (a shift effect on NHEFS) load real data from `causaldata`. Install it with `uv sync --all-packages --all-extras --all-groups` from the repo root.
+
 ## Quickstart (R)
 
-R6-style wrapper. Install Python rieszboost into a venv first, then point R at it:
+R6-style wrapper. Install the Python workspace first (see [Install](#install)), then point R at its venv. Run from the repo root:
 
 ```r
 Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), ".venv/bin/python"))
-pkgload::load_all("r/rieszboost")   # or install from r/rieszboost/
+pkgload::load_all("packages/rieszreg/r/rieszreg")      # rieszreg first
+pkgload::load_all("packages/rieszboost/r/rieszboost")  # or: Rscript tools/r/install.R rieszboost
 
 df <- data.frame(a = ..., x = ...)
 booster <- RieszBooster$new(
@@ -238,7 +244,7 @@ The active list is empty — all original v0.0.1 items have shipped:
 
 - Six built-in estimand factories with worked examples (synthetic + real-data: Lalonde ATE, NHEFS shift).
 - Two backends, four losses, full sklearn integration, R6 wrapper, save / load (cross-language).
-- Six-layer test suite (smoke + regression baselines + backend equivalence + edge cases + property + sklearn conformance + perf bench). See [docs/TESTING_PLAN.md](docs/TESTING_PLAN.md).
+- Six-layer test suite (smoke + regression baselines + backend equivalence + edge cases + property + sklearn conformance + perf bench) under [`python/tests/`](python/tests/).
 
 Future work would focus on CI wiring, real-data examples beyond the two shipped, and additional Bregman losses (e.g. Itakura-Saito for audio-style ratios) as use cases emerge.
 
@@ -252,15 +258,18 @@ See `CLAUDE.md` for design notes and the API design rule.
 
 ## Tests
 
+Run from the repo root:
+
 ```sh
 # Python
-.venv/bin/python -m pytest python/tests -v
+uv run pytest packages/rieszboost/python/tests -q
 
-# R (run from repo root)
+# R
 Rscript -e '
   Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), ".venv/bin/python"))
-  pkgload::load_all("r/rieszboost")
-  testthat::test_dir("r/rieszboost/tests/testthat")
+  pkgload::load_all("packages/rieszreg/r/rieszreg")
+  pkgload::load_all("packages/rieszboost/r/rieszboost")
+  testthat::test_dir("packages/rieszboost/r/rieszboost/tests/testthat")
 '
 ```
 

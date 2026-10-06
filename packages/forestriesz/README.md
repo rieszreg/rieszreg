@@ -48,7 +48,7 @@ This editable-installs every package in the workspace, including `forestriesz`. 
 ```python
 import numpy as np
 import pandas as pd
-from forestriesz import ForestRieszRegressor, ATE
+from forestriesz import AugForestRieszRegressor, ATE
 
 # Synthetic binary-treatment data
 rng = np.random.default_rng(0)
@@ -58,10 +58,9 @@ pi = 1 / (1 + np.exp(-(-0.02*x - x**2 + 4*np.log(x + 0.3) + 1.5)))
 a = rng.binomial(1, pi).astype(float)
 df = pd.DataFrame({"a": a, "x": x})
 
-fr = ForestRieszRegressor(
+fr = AugForestRieszRegressor(
     estimand=ATE(treatment="a", covariates=("x",)),
     n_estimators=500,
-    min_samples_leaf=10,
     random_state=0,
 )
 fr.fit(df)
@@ -69,11 +68,9 @@ alpha_hat = fr.predict(df)
 # alpha_hat ≈ A/π(X) - (1-A)/(1-π(X)) — without ever estimating π(X)
 ```
 
-The default `riesz_feature_fns="auto"` resolves to a sensible sieve for built-in estimands (treatment indicators for ATE/ATT/TSM). Pass an explicit list of basis callables to override.
+## Quickstart (Python) — AdditiveShift
 
-## Quickstart (Python) — AdditiveShift with the augmentation-style backend
-
-For estimands without a canonical list of basis functions — `AdditiveShift`, `LocalShift`, custom user moments — `ForestRieszRegressor` raises a row-constant degeneracy error. `AugForestRieszRegressor` handles them with no extra configuration:
+`AugForestRieszRegressor` also handles estimands without a canonical list of basis functions (`AdditiveShift`, `LocalShift`, custom user moments). `ForestRieszRegressor` raises a row-constant degeneracy error on these. The same call works:
 
 ```python
 from forestriesz import AugForestRieszRegressor, AdditiveShift
@@ -96,6 +93,8 @@ It also works on every built-in estimand (ATE, ATT, TSM, …) without any extra 
 
 ## Quickstart (Python) — TSM with confidence intervals
 
+Use `ForestRieszRegressor` when you need confidence intervals on $\alpha(z)$. Its default `riesz_feature_fns="auto"` picks the basis functions for built-in estimands (treatment indicators for ATE/ATT/TSM). Pass an explicit list of basis callables to override.
+
 ```python
 from forestriesz import ForestRieszRegressor, TSM
 
@@ -113,12 +112,25 @@ lb, ub = fr.predict_interval(df, alpha=0.05)  # 95% CI per row
 
 `honest=True` enables the GRF half-sample honest-split scheme so the CIs are asymptotically valid. `inference=True` retains the per-tree subsample structure needed for variance estimation (requires `n_estimators` divisible by `subforest_size=4`).
 
-## Quickstart (R) — TSM
+## Quickstart (R)
+
+The R wrapper exposes `ForestRieszRegressor`. It fits ATE, ATT, and TSM with the default basis functions:
 
 ```r
 library(forestriesz)
 use_python_forestriesz(".venv/bin/python")
 
+fr <- ForestRieszRegressor$new(
+  estimand = ATE(treatment = "a", covariates = "x"),
+  n_estimators = 500L
+)
+fr$fit(df)
+alpha_hat <- fr$predict(df)
+```
+
+Confidence intervals need a single-basis estimand such as TSM:
+
+```r
 fr <- ForestRieszRegressor$new(
   estimand = TSM(level = 1L, treatment = "a", covariates = "x"),
   n_estimators = 500L,
@@ -127,10 +139,10 @@ fr <- ForestRieszRegressor$new(
 )
 fr$fit(df)
 alpha_hat <- fr$predict(df)
-ci <- fr$predict_interval(df, alpha = 0.05)
+ci <- fr$predict_interval(df, alpha = 0.05)   # list(lb = ..., ub = ...)
 ```
 
-The R wrapper exposes locally constant fits (single-basis sieve under the hood for built-in estimands). For ATE/ATT and other multi-basis sieves, call into Python via reticulate.
+Custom `riesz_feature_fns` and `AugForestRieszRegressor` are Python-only.
 
 ## Built-in estimands
 

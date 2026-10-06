@@ -1,7 +1,7 @@
 """ForestDiagnostics — extends rieszreg.Diagnostics with forest-specific extras.
 
 Reports per-feature importance and mean leaf size in addition to the base
-diagnostics (RMS, quantiles, extreme-α̂ warnings, held-out Riesz loss).
+diagnostics (RMS, quantiles, extreme-α̂ warnings, Riesz loss on the diagnosed rows).
 """
 
 from __future__ import annotations

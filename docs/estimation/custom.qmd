@@ -10,6 +10,8 @@ Cross-fit $\hat\alpha$ from `rieszreg` plus a cross-fit outcome regression $\hat
 
 The Dehejia-Wahba dataset: NSW-treated job-trainees vs CPS observational controls, outcome `re78` (1978 earnings). The standard covariates are age, education, race, marital status, schooling, and pre-period earnings.
 
+The data come from the `causaldata` package. It is in the workspace's `docs` dependency group, so install with `uv sync --all-packages --all-extras --all-groups` (see [Install](../install.qmd)).
+
 ::: {.panel-tabset group="lang"}
 
 ## Python
@@ -38,9 +40,11 @@ library(reticulate)
 cd_py <- import("causaldata")
 COVARIATES <- c("age", "educ", "black", "hisp", "marr", "nodegree", "re74", "re75")
 
-treated  <- py_to_r(cd_py$nsw_mixtape$load_pandas()$data)
+# Convert column by column; works with every pandas version.
+load_cd  <- function(ds) as.data.frame(ds$load_pandas()$data$to_dict("list"))
+treated  <- load_cd(cd_py$nsw_mixtape)
 treated  <- treated[treated$treat == 1, ]
-controls <- py_to_r(cd_py$cps_mixtape$load_pandas()$data)
+controls <- load_cd(cd_py$cps_mixtape)
 df <- rbind(treated, controls)
 df$a <- as.numeric(df$treat)
 df$y <- df$re78
@@ -53,7 +57,7 @@ cat(sprintf("n = %d  (%d treated, %d control)\n",
 
 ## Cross-fit nuisances
 
-Both $\hat\mu$ and $\hat\alpha$ go through `cross_val_predict` so every prediction used in the influence function is out-of-fold.
+Split the rows into 5 folds. For each fold, fit the outcome model $\hat\mu$ and the Riesz learner $\hat\alpha$ on the other four folds. Then predict on the held-out fold at the observed treatment and at $A = 1$ and $A = 0$. Every prediction used below comes from models that never saw that row.
 
 ::: {.panel-tabset group="lang"}
 
@@ -61,36 +65,40 @@ Both $\hat\mu$ and $\hat\alpha$ go through `cross_val_predict` so every predicti
 
 ```{python}
 import xgboost as xgb
-from sklearn.model_selection import KFold, cross_val_predict
+from sklearn.base import clone
+from sklearn.model_selection import KFold
 from rieszreg import ATE
 from rieszboost import RieszBooster
 
-cv = KFold(n_splits=5, shuffle=True, random_state=0)
+Z  = df[["a"] + COVARIATES]
+y  = df["y"].to_numpy(dtype=float)
+Z1 = Z.assign(a=1.0)   # everyone treated
+Z0 = Z.assign(a=0.0)   # everyone untreated
 
-# Outcome regression μ̂(A, X)
-Z_full = df[["a"] + COVARIATES].to_numpy(dtype=float)
-y      = df["y"].to_numpy(dtype=float)
-mu_hat = xgb.XGBRegressor(
+outcome_model = xgb.XGBRegressor(
     objective="reg:squarederror", learning_rate=0.05,
     max_depth=4, reg_lambda=1.0, n_estimators=300,
     random_state=0, verbosity=0,
 )
-mu_oof = cross_val_predict(mu_hat, Z_full, y, cv=cv)
-
-# Riesz representer α̂(A, X) for ATE
 booster = RieszBooster(
     estimand=ATE(treatment="a", covariates=tuple(COVARIATES)),
     n_estimators=2000, early_stopping_rounds=20, validation_fraction=0.2,
     learning_rate=0.05, max_depth=3, reg_lambda=10.0, random_state=0,
 )
-alpha_hat = cross_val_predict(booster, df[["a"] + COVARIATES], cv=cv)
 
-# Counterfactual μ̂(1, X) and μ̂(0, X) need a model fit on the full data.
-mu_full = mu_hat.fit(Z_full, y)
-Z1 = np.column_stack([np.ones(len(df)),  df[COVARIATES].to_numpy(dtype=float)])
-Z0 = np.column_stack([np.zeros(len(df)), df[COVARIATES].to_numpy(dtype=float)])
-mu1 = mu_full.predict(Z1)
-mu0 = mu_full.predict(Z0)
+n = len(df)
+mu_obs, mu1, mu0 = np.zeros(n), np.zeros(n), np.zeros(n)
+alpha_hat, alpha_1, alpha_0 = np.zeros(n), np.zeros(n), np.zeros(n)
+for train, test in KFold(n_splits=5, shuffle=True, random_state=0).split(Z):
+    mu_k = clone(outcome_model).fit(Z.iloc[train], y[train])
+    mu_obs[test] = mu_k.predict(Z.iloc[test])
+    mu1[test]    = mu_k.predict(Z1.iloc[test])
+    mu0[test]    = mu_k.predict(Z0.iloc[test])
+
+    alpha_k = clone(booster).fit(Z.iloc[train])
+    alpha_hat[test] = alpha_k.predict(Z.iloc[test])
+    alpha_1[test]   = alpha_k.predict(Z1.iloc[test])
+    alpha_0[test]   = alpha_k.predict(Z0.iloc[test])
 ```
 
 ## R
@@ -100,51 +108,40 @@ library(xgboost)
 suppressPackageStartupMessages(library(rsample))
 set.seed(0)
 
-# Shared 5-fold split — used for both μ̂ and α̂ so they're aligned.
-splits <- vfold_cv(df, v = 5)$splits
+X  <- as.matrix(df[, c("a", COVARIATES)])
+y  <- df$y
+X1 <- X; X1[, "a"] <- 1   # everyone treated
+X0 <- X; X0[, "a"] <- 0   # everyone untreated
+df_a1 <- df; df_a1$a <- 1
+df_a0 <- df; df_a0$a <- 0
 
-# Outcome regression μ̂(A, X) via xgboost (R) with 5-fold cross-fit.
-X_full <- as.matrix(df[, c("a", COVARIATES)])
-y      <- df$y
-mu_oof <- numeric(nrow(df))
-for (split in splits) {
-  te_idx <- complement(split)
-  tr_idx <- setdiff(seq_len(nrow(df)), te_idx)
-  bst <- xgb.train(
+n <- nrow(df)
+mu_obs <- mu1 <- mu0 <- numeric(n)
+alpha_hat <- alpha_1 <- alpha_0 <- numeric(n)
+for (split in vfold_cv(df, v = 5)$splits) {
+  test  <- complement(split)
+  train <- setdiff(seq_len(n), test)
+
+  mu_k <- xgb.train(
     params = list(objective = "reg:squarederror", eta = 0.05,
                   max_depth = 4, lambda = 1.0, verbosity = 0),
-    data = xgb.DMatrix(X_full[tr_idx, , drop = FALSE], label = y[tr_idx]),
+    data = xgb.DMatrix(X[train, , drop = FALSE], label = y[train]),
     nrounds = 300
   )
-  mu_oof[te_idx] <- predict(bst, X_full[te_idx, , drop = FALSE])
-}
+  mu_obs[test] <- predict(mu_k, X[test, , drop = FALSE])
+  mu1[test]    <- predict(mu_k, X1[test, , drop = FALSE])
+  mu0[test]    <- predict(mu_k, X0[test, , drop = FALSE])
 
-# Riesz representer α̂ via the same 5-fold loop, calling $fit / $predict on
-# the R6 booster per fold.
-make_booster <- function() RieszBooster$new(
-  estimand = ATE(treatment = "a", covariates = COVARIATES),
-  n_estimators = 2000L, early_stopping_rounds = 20L, validation_fraction = 0.2,
-  learning_rate = 0.05, max_depth = 3L, reg_lambda = 10.0
-)
-alpha_hat <- numeric(nrow(df))
-for (split in splits) {
-  m <- make_booster()
-  m$fit(analysis(split))
-  alpha_hat[complement(split)] <- m$predict(assessment(split))
+  alpha_k <- RieszBooster$new(
+    estimand = ATE(treatment = "a", covariates = COVARIATES),
+    n_estimators = 2000, early_stopping_rounds = 20, validation_fraction = 0.2,
+    learning_rate = 0.05, max_depth = 3, reg_lambda = 10.0
+  )
+  alpha_k$fit(df[train, ])
+  alpha_hat[test] <- alpha_k$predict(df[test, ])
+  alpha_1[test]   <- alpha_k$predict(df_a1[test, ])
+  alpha_0[test]   <- alpha_k$predict(df_a0[test, ])
 }
-booster <- make_booster()  # used by the TMLE step below to produce α at counterfactual treatment levels
-
-# Counterfactual μ̂(1, X) and μ̂(0, X) from a full-data fit.
-mu_full <- xgb.train(
-  params = list(objective = "reg:squarederror", eta = 0.05,
-                max_depth = 4, lambda = 1.0, verbosity = 0),
-  data = xgb.DMatrix(X_full, label = y),
-  nrounds = 300
-)
-X1 <- cbind(a = 1, as.matrix(df[, COVARIATES]))
-X0 <- cbind(a = 0, as.matrix(df[, COVARIATES]))
-mu1 <- predict(mu_full, X1)
-mu0 <- predict(mu_full, X0)
 ```
 
 :::
@@ -160,7 +157,7 @@ with $m(\hat\mu)(Z) = \hat\mu(1, X) - \hat\mu(0, X)$. Average it for $\hat\psi$;
 ## Python
 
 ```{python}
-eif = (mu1 - mu0) + alpha_hat * (y - mu_oof)
+eif = (mu1 - mu0) + alpha_hat * (y - mu_obs)
 psi = float(eif.mean())
 se  = float(np.sqrt(np.var(eif, ddof=1) / len(eif)))
 ci  = (psi - 1.96 * se, psi + 1.96 * se)
@@ -172,7 +169,7 @@ print(f"95% CI = [{ci[0]:.2f}, {ci[1]:.2f}]")
 ## R
 
 ```{r}
-eif <- (mu1 - mu0) + alpha_hat * (y - mu_oof)
+eif <- (mu1 - mu0) + alpha_hat * (y - mu_obs)
 psi <- mean(eif)
 se  <- sqrt(var(eif) / length(eif))
 ci  <- c(psi - 1.96 * se, psi + 1.96 * se)
@@ -188,26 +185,20 @@ The experimental NSW-only ATE benchmark is roughly \$1,794 (Dehejia-Wahba 1999);
 
 TMLE solves the same EIF=0 estimating equation as one-step but does it by *targeting* $\hat\mu$: fit a one-parameter fluctuation $\mu^\star(\cdot) = \hat\mu(\cdot) + \epsilon \hat\alpha(\cdot)$ on a "clever covariate" $\hat\alpha$ to drive the empirical mean of $\hat\alpha(O)(Y - \mu^\star(O))$ to zero, then take the plug-in $\hat\psi = (1/n) \sum \mu^\star(1, X) - \mu^\star(0, X)$. For continuous $Y$ the targeting is a single linear regression of the outcome residual on $\hat\alpha$.
 
-To target the counterfactual predictions we also need $\hat\alpha$ at $A=1$ and $A=0$. Refit the booster on the full sample and predict at the two counterfactual treatment levels.
+The targeting step also needs $\hat\alpha$ at $A=1$ and $A=0$. The cross-fitting loop above already produced them (`alpha_1`, `alpha_0`).
 
 ::: {.panel-tabset group="lang"}
 
 ## Python
 
 ```{python}
-booster.fit(df[["a"] + COVARIATES])
-df_a1 = df.assign(a=1.0)
-df_a0 = df.assign(a=0.0)
-alpha_1 = booster.predict(df_a1[["a"] + COVARIATES])
-alpha_0 = booster.predict(df_a0[["a"] + COVARIATES])
-
-# Fluctuation: ε from OLS of (y - μ̂_oof) on α̂_oof, no intercept.
-eps = float(np.dot(alpha_hat, y - mu_oof) / np.dot(alpha_hat, alpha_hat))
+# Fluctuation: ε from OLS of (y - μ̂) on α̂, no intercept.
+eps = float(np.dot(alpha_hat, y - mu_obs) / np.dot(alpha_hat, alpha_hat))
 
 # Targeted counterfactual regressions and observed-row regression.
 mu1_star    = mu1   + eps * alpha_1
 mu0_star    = mu0   + eps * alpha_0
-mu_obs_star = mu_oof + eps * alpha_hat
+mu_obs_star = mu_obs + eps * alpha_hat
 
 psi_tmle = float((mu1_star - mu0_star).mean())
 eif_tmle = (mu1_star - mu0_star - psi_tmle) + alpha_hat * (y - mu_obs_star)
@@ -221,16 +212,10 @@ print(f"95% CI = [{ci_tmle[0]:.2f}, {ci_tmle[1]:.2f}]")
 ## R
 
 ```{r}
-df_a1 <- df; df_a1$a <- 1
-df_a0 <- df; df_a0$a <- 0
-booster$fit(df)
-alpha_1 <- booster$predict(df_a1)
-alpha_0 <- booster$predict(df_a0)
-
-eps          <- sum(alpha_hat * (y - mu_oof)) / sum(alpha_hat^2)
+eps          <- sum(alpha_hat * (y - mu_obs)) / sum(alpha_hat^2)
 mu1_star     <- mu1   + eps * alpha_1
 mu0_star     <- mu0   + eps * alpha_0
-mu_obs_star  <- mu_oof + eps * alpha_hat
+mu_obs_star  <- mu_obs + eps * alpha_hat
 
 psi_tmle <- mean(mu1_star - mu0_star)
 eif_tmle <- (mu1_star - mu0_star - psi_tmle) + alpha_hat * (y - mu_obs_star)
@@ -254,10 +239,10 @@ The pattern generalizes verbatim. Swap the estimand factory and the $m(\hat\mu)(
 | TSM at $a^\star$ | $\hat\mu(a^\star, X)$ | `TSM(level=a_star)` |
 | Additive shift $\delta$ | $\hat\mu(A + \delta, X) - \hat\mu(A, X)$ | `AdditiveShift(delta)` |
 
-Worked examples for each: [`rieszboost/examples/`](https://github.com/rieszreg/rieszboost/tree/main/examples) (`tsm.py`, `nhefs_shift.py`, `lee_schuler/binary_dgp.py`).
+Worked examples for each: [`rieszboost/examples/`](https://github.com/rieszreg/rieszreg/tree/main/packages/rieszboost/examples) (`tsm.py`, `nhefs_shift.py`, `lee_schuler/binary_dgp.py`).
 
 ## See also
 
-- [`rieszboost/examples/lalonde_ate.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/lalonde_ate.py) — runnable Python script this page is based on.
-- [`rieszboost/examples/lee_schuler/binary_dgp.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/lee_schuler/binary_dgp.py) — `eee_ate` and `eee_att` helper functions, simulation-based coverage check.
+- [`rieszboost/examples/lalonde_ate.py`](https://github.com/rieszreg/rieszreg/blob/main/packages/rieszboost/examples/lalonde_ate.py) — runnable Python script this page is based on.
+- [`rieszboost/examples/lee_schuler/binary_dgp.py`](https://github.com/rieszreg/rieszreg/blob/main/packages/rieszboost/examples/lee_schuler/binary_dgp.py) — `eee_ate` and `eee_att` helper functions, simulation-based coverage check.
 - [Estimation → external packages](external.qmd) — DoubleML / EconML / tlverse routes.

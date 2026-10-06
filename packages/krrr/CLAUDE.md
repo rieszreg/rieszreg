@@ -1,8 +1,7 @@
 # krrr
 
-> **Read the family design doc first.** It lives in the rieszreg meta-package
-> at `rieszreg/DESIGN.md` (clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling, then it's at
-> [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md)). Part B is the contract this package implements —
+> **Read the family design doc first.** It lives at the monorepo root:
+> [`../../DESIGN.md`](../../DESIGN.md). Part B is the contract this package implements —
 > anything in this CLAUDE.md is krrr-specific notes layered on top.
 
 Kernel-ridge backend for the [RieszReg meta-package](../README.md), implementing Singh ([arXiv:2102.11076](https://arxiv.org/abs/2102.11076)) for the full set of estimands the rieszreg framework supports.

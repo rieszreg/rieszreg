@@ -1,8 +1,7 @@
 # rieszboost
 
-> **Read the family design doc first.** It lives in the rieszreg meta-package
-> at `rieszreg/DESIGN.md` (clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling, then it's at
-> [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md)). Part B is the contract this package implements —
+> **Read the family design doc first.** It lives at the monorepo root:
+> [`../../DESIGN.md`](../../DESIGN.md). Part B is the contract this package implements —
 > anything in this CLAUDE.md is rieszboost-specific notes layered on top.
 
 Gradient-boosting backend for the [RieszReg meta-package](../README.md), implementing Lee & Schuler ([arXiv:2501.04871](https://arxiv.org/abs/2501.04871)).
@@ -19,11 +18,9 @@ The shared `python/rieszboost/{estimand,losses,tracer,augmentation,diagnostics}.
 
 `README.md` is a living document — update it in the same edit whenever a change touches the public API surface (new backend, new convenience-class arg). If a change makes any line in the README false or outdated, the change is not done until the README is fixed.
 
-The user guide moved to the unified Quarto site at [`../docs/`](../docs/). The boosting-specific page is [`../docs/backends/boosting.qmd`](../docs/backends/boosting.qmd). Any change to the boosting backend that affects user-facing behavior must update that page in the same edit. On bilingual pages, update BOTH the `{python}` and `{r}` tabs.
+The user guide is the unified Quarto site at [`../../docs/`](../../docs/). The boosting-specific page is [`../../docs/backends/boosting.qmd`](../../docs/backends/boosting.qmd). Any change to the boosting backend that affects user-facing behavior must update that page in the same edit. On bilingual pages, update BOTH the `{python}` and `{r}` tabs.
 
 The pre-commit hook at the monorepo root (`../../.githooks/pre-commit`) enforces this — a public-API change with no `README.md` or `docs/*.qmd` change in the same commit is rejected. Activate the hook once per clone with `bash ../../scripts/setup-hooks.sh`. Bypass only for genuinely doc-irrelevant changes (internal refactor, tests, comments) with `--no-verify`. The same lint runs in CI via the `lint-docs` job.
-
-The original `docs/` directory in this package is deprecated; see `docs/DEPRECATED.md`.
 
 ### Doc tone rules
 
@@ -52,7 +49,7 @@ If a new estimand factory is added on the Python side, it should also be exposed
 The public API should feel like **ngboost / sklearn**:
 
 - Object-oriented factories that bake in configuration (estimand, loss, backend, hyperparameters) at construction; `BaseEstimator`-compatible `fit / predict / score` on every fittable thing; swappable orthogonal components (backend, loss, estimand). Anything that can't compose with `sklearn.model_selection` (`GridSearchCV`, `cross_val_predict`, `Pipeline`) is a regression and should be fixed.
-- **No `feature_keys` (or other input-schema args) on `fit()` / `predict()`.** The estimand owns its input schema — `feature_keys`, `extra_keys`, anything else. If a new estimand needs different inputs, that's a property of the estimand object, not a separate argument the user repeats every call.
+- **No `feature_keys` (or other input-schema args) on `fit()` / `predict()`.** The estimand owns its input schema (`feature_keys` and anything else). If a new estimand needs different inputs, that's a property of the estimand object, not a separate argument the user repeats every call.
 - Cross-fitting is `sklearn.model_selection.cross_val_predict`. Don't reintroduce a bespoke `crossfit()` function.
 - Hyperparameter tuning is `sklearn.model_selection.GridSearchCV` (or `HalvingGridSearchCV`, etc.). Don't introduce a `tune_riesz()`.
 
@@ -65,7 +62,7 @@ R-side mirrors this: R6 classes (`RieszBooster$new(estimand=, loss=, ...)$fit(df
 - `python/rieszboost/` — backend implementations (`XGBoostBackend`, `SklearnBackend`) and the `RieszBooster` convenience class. Shared modules (`estimand.py`, `losses.py`, `tracer.py`, `augmentation.py`, `diagnostics.py`, `backends/base.py`) are now thin re-export shims pointing at `rieszreg`. `pyproject.toml` declares `rieszreg>=0.0.1` as a dependency.
 - `r/rieszboost/` — R6 wrapper via reticulate. `RieszBooster` subclasses `rieszreg::RieszEstimatorR6` (~50 lines locally). Estimand and loss factories are re-exported from `rieszreg` via NAMESPACE. Run R tests by dev-loading both packages: `pkgload::load_all("../rieszreg/r/rieszreg"); pkgload::load_all("r/rieszboost"); testthat::test_dir(...)`.
 - `reference/` — moved to the meta-project top level at `../reference/` (the local copy is deprecated; will be removed).
-- `docs/` — deprecated; see `docs/DEPRECATED.md`. The unified Quarto site lives at `../docs/`.
+- The user guide is the unified Quarto site at `../../docs/`.
 - `.venv/` — local Python venv (gitignored).
 
 ## Run tests

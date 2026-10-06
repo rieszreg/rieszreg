@@ -8,22 +8,26 @@ title: "Install"
 
 ## Python
 
-The five packages live in sibling GitHub repos: [rieszreg](https://github.com/rieszreg/rieszreg) (meta-package + this user guide), [rieszboost](https://github.com/rieszreg/rieszboost), [krrr](https://github.com/rieszreg/krrr), [forestriesz](https://github.com/rieszreg/forestriesz), [riesznet](https://github.com/rieszreg/riesznet). Clone them into a parent directory:
+All six packages live in one GitHub repo, [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg), under `packages/`:
+
+| Package | Learner |
+|---|---|
+| `rieszreg` | shared estimands, losses, and sklearn glue |
+| `rieszboost` | gradient boosting |
+| `krrr` | kernel ridge regression |
+| `forestriesz` | random forests |
+| `riesztree` | a single decision tree |
+| `riesznet` | neural networks |
+
+The repo is a [uv](https://docs.astral.sh/uv/) workspace. One command installs every package into `.venv/` at the repo root:
 
 ```sh
-mkdir RieszReg && cd RieszReg
 git clone https://github.com/rieszreg/rieszreg.git
-git clone https://github.com/rieszreg/rieszboost.git
-git clone https://github.com/rieszreg/krrr.git
-git clone https://github.com/rieszreg/forestriesz.git
-git clone https://github.com/rieszreg/riesznet.git
-python3 -m venv .venv
-.venv/bin/pip install -e rieszreg/python
-.venv/bin/pip install -e rieszboost/python      # gradient boosting backend
-.venv/bin/pip install -e krrr/python            # kernel ridge backend
-.venv/bin/pip install -e forestriesz/python     # random-forest backend
-.venv/bin/pip install -e riesznet/python        # neural-network backend
+cd rieszreg
+uv sync --all-packages --all-extras --all-groups
 ```
+
+`--all-groups` adds the `docs` dependency group (`causaldata`, `matplotlib`, and a few others). The real-data examples need it: `packages/rieszboost/examples/lalonde_ate.py`, `packages/rieszboost/examples/nhefs_shift.py`, and the [custom estimation](estimation/custom.qmd) page load their data from `causaldata`. Leave the flag off if you only need the learners.
 
 `rieszboost`'s `XGBoostBackend` requires OpenMP. On macOS:
 
@@ -31,7 +35,7 @@ python3 -m venv .venv
 brew install libomp
 ```
 
-Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed. `krrr` has no system prerequisites. `forestriesz` depends on `econml`, which ships prebuilt wheels for macOS arm64+x86_64 and ubuntu — no compiler required. `riesznet` depends on `torch>=2.0`; CPU wheels are fetched automatically, GPU wheels need a `--index-url` per the PyTorch install matrix.
+Linux distributions (and GitHub Actions ubuntu-latest) ship `libgomp1`; no extra step is needed. `krrr` has no system prerequisites. `forestriesz` depends on `econml`, which ships prebuilt wheels for macOS arm64+x86_64 and ubuntu — no compiler required. `riesztree` (which `forestriesz` also uses) builds a small Cython extension during install, so it needs a C compiler (Xcode command-line tools on macOS, `gcc` on Linux). `riesznet` depends on `torch>=2.0`; CPU wheels are fetched automatically, GPU wheels need a `--index-url` per the PyTorch install matrix.
 
 ### Combining `rieszboost` and `riesznet` in one process
 
@@ -40,9 +44,9 @@ The macOS pip wheels for `xgboost` and `torch` each bundle their own `libomp.dyl
 - **conda-forge** — installs `xgboost` and `pytorch` against a single shared `llvm-openmp`, so the conflict cannot occur:
   ```sh
   conda install -c conda-forge xgboost pytorch
-  pip install -e rieszreg/python rieszboost/python riesznet/python
+  pip install -e packages/rieszreg/python packages/rieszboost/python packages/riesznet/python
   ```
-- **pip + thread-limit env vars** — keep the pip install above and set `OMP_NUM_THREADS=1` (and `MKL_NUM_THREADS=1`) in the shell or at the top of every script that uses both backends. See the [troubleshooting page](troubleshooting.qmd) for the full discussion and options including `threadpoolctl.threadpool_limits` for finer-grained control.
+- **thread-limit env vars** — keep the uv install above and set `OMP_NUM_THREADS=1` (and `MKL_NUM_THREADS=1`) in the shell or at the top of every script that uses both backends. See the [troubleshooting page](troubleshooting.qmd) for the full discussion and options including `threadpoolctl.threadpool_limits` for finer-grained control.
 
 ### Verify
 
@@ -54,21 +58,24 @@ The chunks below import each package and exercise its public entry point. Failur
 
 ```{python}
 import importlib.metadata as _md
-import rieszreg, rieszboost, krrr, forestriesz, riesznet
-from rieszreg import ATE, BoundedSquaredLoss, SquaredLoss
+import rieszreg, rieszboost, krrr, forestriesz, riesztree, riesznet
+from rieszreg import ATE
 from rieszboost import RieszBooster
 from krrr import KernelRieszRegressor
-from forestriesz import ForestRieszRegressor
+from forestriesz import AugForestRieszRegressor, ForestRieszRegressor
+from riesztree import RieszTreeRegressor
 from riesznet import RieszNet
 
 # Construct one estimator from each backend to confirm wiring.
 estimand = ATE()
 RieszBooster(estimand=estimand, n_estimators=5)
 KernelRieszRegressor(estimand=estimand, lambda_grid=(1e-2,))
+AugForestRieszRegressor(estimand=estimand, n_estimators=10)
 ForestRieszRegressor(estimand=estimand, n_estimators=10)
+RieszTreeRegressor(estimand=estimand)
 RieszNet(estimand=estimand, hidden_sizes=(8,), epochs=1)
 
-for pkg in ("rieszreg", "rieszboost", "krrr", "forestriesz", "riesznet"):
+for pkg in ("rieszreg", "rieszboost", "krrr", "forestriesz", "riesztree", "riesznet"):
     print(f"{pkg:<12} {_md.version(pkg)}")
 ```
 
@@ -101,43 +108,52 @@ First-time setup:
                                   # and the estimation/custom-code page
    ))
    ```
-2. Load the R wrappers. For this guide we dev-load them from the source tree:
-   ```r
-   pkgload::load_all("rieszboost/r/rieszboost")
-   pkgload::load_all("krrr/r/krrr")
-   pkgload::load_all("forestriesz/r/forestriesz")
-   pkgload::load_all("riesznet/r/riesznet")
-   ```
-3. Point reticulate at the Python venv:
-   ```r
-   use_python_rieszboost(".venv/bin/python")
-   ```
-   Or set the environment variable before R starts:
+2. Install the six R packages from the repo root:
    ```sh
-   export RETICULATE_PYTHON=/path/to/RieszReg/.venv/bin/python
+   Rscript tools/r/install.R              # all six
+   Rscript tools/r/install.R rieszboost   # rieszreg + one learner package
    ```
+   Then `library(rieszreg); library(rieszboost)` in R. To dev-load from the source tree instead, run from the repo root and load `rieszreg` first, since every learner package imports from it:
+   ```r
+   pkgload::load_all("packages/rieszreg/r/rieszreg")
+   pkgload::load_all("packages/rieszboost/r/rieszboost")
+   pkgload::load_all("packages/krrr/r/krrr")
+   pkgload::load_all("packages/forestriesz/r/forestriesz")
+   pkgload::load_all("packages/riesztree/r/riesztree")
+   pkgload::load_all("packages/riesznet/r/riesznet")
+   ```
+   Load `rieszboost` and `riesznet` in separate R sessions on macOS (see [Combining `rieszboost` and `riesznet` in one process](#combining-rieszboost-and-riesznet-in-one-process)).
+3. Point reticulate at the uv venv before loading any package. Set the environment variable before R starts:
+   ```sh
+   export RETICULATE_PYTHON=/path/to/rieszreg/.venv/bin/python
+   ```
+   Or call `use_python_rieszboost(".venv/bin/python")` (each package has its own `use_python_<pkg>()`).
 
 The R API exposes every built-in estimand, every loss, and the full estimator interface for each backend. The symbolic tracer for custom `m()` is Python-only; see [r-interface](r-interface.qmd) for how to call it from R.
 
 ## Tests
 
-```{.bash}
-.venv/bin/python -m pytest rieszreg/python/tests -v
-.venv/bin/python -m pytest rieszboost/python/tests -v
-.venv/bin/python -m pytest krrr/python/tests -v
-.venv/bin/python -m pytest forestriesz/python/tests -v
-.venv/bin/python -m pytest riesznet/python/tests -v
+Run each Python test suite separately from the repo root:
 
+```{.bash}
+for pkg in rieszreg rieszboost krrr forestriesz riesztree riesznet; do
+  uv run pytest "packages/$pkg/python/tests" -q
+done
+```
+
+The R tests use the R packages installed in step 2 above. Run `riesznet` in its own R session:
+
+```{.bash}
+export RETICULATE_PYTHON=$PWD/.venv/bin/python
 Rscript -e '
-  Sys.setenv(RETICULATE_PYTHON = file.path(getwd(), ".venv/bin/python"))
-  pkgload::load_all("rieszreg/r/rieszreg")
-  pkgload::load_all("rieszboost/r/rieszboost")
-  testthat::test_dir("rieszboost/r/rieszboost/tests/testthat")
-  pkgload::load_all("krrr/r/krrr")
-  testthat::test_dir("krrr/r/krrr/tests/testthat")
-  pkgload::load_all("forestriesz/r/forestriesz")
-  testthat::test_dir("forestriesz/r/forestriesz/tests/testthat")
-  pkgload::load_all("riesznet/r/riesznet")
-  testthat::test_dir("riesznet/r/riesznet/tests/testthat")
+  library(rieszreg)
+  for (pkg in c("rieszboost", "krrr", "forestriesz", "riesztree")) {
+    library(pkg, character.only = TRUE)
+    testthat::test_dir(file.path("packages", pkg, "r", pkg, "tests", "testthat"))
+  }
+'
+Rscript -e '
+  library(rieszreg); library(riesznet)
+  testthat::test_dir("packages/riesznet/r/riesznet/tests/testthat")
 '
 ```

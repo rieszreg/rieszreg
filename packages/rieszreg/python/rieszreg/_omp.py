@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import warnings
 
@@ -23,6 +24,9 @@ def warn_if_multi_backend_omp() -> None:
     if _WARNED:
         return
     if "torch" not in sys.modules or "xgboost" not in sys.modules:
+        return
+    if os.environ.get("OMP_NUM_THREADS", "").strip() == "1":
+        # The user already applied the documented fix.
         return
     _WARNED = True
     warnings.warn(

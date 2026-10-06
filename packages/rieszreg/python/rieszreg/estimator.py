@@ -385,7 +385,7 @@ class RieszEstimator(BaseEstimator):
 
     def diagnose(self, Z, y=None, **kwargs):
         """Health checks on α̂ over Z: magnitude, extreme values (a sign of
-        poor overlap / near-positivity violations), and held-out Riesz loss.
+        poor overlap / near-positivity violations), and the Riesz loss on ``Z``.
         Returns a `Diagnostics` object; call ``.summary()`` for a report.
         Pass ``y`` when the estimand's functional reads the outcome. Keyword
         arguments (``extreme_threshold``, ``extreme_fraction_warn``) are

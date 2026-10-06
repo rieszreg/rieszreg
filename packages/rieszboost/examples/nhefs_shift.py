@@ -20,8 +20,10 @@ estimates it directly without ever needing the conditional density of A.
 EEE / one-step:
     ψ̂ = (1/n) Σ [ μ̂(A − 5, X) − μ̂(A, X) + α̂(O)·(Y − μ̂(O)) ]
 
-Run:
-    .venv/bin/python examples/nhefs_shift.py
+Needs `causaldata` (the workspace `docs` dependency group). Run from the
+repo root:
+    uv sync --all-packages --all-extras --all-groups
+    uv run python packages/rieszboost/examples/nhefs_shift.py
 """
 
 from __future__ import annotations
@@ -37,7 +39,8 @@ try:
     from causaldata import nhefs_complete
 except ImportError as e:
     raise SystemExit(
-        "This example needs `pip install causaldata`."
+        "This example needs `causaldata`. From the repo root, run "
+        "`uv sync --all-packages --all-extras --all-groups` and retry."
     ) from e
 
 

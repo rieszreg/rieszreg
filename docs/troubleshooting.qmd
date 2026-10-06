@@ -41,7 +41,7 @@ These two flags do **not** prevent the threadpool deadlock above. That requires 
 
 `rieszboost` and `riesznet` defer their `import xgboost` and `import torch` until the first attribute access, so `import rieszboost; import riesznet` (without instantiating estimators from both) does not load both `libomp` copies.
 
-When `RieszEstimator.fit()` runs and detects both `torch` and `xgboost` already loaded, it emits a one-time `RuntimeWarning` describing the situation.
+When `RieszEstimator.fit()` runs and detects both `torch` and `xgboost` already loaded, it emits a one-time `RuntimeWarning` describing the situation, unless `OMP_NUM_THREADS=1` is already set.
 
 ### Fixing the deadlock
 

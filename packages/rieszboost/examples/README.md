@@ -15,7 +15,14 @@ End-to-end scripts demonstrating `rieszboost`. Two flavors:
 | `rieszboost.AdditiveShift(delta=…)` | [`lee_schuler/continuous_dgp.py`](lee_schuler/continuous_dgp.py) | ASE on continuous-treatment DGP |
 | `rieszboost.LocalShift(delta, threshold)` | [`lee_schuler/continuous_dgp.py`](lee_schuler/continuous_dgp.py) | LASE partial-parameter + delta-method |
 
-Run any of them with `.venv/bin/python examples/<script>.py --n_reps 50` (defaults are smaller for short wall time).
+Run any of them from this package directory with `uv run python examples/<script>.py --n_reps 50`.
+
+## Real-data examples
+
+- [`lalonde_ate.py`](lalonde_ate.py): ATE of a job-training program on 1978 earnings (Lalonde NSW treated vs CPS controls).
+- [`nhefs_shift.py`](nhefs_shift.py): average effect of cutting daily cigarettes by 5 on weight change (NHEFS).
+
+Both load their data from `causaldata`. Install it with `uv sync --all-packages --all-extras --all-groups` from the repo root.
 
 > **CLAUDE.md rule**: every built-in estimand factory must have a worked example here. When you add a new factory, add a runnable script demonstrating it on a realistic DGP and update this table in the same commit.
 
@@ -46,16 +53,18 @@ Two of the four estimands in Lee-Schuler are not themselves Riesz functionals �
 
 ## Reproducing the paper
 
-The scripts use a single fixed hyperparameter setting plus held-out early stopping; the paper CV-tunes over a grid (`learning_rate ∈ {0.001, 0.01, 0.1, 0.25}`, `max_depth ∈ {3, 5, 7}`, `n_estimators ∈ {10..200}`). Without CV, our final-parameter EEE estimates land within roughly 1 SE of the paper for ATE/ATT/ASE; α-RMSE numbers are somewhat worse (factor of 1–2). Wrap a CV loop around `rieszboost.fit(...)` to close the remaining gap.
+The scripts use a single fixed hyperparameter setting plus held-out early stopping; the paper CV-tunes over a grid (`learning_rate ∈ {0.001, 0.01, 0.1, 0.25}`, `max_depth ∈ {3, 5, 7}`, `n_estimators ∈ {10..200}`). Without CV, our ATE estimate is close to the paper's. ATT and ASE have about 1.6 times the paper's RMSE. α-RMSE numbers are worse by a factor of 1.2 to 2. Wrap a CV loop around `rieszboost.fit(...)` to close the remaining gap.
+
+The numbers below come from the scripts' defaults (`--n 1000 --n_reps 50 --seed 0`), run in September 2026. Rerun them to check your install.
 
 | | Paper α-RMSE | Ours α-RMSE | Paper final-param RMSE | Ours final-param RMSE |
 |---|---|---|---|---|
-| ATE  | 0.92 | ~1.15 | 0.187 (94% cov) | ~0.20 (90% cov) |
-| ATT  | 0.44 | ~0.77 | 0.177 (95% cov) | ~0.19 (98% cov) |
-| ASE  | 0.37 | ~0.46 | 2.80 (93% cov) | ~3.85 (90% cov) |
-| LASE | 0.25 | ~0.37 | 1.86 (95% cov) | ~4.4 (32% cov) |
+| ATE  | 0.92 | 1.10 | 0.187 (94% cov) | 0.193 (92% cov) |
+| ATT  | 0.44 | 0.82 | 0.177 (95% cov) | 0.279 (92% cov) |
+| ASE  | 0.37 | 0.77 | 2.80 (93% cov) | 4.58 (90% cov) |
+| LASE | 0.25 | 0.36 | 1.86 (95% cov) | 4.30 (32% cov) |
 
-LASE is the worst case — its representer has step discontinuities at `a = t` and `a = t + δ`, and tree boosting smooths them into ramps. CV-tuned hyperparameters help substantially; `max_depth ≥ 5` plus more boosting rounds is roughly the right move.
+LASE is the worst case. Its 95% intervals cover the truth only about 30% of the time, because the point estimate is biased (mean 91.0 vs 94.9 in the paper) by about twice its SE. Its representer has step discontinuities at `a = t` and `a = t + δ`, and tree boosting smooths them into ramps. CV-tuned hyperparameters help; `max_depth ≥ 5` plus more boosting rounds is a reasonable place to start.
 
 ## Cross-check vs the reference implementation
 

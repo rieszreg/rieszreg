@@ -81,7 +81,7 @@ ate, se = psi_i.mean(), psi_i.std() / np.sqrt(n)
 print(f"ATE = {ate:.2f} ± {1.96 * se:.2f}")   # ATE = 2.02 ± 0.10 (truth: 2.0)
 ```
 
-This short version does not cross-fit `mu1` and `mu0`. The [estimation guide](https://rieszreg.github.io/rieszreg/estimation/) shows the fully cross-fit version, plus TMLE and hand-offs to DoubleML.
+This short version does not cross-fit `mu1` and `mu0`. The [custom-code estimation page](https://rieszreg.github.io/rieszreg/estimation/custom.html) shows the fully cross-fit version, where each fold's outcome model predicts `mu1` and `mu0` on its held-out rows, plus TMLE.
 
 ## Using `RieszEstimator` directly
 

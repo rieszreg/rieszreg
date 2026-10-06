@@ -28,7 +28,7 @@ class Diagnostics:
     n_extreme: int           # rows with |alpha_hat| above `extreme_threshold`
     extreme_fraction: float  # n_extreme / n
     extreme_threshold: float
-    riesz_loss: float | None  # held-out per-row Riesz loss, if rows + m given
+    riesz_loss: float | None  # mean per-row Riesz loss on the rows passed to diagnose
     warnings: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
@@ -46,7 +46,7 @@ class Diagnostics:
             f"({100 * self.extreme_fraction:.2f}%) with |alpha| > {self.extreme_threshold}"
         )
         if self.riesz_loss is not None:
-            lines.append(f"  held-out Riesz  : {self.riesz_loss:.4f}")
+            lines.append(f"  Riesz loss on Z : {self.riesz_loss:.4f}")
         if self.warnings:
             lines.append("  warnings:")
             for w in self.warnings:
@@ -65,7 +65,8 @@ def diagnose(
 ) -> Diagnostics:
     """Compute diagnostics from either pre-computed ``alpha_hat`` or by
     predicting with ``estimator.predict(Z)``. If ``(estimator, Z)`` is given,
-    the held-out Riesz loss is computed automatically via ``estimator.riesz_loss``.
+    the Riesz loss on ``Z`` is computed automatically via ``estimator.riesz_loss``.
+    It is held out only if ``Z`` was not used to fit ``estimator``.
 
     Parameters
     ----------

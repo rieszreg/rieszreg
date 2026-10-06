@@ -1,8 +1,7 @@
 # riesznet
 
-> **Read the family design doc first.** It lives in the rieszreg meta-package
-> at `rieszreg/DESIGN.md` (clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling, then it's at
-> [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md)). Part B is the contract this package implements —
+> **Read the family design doc first.** It lives at the monorepo root:
+> [`../../DESIGN.md`](../../DESIGN.md). Part B is the contract this package implements —
 > anything in this CLAUDE.md is riesznet-specific notes layered on top.
 
 Neural-network backend for the [RieszReg meta-package](../README.md), in the spirit of [Chernozhukov et al. (2021)](https://arxiv.org/abs/2110.03031). Trains the Riesz representer α(x) only — outcome regression is the user's responsibility.

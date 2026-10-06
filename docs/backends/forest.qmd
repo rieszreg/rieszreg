@@ -141,18 +141,17 @@ pi <- 1 / (1 + exp(-(-0.02 * x - x^2 + 4 * log(x + 0.3) + 1.5)))
 a  <- rbinom(n, 1, pi)
 df <- data.frame(a = as.numeric(a), x = x)
 
-# ATE / ATT use a multi-basis list, which is Python-only in v1.
-# Call into Python directly via reticulate.
-fr_py <- reticulate::import("forestriesz", convert = FALSE)
-pd_py <- reticulate::import("pandas", convert = FALSE)
-py_df <- pd_py$DataFrame(reticulate::r_to_py(list(a = as.numeric(a), x = x)))
-
-fr <- fr_py$ForestRieszRegressor(
-  estimand = fr_py$ATE(treatment = "a", covariates = list("x")),
-  n_estimators = 500L, min_samples_leaf = 10L, random_state = 0L
+fr <- ForestRieszRegressor$new(
+  estimand = ATE(treatment = "a", covariates = "x"),
+  n_estimators = 500,
+  min_samples_leaf = 10,
+  random_state = 0
 )
-fr$fit(py_df)
-alpha_hat <- as.numeric(reticulate::py_to_r(fr$predict(py_df)))
+fr$fit(df)
+
+alpha_hat  <- fr$predict(df)
+true_alpha <- a / pi - (1 - a) / (1 - pi)
+cat(sprintf("corr(α̂, α₀) = %.3f\n", cor(alpha_hat, true_alpha)))
 ```
 
 :::

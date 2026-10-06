@@ -8,11 +8,15 @@ Reference: [Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (2021), *RieszNet 
 
 ## Install
 
+`riesznet` lives in the [rieszreg monorepo](https://github.com/rieszreg/rieszreg) and depends on the `rieszreg` package there and on `torch>=2.0`. Install the whole workspace from the repo root:
+
 ```sh
-pip install -e ./python
+git clone https://github.com/rieszreg/rieszreg.git
+cd rieszreg
+uv sync --all-packages --all-extras
 ```
 
-This package depends on `rieszreg` (the meta-package) and `torch>=2.0`. Clone [rieszreg/rieszreg](https://github.com/rieszreg/rieszreg) as a sibling and `pip install -e ../rieszreg/python` first.
+Worked examples are in [`examples/`](examples/).
 
 If you also use `rieszboost` in the same Python process, the macOS pip wheels of `torch` and `xgboost` each bundle their own `libomp.dylib` and the two OpenMP runtimes can deadlock during a fit. Either install both via conda-forge or set `OMP_NUM_THREADS=1` before importing — see the [troubleshooting page](https://rieszreg.github.io/rieszreg/troubleshooting.html) in the user guide.
 
@@ -85,7 +89,7 @@ path = net.predict_path(df)            # shape (n_rows, 5)
 sub = net.predict_path(df, epochs=[25, 200])
 ```
 
-`snapshot_epochs=None` (the default) builds an auto-grid of ~20 log-spaced ticks across `[1, epochs]`. Pass `snapshot_epochs=[]` to disable snapshotting if storage is tight.
+`snapshot_epochs=None` (the default) snapshots at epochs 1, 2, 5, and 10, then every `epochs // 20` epochs up to `epochs` (about 20 ticks). Pass `snapshot_epochs=[]` to disable snapshotting if storage is tight.
 
 When early stopping fires, only ticks reached during training are retained. Each retained column is bit-equal to a fresh fit at that epoch under the same `random_state`, since Adam's trajectory is deterministic given fixed seed and data ordering.
 

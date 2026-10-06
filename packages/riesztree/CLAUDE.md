@@ -2,7 +2,7 @@
 
 Single-tree backend for the [RieszReg meta-package](../README.md). Greedy splits on the augmented Bregman-Riesz loss; closed-form per-leaf α* = -C/D (loss-projected to the link's α-domain).
 
-This package depends on `rieszreg` for shared abstractions (`Estimand`, `Loss`, `Backend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `AugmentedDataset`). See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `riesztree` contributes:
+This package depends on `rieszreg` for shared abstractions (`Estimand`, `Loss`, `Backend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `AugmentedDataset`). See [`DESIGN.md`](../../DESIGN.md) at the repo root for the meta-package design and the contract every implementation package follows. `riesztree` contributes:
 
 - `RieszTreeBackend` — `Backend` Protocol implementation (the augmentation-style entry point). Consumes the precomputed `AugmentedDataset` and grows / prunes a single decision tree with loss-aware splits.
 - `RieszTreeRegressor` — convenience subclass of `rieszreg.RieszEstimator` with tree-specific hyperparameters mirroring `sklearn.tree.DecisionTreeRegressor` where the augmented Bregman-Riesz setting allows: `max_depth`, `min_samples_split`, `min_samples_leaf`, `min_weight_fraction_leaf`, `max_leaf_nodes`, `max_features`, `growth_policy`, `min_impurity_decrease`, `ccp_alpha`, `early_stopping_rounds`, `validation_fraction`, `categorical_features`.

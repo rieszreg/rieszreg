@@ -22,6 +22,8 @@ use_python_rieszboost("/path/to/RieszReg/.venv/bin/python")
 use_python_krrr("/path/to/RieszReg/.venv/bin/python")
 # or, for the forest backend:
 use_python_forestriesz("/path/to/RieszReg/.venv/bin/python")
+# or, for the single-tree backend:
+use_python_riesztree("/path/to/RieszReg/.venv/bin/python")
 # or, for the neural backend:
 use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 ```
@@ -80,6 +82,20 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 
 The R wrapper exposes the moment-style `ForestRieszRegressor`. It handles ATE, ATT and TSM through the default treatment-indicator basis. The augmentation-style `AugForestRieszRegressor` is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.
 
+## API surface (riesztree)
+
+| R | Python equivalent |
+|---|---|
+| `RieszTreeRegressor$new(estimand, loss, max_depth, min_samples_split, min_samples_leaf, max_leaf_nodes, growth_policy, ccp_alpha, early_stopping_rounds, splitter, ...)` | `riesztree.RieszTreeRegressor(...)` |
+| &nbsp;&nbsp;`$fit(df, eval_set=)` | `.fit(Z, eval_set=)` |
+| &nbsp;&nbsp;`$predict(df)` | `.predict(Z)` |
+| &nbsp;&nbsp;`$score(df)` | `.score(Z)` |
+| &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(Z)` |
+| &nbsp;&nbsp;`$save(path)` | `.save(path)` |
+| `load_riesz_tree_regressor(path)` | `RieszTreeRegressor.load(path)` |
+
+`categorical_features` takes 1-based R column positions.
+
 ## API surface (riesznet)
 
 | R | Python equivalent |
@@ -92,7 +108,7 @@ The R wrapper exposes the moment-style `ForestRieszRegressor`. It handles ATE, A
 
 The R wrapper exposes the simple-MLP convenience surface only. Custom torch architectures (custom `nn.Module` factory, custom optimizer, custom scheduler) are Python-only — define the factory in Python at module top level and call into Python via reticulate. `TorchBackend` direct construction is also Python-only in v1.
 
-R6's `$method()` syntax maps to Python's `.method()`. Integer-typed kwargs (`n_estimators`, `max_depth`, `random_state`, `early_stopping_rounds`, `n_landmarks`, `n_features`, `cg_max_iter`, `min_samples_leaf`, `subforest_size`, `epochs`, `batch_size`) take an `L` suffix in R: `n_estimators = 200L`. Other kwargs are auto-converted by reticulate.
+R6's `$method()` syntax maps to Python's `.method()`. The wrappers convert integer-typed arguments (`n_estimators`, `max_depth`, `random_state`, `epochs`, and so on) with `as.integer()`, so `n_estimators = 200` and `n_estimators = 200L` both work. Other arguments are converted by reticulate.
 
 Data frames are converted to pandas column by column. Numeric and logical columns pass through as numbers. Factor columns are converted through their labels, so a treatment coded `factor(c("0", "1"))` arrives as 0/1. ATE and ATT need the treatment coded 0/1 and stop with an error otherwise.
 

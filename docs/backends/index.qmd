@@ -20,6 +20,17 @@ A backend fits the Riesz representer for a given estimand and loss. Five impleme
 
 A fifth learner, [`riesztree`](tree.qmd), fits a single decision tree (`RieszTreeRegressor`). It is fast and easy to inspect, and it supports all four losses.
 
+### Where to start
+
+Start with `RieszBooster` at its default settings. For $n$ in the low thousands to tens of thousands of rows it is a good first choice. In a cross-fit ATE simulation with the defaults, the one-step estimate had bias of about $-0.001$ and 95% intervals covered the truth at least 95% of the time.
+
+Switch when your problem fits another learner's strengths:
+
+- **Kernel ridge (`krrr`)** for small $n$ or a smooth, low-dimensional $\alpha$.
+- **Neural net (`riesznet`)** for large $n$, many covariates, or image and text features.
+- **Forest (`forestriesz`)** when you need confidence intervals on $\alpha(z)$ (`ForestRieszRegressor` with `honest=True, inference=True`).
+- **Single tree (`riesztree`)** when you want a rule you can read.
+
 ### The same setting under different names
 
 Each learner names its settings after the library it follows (xgboost, sklearn, PyTorch). This table lines them up.

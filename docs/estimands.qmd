@@ -83,9 +83,11 @@ library(reticulate)
 cd_py <- import("causaldata")
 COVARIATES <- c("age", "educ", "black", "hisp", "marr", "nodegree", "re74", "re75")
 
-treated  <- py_to_r(cd_py$nsw_mixtape$load_pandas()$data)
+# Convert column by column; works with every pandas version.
+load_cd  <- function(ds) as.data.frame(ds$load_pandas()$data$to_dict("list"))
+treated  <- load_cd(cd_py$nsw_mixtape)
 treated  <- treated[treated$treat == 1, ]
-controls <- py_to_r(cd_py$cps_mixtape$load_pandas()$data)
+controls <- load_cd(cd_py$cps_mixtape)
 df <- rbind(treated, controls)
 df$treat <- as.numeric(df$treat)
 
@@ -117,10 +119,10 @@ booster$diagnose(Z)$summary
 
 | Estimand | $m(\mu)(z, y)$ | Notes |
 |---|---|---|
-| `ATE(treatment, covariates)` | $\mu(1, x) - \mu(0, x)$ | Average treatment effect — see [`rieszboost/examples/lee_schuler/binary_dgp.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/lee_schuler/binary_dgp.py). |
+| `ATE(treatment, covariates)` | $\mu(1, x) - \mu(0, x)$ | Average treatment effect — see [`rieszboost/examples/lee_schuler/binary_dgp.py`](https://github.com/rieszreg/rieszreg/blob/main/packages/rieszboost/examples/lee_schuler/binary_dgp.py). |
 | `ATT(treatment, covariates)` | $a \cdot (\mu(1, x) - \mu(0, x))$ | ATT *partial-estimand* surface. Full ATT divides by $P(A=1)$ — combine with a delta-method EIF downstream. |
-| `TSM(level, treatment, covariates)` | $\mu(\text{level}, x)$ | Treatment-specific mean — see [`rieszboost/examples/tsm.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/tsm.py). |
-| `AdditiveShift(delta, ...)` | $\mu(a + \delta, x) - \mu(a, x)$ | Continuous-treatment shift effect — see [`rieszboost/examples/lee_schuler/continuous_dgp.py`](https://github.com/rieszreg/rieszboost/blob/main/examples/lee_schuler/continuous_dgp.py). |
+| `TSM(level, treatment, covariates)` | $\mu(\text{level}, x)$ | Treatment-specific mean — see [`rieszboost/examples/tsm.py`](https://github.com/rieszreg/rieszreg/blob/main/packages/rieszboost/examples/tsm.py). |
+| `AdditiveShift(delta, ...)` | $\mu(a + \delta, x) - \mu(a, x)$ | Continuous-treatment shift effect — see [`rieszboost/examples/lee_schuler/continuous_dgp.py`](https://github.com/rieszreg/rieszreg/blob/main/packages/rieszboost/examples/lee_schuler/continuous_dgp.py). |
 | `LocalShift(delta, threshold, ...)` | $\mathbf{1}\{a < \text{threshold}\} \cdot (\mu(a + \delta, x) - \mu(a, x))$ | LASE *partial-estimand* surface; same caveat as ATT. |
 
 The R and Python factories take the same arguments.

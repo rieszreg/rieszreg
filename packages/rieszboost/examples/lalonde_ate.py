@@ -15,8 +15,10 @@ Comparing NSW-treated vs CPS-controls makes the point estimate dependent on
 how well covariates account for the gap between the experimental treated
 group and the very different observational comparison group.
 
-Run:
-    .venv/bin/python examples/lalonde_ate.py
+Needs `causaldata` (the workspace `docs` dependency group). Run from the
+repo root:
+    uv sync --all-packages --all-extras --all-groups
+    uv run python packages/rieszboost/examples/lalonde_ate.py
 """
 
 from __future__ import annotations
@@ -32,8 +34,8 @@ try:
     from causaldata import cps_mixtape, nsw_mixtape
 except ImportError as e:
     raise SystemExit(
-        "This example needs `pip install causaldata`. Run "
-        "`.venv/bin/pip install causaldata` and retry."
+        "This example needs `causaldata`. From the repo root, run "
+        "`uv sync --all-packages --all-extras --all-groups` and retry."
     ) from e
 
 

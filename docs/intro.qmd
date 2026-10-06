@@ -168,14 +168,24 @@ Hines & Miles ([2025](https://arxiv.org/abs/2510.16127)) extended the same trick
 
 ## Pick a learner
 
-Riesz regression with the squared loss is a standard regression problem. Different learners trade off the same way they do for outcome regression:
+Riesz regression with the squared loss is a standard regression problem. Different learners trade off the same way they do for outcome regression.
+
+**Start with `RieszBooster` at its default settings.** For $n$ in the low thousands to tens of thousands of rows it is a good first choice. In a cross-fit ATE simulation with the defaults, the one-step estimate had bias of about $-0.001$ and 95% intervals covered the truth at least 95% of the time. Reach for the others when your problem fits their strengths:
 
 - **[Gradient boosting](backends/boosting.qmd)** — the standard tool for tabular data. `rieszboost` plugs the per-row gradient and Hessian into xgboost's custom-objective interface. Hyperparameters that work for outcome models transfer.
 - **[Kernel ridge regression](backends/kernel.qmd)** — closed form on small / medium data. `krrr` solves the linear system per $\lambda$; no boosting iterations.
 - **[Random forests](backends/forest.qmd)** — non-parametric and well-suited to many covariates. `forestriesz` ships two flavors: an augmentation-style fit that works on every estimand (including custom ones) without per-estimand configuration, and a moment-style fit with honest-split confidence intervals on `ATE`, `ATT`, and `TSM`.
 - **[Neural networks](backends/neural.qmd)** — `riesznet` trains the Riesz loss with PyTorch autograd; the same MLP / custom-`nn.Module` story you get from any neural regressor.
+- **[A single decision tree](backends/tree.qmd)** — `riesztree` fits one tree. It is fast and easy to read: each leaf holds one weight for a subgroup.
 
-The four learner families produce different $\hat\alpha$, but all are minimizers of the same population objective and converge to $\alpha$ under their respective consistency conditions.
+Rules of thumb:
+
+- Small $n$ (hundreds to a few thousand) or a smooth, low-dimensional problem: try kernel ridge (`krrr`).
+- Large $n$ or many covariates (including image or text features): try the neural net (`riesznet`).
+- Confidence intervals on $\alpha(z)$ itself: use the forest (`forestriesz.ForestRieszRegressor` with `honest=True, inference=True`).
+- A readable rule you can inspect: use the single tree (`riesztree`).
+
+The five learner families produce different $\hat\alpha$, but all are minimizers of the same population objective and converge to $\alpha$ under their respective consistency conditions.
 
 ## What `rieszreg` provides
 
