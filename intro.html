@@ -724,14 +724,23 @@ L(\alpha) \;=\; \mathbb{E}\!\left[\,\alpha(Z)^2 \;-\; 2\,m(\alpha)(Z,Y)\,\right]
 </section>
 <section id="pick-a-learner" class="level2">
 <h2 class="anchored" data-anchor-id="pick-a-learner">Pick a learner</h2>
-<p>Riesz regression with the squared loss is a standard regression problem. Different learners trade off the same way they do for outcome regression:</p>
+<p>Riesz regression with the squared loss is a standard regression problem. Different learners trade off the same way they do for outcome regression.</p>
+<p><strong>Start with <code>RieszBooster</code> at its default settings.</strong> For <span class="math inline">\(n\)</span> in the low thousands to tens of thousands of rows it is a good first choice. In a cross-fit ATE simulation with the defaults, the one-step estimate had bias of about <span class="math inline">\(-0.001\)</span> and 95% intervals covered the truth at least 95% of the time. Reach for the others when your problem fits their strengths:</p>
 <ul>
 <li><strong><a href="./backends/boosting.html">Gradient boosting</a></strong> — the standard tool for tabular data. <code>rieszboost</code> plugs the per-row gradient and Hessian into xgboost’s custom-objective interface. Hyperparameters that work for outcome models transfer.</li>
 <li><strong><a href="./backends/kernel.html">Kernel ridge regression</a></strong> — closed form on small / medium data. <code>krrr</code> solves the linear system per <span class="math inline">\(\lambda\)</span>; no boosting iterations.</li>
 <li><strong><a href="./backends/forest.html">Random forests</a></strong> — non-parametric and well-suited to many covariates. <code>forestriesz</code> ships two flavors: an augmentation-style fit that works on every estimand (including custom ones) without per-estimand configuration, and a moment-style fit with honest-split confidence intervals on <code>ATE</code>, <code>ATT</code>, and <code>TSM</code>.</li>
 <li><strong><a href="./backends/neural.html">Neural networks</a></strong> — <code>riesznet</code> trains the Riesz loss with PyTorch autograd; the same MLP / custom-<code>nn.Module</code> story you get from any neural regressor.</li>
+<li><strong><a href="./backends/tree.html">A single decision tree</a></strong> — <code>riesztree</code> fits one tree. It is fast and easy to read: each leaf holds one weight for a subgroup.</li>
 </ul>
-<p>The four learner families produce different <span class="math inline">\(\hat\alpha\)</span>, but all are minimizers of the same population objective and converge to <span class="math inline">\(\alpha\)</span> under their respective consistency conditions.</p>
+<p>Rules of thumb:</p>
+<ul>
+<li>Small <span class="math inline">\(n\)</span> (hundreds to a few thousand) or a smooth, low-dimensional problem: try kernel ridge (<code>krrr</code>).</li>
+<li>Large <span class="math inline">\(n\)</span> or many covariates (including image or text features): try the neural net (<code>riesznet</code>).</li>
+<li>Confidence intervals on <span class="math inline">\(\alpha(z)\)</span> itself: use the forest (<code>forestriesz.ForestRieszRegressor</code> with <code>honest=True, inference=True</code>).</li>
+<li>A readable rule you can inspect: use the single tree (<code>riesztree</code>).</li>
+</ul>
+<p>The five learner families produce different <span class="math inline">\(\hat\alpha\)</span>, but all are minimizers of the same population objective and converge to <span class="math inline">\(\alpha\)</span> under their respective consistency conditions.</p>
 </section>
 <section id="what-rieszreg-provides" class="level2">
 <h2 class="anchored" data-anchor-id="what-rieszreg-provides">What <code>rieszreg</code> provides</h2>

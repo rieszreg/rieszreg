@@ -823,7 +823,7 @@ window.Quarto = {
 <ul>
 <li><strong>Boosting</strong> (<a href="./backends/boosting.html"><code>rieszboost</code></a>): all four losses.</li>
 <li><strong>Kernel ridge</strong> (<a href="./backends/kernel.html"><code>krrr</code></a>): <code>SquaredLoss</code> only — non-quadratic losses need a Newton iteration on the kernel system.</li>
-<li><strong>Random forest, augmentation-style</strong> (<code>forestriesz.AugForestRieszRegressor</code>): all four losses. Tree structure from the squared MSE criterion, then a per-leaf Newton replaces each leaf’s stored θ with the Bregman optimum.</li>
+<li><strong>Random forest, augmentation-style</strong> (<code>forestriesz.AugForestRieszRegressor</code>): all four losses. Each tree picks splits by the gain in the loss you chose, and each leaf stores that loss’s closed-form optimum.</li>
 <li><strong>Random forest, moment-style</strong> (<code>forestriesz.ForestRieszRegressor</code>): <code>SquaredLoss</code> only.</li>
 <li><strong>Neural network</strong> (<a href="./backends/neural.html"><code>riesznet</code></a>): all four losses. Each loss’s per-row Bregman form is implemented in autograd-friendly torch ops; gradient parity vs the analytic loss is checked at 1e-8.</li>
 </ul>
