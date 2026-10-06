@@ -77,7 +77,7 @@ ForestRieszRegressor <- R6::R6Class(
                           honest = FALSE,
                           inference = FALSE,
                           subforest_size = 4L,
-                          l2 = 0.01,
+                          l2 = 0,
                           n_jobs = -1L,
                           loss = NULL,
                           init = NULL,

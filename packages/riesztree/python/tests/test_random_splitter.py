@@ -29,7 +29,6 @@ from riesztree import (
     SquaredLoss,
     TSM,
 )
-from riesztree.tree import n_leaves
 
 
 def _make_df(n=600, p=4, seed=0):

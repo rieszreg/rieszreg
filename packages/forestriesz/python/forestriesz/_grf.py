@@ -26,18 +26,21 @@ class _RieszGRF(BaseGRF):
     """BaseGRF specialized for the Riesz linear-moment equation.
 
     The basis dimension ``p`` is fixed at construction so the abstract
-    methods can recover it without a side-channel.
+    methods can recover it without a side-channel. ``l2`` is added to each
+    row's Jacobian, so a leaf solves ``(mean J + l2 · I) θ = mean A``, i.e.
+    ``(Σ J_i + n_leaf · l2 · I) θ = Σ A_i``.
     """
 
-    def __init__(self, *, n_outputs_riesz: int, **kwargs):
+    def __init__(self, *, n_outputs_riesz: int, l2: float = 0.0, **kwargs):
         super().__init__(**kwargs)
         self._n_outputs_riesz = int(n_outputs_riesz)
+        self._l2 = float(l2)
 
     def _get_alpha_and_pointJ(self, X, T, y, **kwargs):
         p = self._n_outputs_riesz
-        pointJ = np.ascontiguousarray(T[:, : p * p])
+        pointJ = T[:, : p * p] + self._l2 * np.eye(p).ravel()
         alpha = np.ascontiguousarray(T[:, p * p : p * p + p])
-        return alpha, pointJ
+        return alpha, np.ascontiguousarray(pointJ)
 
     def _get_n_outputs_decomposition(self, X, T, y, **kwargs):
         p = self._n_outputs_riesz

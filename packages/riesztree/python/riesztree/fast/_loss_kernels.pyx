@@ -20,7 +20,7 @@ dispatcher; this file is the C-speed mirror used by the Cython splitter.
 from libc.math cimport log, INFINITY, NAN, isfinite
 
 
-# Public loss-kind constants. The Python ``_splitter._loss_kind_for``
+# Public loss-kind constants. The Python ``_splitter.loss_kind_for``
 # helper picks one based on the LossSpec subclass.
 cdef int LOSS_SQUARED = 0
 cdef int LOSS_KL = 1
@@ -61,14 +61,17 @@ cdef inline double bernoulli_leaf_loss(double D, double C) noexcept nogil:
     # Boundary cases match riesztree.splitter._leaf_loss_bernoulli:
     #   D <= 0  -> 0
     #   C == 0  -> 0
-    #   not in (-D, 0) -> +inf (infeasible)
+    #   not in [-D, 0) -> +inf (infeasible)
+    #   C == -D -> 0 (α* = 1; the (D+C)·log(D+C) term is 0·log 0 = 0)
     # Otherwise L(α*) = D·log D - (D+C)·log(D+C) + C·log(-C).
     if D <= 0.0:
         return 0.0
     if C == 0.0:
         return 0.0
-    if not (-D < C < 0.0):
+    if not (-D <= C < 0.0):
         return INFINITY
+    if C == -D:
+        return 0.0
     return D * log(D) - (D + C) * log(D + C) + C * log(-C)
 
 

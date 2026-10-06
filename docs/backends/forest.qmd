@@ -36,9 +36,11 @@ Because $D_r$ and $C_r$ already vary across augmented rows for every estimand �
 The user supplies a list of functions $\varphi = (\varphi_1, \dots, \varphi_p)$ of the data. Inside each leaf $\ell$ the per-leaf parameter $\theta_\ell \in \mathbb R^p$ solves the linear-moment equation
 
 $$
-\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top}\big)^{-1}
+\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top} + n_\ell\,\lambda I\big)^{-1}
                  \textstyle\sum_{i\in\ell} m(\varphi)(Z_i, Y_i),
 $$
+
+where $n_\ell$ is the leaf size and $\lambda$ is the `l2` ridge (default $0$).
 
 and predictions are $\hat\alpha(z) = \hat\theta(z_{\text{split}}) \cdot \varphi(z)$. The forest is fit on the $n$ original rows, and the MSE splitting criterion picks splits to minimize the sum of in-leaf residuals against this leaf optimum.
 
@@ -239,17 +241,19 @@ Mirrors [`sklearn.ensemble.RandomForestRegressor`](https://scikit-learn.org/stab
 | `min_samples_split` | 2 | Minimum count of original ($D > 0$) augmented rows in a node before considering a split. |
 | `min_samples_leaf` | 1 | Minimum count of original rows in each child of a candidate split. |
 | `max_features` | 1.0 | Per-split feature-subsampling rule. |
-| `max_leaf_nodes` | None | Cap on per-tree leaf count. |
+| `max_leaf_nodes` | None | Cap on per-tree leaf count. When set, trees grow best-first, as in sklearn. |
 | `min_impurity_decrease` | 0.0 | Reject splits below this gain. |
 | `ccp_alpha` | 0.0 | Cost-complexity pruning per tree. |
 | `bootstrap` | True | Per-tree resampling at the original-row level (block bootstrap). |
 | `max_samples` | None | Per-tree subsample size as fraction or count of original rows. |
 | `n_jobs` | None | Parallelism across trees via `joblib.Parallel`. |
-| `splitter` | `"exact"` | `"exact"`, `"hist"`, `"random"`, or `"python"` — riesztree splitter dispatch. |
+| `splitter` | `"exact"` | `"exact"`, `"hist"`, or `"random"` — riesztree splitter dispatch. |
 | `max_bins` | 255 | Histogram-splitter bin count. |
 | `categorical_features` | None | Column indices treated as integer category labels. |
 
-When `splitter="hist"` and the configuration is "simple" (no categoricals, no `max_features` subsampling, no `ccp_alpha`, no leaf-count cap, built-in loss), the bin mapper is fitted **once** on the full augmented training data and the binned matrix is shared across joblib workers — sklearn-`HistGradientBoostingRegressor` convention. The win is largest at shallow depths where per-tree binning dominates tree-build wall time (~2× speedup at `max_depth=8`).
+With `splitter="hist"`, the bin mapper is fitted once on the full augmented training data and every tree slices the shared binned matrix (the sklearn `HistGradientBoostingRegressor` convention). The win is largest at shallow depths, where per-tree binning dominates tree-build time.
+
+`init` has no effect on `AugForestRieszRegressor`: each leaf stores its loss-optimal α directly.
 
 ### `ForestRieszRegressor`
 
@@ -265,7 +269,7 @@ Forwarded to EconML's `BaseGRF`:
 | `honest` | False | Enable for valid-coverage CIs (50/50 sample split). |
 | `inference` | False | Enable for `predict_interval`; preserves subforest structure. |
 | `subforest_size` | 4 | Trees per subforest when computing inference variance. |
-| `l2` | 0.01 | Ridge added to the per-leaf Jacobian. |
+| `l2` | 0 | Ridge added to the per-leaf Jacobian: each leaf solves $(\bar J + \lambda I)\theta = \bar A$. For `TSM` this gives $\hat\theta = 1 / (\hat P(A = \text{level} \mid \text{leaf}) + \lambda)$. With $\lambda > 0$ the forest can grow leaves with no treated rows, whose $\hat\theta \approx \bar A / \lambda$ gives very large weights out of sample. Leave it at 0 unless you need it. |
 | `n_jobs` | -1 | Parallel tree training. |
 
 ## Save / load

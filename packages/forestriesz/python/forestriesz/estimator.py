@@ -12,7 +12,7 @@ from typing import Callable, Sequence
 
 import numpy as np
 
-from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator
 
 from .backend import ForestRieszBackend
 
@@ -56,8 +56,13 @@ class ForestRieszRegressor(RieszEstimator):
         they differ from ``AugForestRieszRegressor``'s sklearn-style ones). ``honest``
         defaults to False (cross-fitting works without honesty); enable it
         plus ``inference=True`` to use ``predict_interval``.
-    l2 : float
-        Ridge added to the per-leaf Jacobian for numerical stability.
+    l2 : float, default=0.0
+        Ridge added to the per-leaf Jacobian: each leaf solves
+        ``(mean J + l2 · I) θ = mean A``. For TSM this gives
+        ``θ = 1 / (P̂(A = level | leaf) + l2)``. With ``l2 > 0`` the forest
+        can grow leaves with no treated (or no control) rows, whose
+        ``θ ≈ mean A / l2`` gives very large α̂ for new rows landing there.
+        Leave it at 0 unless you have a reason to ridge the leaf solve.
     loss : rieszreg.Loss, default=SquaredLoss()
         Currently only ``SquaredLoss`` is supported.
     init : float or None
@@ -85,7 +90,7 @@ class ForestRieszRegressor(RieszEstimator):
         inference: bool = False,
         fit_intercept: bool = True,
         subforest_size: int = 4,
-        l2: float = 0.01,
+        l2: float = 0.0,
         n_jobs: int = -1,
         verbose: int = 0,
         loss: Loss | None = None,
@@ -121,9 +126,6 @@ class ForestRieszRegressor(RieszEstimator):
 
     # ---- defaults / backend construction ----
 
-    def _resolved_loss(self) -> Loss:
-        return self.loss if self.loss is not None else SquaredLoss()
-
     def _resolved_backend(self) -> ForestRieszBackend:
         return ForestRieszBackend(
             riesz_feature_fns=self.riesz_feature_fns,
@@ -144,15 +146,14 @@ class ForestRieszRegressor(RieszEstimator):
             subforest_size=self.subforest_size,
             l2=self.l2,
             n_jobs=self.n_jobs,
-            random_state=self.random_state,
             verbose=self.verbose,
         )
 
-    def diagnose(self, Z, **kwargs):
+    def diagnose(self, Z, y=None, **kwargs):
         """Base diagnostics plus forest extras: feature importances, mean
         leaf size and mean number of leaves per tree."""
         from .diagnostics import diagnose_forest
-        return diagnose_forest(self, Z, **kwargs)
+        return diagnose_forest(self, Z, y=y, **kwargs)
 
     # ---- inference passthroughs ----
 
@@ -168,73 +169,6 @@ class ForestRieszRegressor(RieszEstimator):
         return self.predictor_.predict_interval(feats, alpha=alpha)
 
     # ---- save/load ----
-
-    def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            split_feature_indices=(
-                list(self.split_feature_indices)
-                if self.split_feature_indices is not None
-                else None
-            ),
-            n_estimators=self.n_estimators,
-            max_depth=self.max_depth,
-            min_samples_split=self.min_samples_split,
-            min_samples_leaf=self.min_samples_leaf,
-            min_weight_fraction_leaf=self.min_weight_fraction_leaf,
-            min_var_fraction_leaf=self.min_var_fraction_leaf,
-            max_features=self.max_features,
-            min_impurity_decrease=self.min_impurity_decrease,
-            max_samples=self.max_samples,
-            min_balancedness_tol=self.min_balancedness_tol,
-            honest=self.honest,
-            inference=self.inference,
-            fit_intercept=self.fit_intercept,
-            subforest_size=self.subforest_size,
-            l2=self.l2,
-            n_jobs=self.n_jobs,
-            verbose=self.verbose,
-            has_sieve=self.riesz_feature_fns is not None,
-        )
-        return base
-
-    @classmethod
-    def _construct_for_load(
-        cls, *, estimand, loss, hyperparameters: dict
-    ) -> "ForestRieszRegressor":
-        kwargs = {
-            k: hyperparameters[k]
-            for k in (
-                "max_depth",
-                "min_samples_split",
-                "min_samples_leaf",
-                "min_weight_fraction_leaf",
-                "min_var_fraction_leaf",
-                "max_features",
-                "min_impurity_decrease",
-                "max_samples",
-                "min_balancedness_tol",
-                "honest",
-                "inference",
-                "fit_intercept",
-                "subforest_size",
-                "l2",
-                "n_jobs",
-                "verbose",
-            )
-            if k in hyperparameters
-        }
-        split_idx = hyperparameters.get("split_feature_indices")
-        return cls(
-            estimand=estimand,
-            riesz_feature_fns=None,  # patched by caller for sieve estimators
-            split_feature_indices=tuple(split_idx) if split_idx else None,
-            n_estimators=hyperparameters.get("n_estimators", 100),
-            loss=loss,
-            init=hyperparameters.get("init"),
-            random_state=hyperparameters.get("random_state", 0),
-            **kwargs,
-        )
 
     @classmethod
     def load(
@@ -255,10 +189,10 @@ class ForestRieszRegressor(RieszEstimator):
         from .feature_fns import default_riesz_features
 
         instance = super().load(path, estimand=estimand)
-        sieve = riesz_feature_fns
-        if sieve == "auto":
-            sieve = default_riesz_features(instance.estimand)
-        if sieve is not None:
-            instance.riesz_feature_fns = sieve
-            instance.predictor_.riesz_feature_fns = sieve
+        if riesz_feature_fns != "auto":
+            instance.riesz_feature_fns = riesz_feature_fns
+        sieve = instance.riesz_feature_fns
+        instance.predictor_.riesz_feature_fns = (
+            default_riesz_features(instance.estimand) if sieve == "auto" else sieve
+        )
         return instance

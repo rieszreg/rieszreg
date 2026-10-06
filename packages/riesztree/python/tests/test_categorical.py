@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from riesztree import ATE, RieszTreeRegressor
 
@@ -95,3 +96,21 @@ def test_single_categorical_level_doesnt_split():
     # Splits should still occur (on x) — the categorical column is just unused.
     a_hat = est.predict(df)
     assert a_hat.shape == (1000,)
+
+
+def test_non_integer_or_missing_category_codes_are_rejected():
+    """Codes 1.0 and 1.5 used to merge (truncated to 1) and NaN hit undefined
+    behaviour in the compiled predict; both now raise at the boundary."""
+    import pandas as pd
+    from riesztree import ATE, RieszTreeRegressor
+
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"a": rng.integers(0, 2, 200).astype(float),
+                       "g": rng.integers(0, 3, 200).astype(float)})
+    est = RieszTreeRegressor(ATE(), categorical_features=(1,)).fit(df)
+    for bad in (1.5, np.nan):
+        df_bad = df.assign(g=df["g"].where(df.index != 0, bad))
+        with pytest.raises(ValueError, match="integer level codes"):
+            RieszTreeRegressor(ATE(), categorical_features=(1,)).fit(df_bad)
+        with pytest.raises(ValueError, match="integer level codes"):
+            est.predict(df_bad)

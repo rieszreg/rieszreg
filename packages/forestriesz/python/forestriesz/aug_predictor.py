@@ -16,6 +16,7 @@ import numpy as np
 from rieszreg import Loss, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 from riesztree import RieszTreePredictor
+from riesztree.tree import check_categorical
 
 
 @dataclass
@@ -26,11 +27,12 @@ class AugForestPredictor:
     kind: ClassVar[str] = "aug-forestriesz"
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
-        features = np.asarray(features)
-        per_tree = np.stack(
-            [tree.predict_alpha(features) for tree in self.trees], axis=0
-        )
-        return per_tree.mean(axis=0)
+        features = np.ascontiguousarray(features, dtype=np.float64)
+        check_categorical(features, self.trees[0].categorical_features)
+        total = np.zeros(features.shape[0])
+        for tree in self.trees:
+            total += tree._predict_alpha_unchecked(features)
+        return total / len(self.trees)
 
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
         return self.loss.alpha_to_eta(self.predict_alpha(features))

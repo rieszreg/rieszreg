@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator
 
 from .aug_backend import AugForestRieszBackend
 
@@ -43,8 +43,11 @@ class AugForestRieszRegressor(RieszEstimator):
         :class:`sklearn.ensemble.RandomForestRegressor` where the augmented
         Bregman-Riesz setting allows.
     init : float or None
-        α-space initialization, threaded through to ``RieszEstimator``.
+        Accepted for API parity with the other learners. Leaves store the
+        loss-optimal α directly, so it has no effect on the forest.
     random_state : int, default=0
+        Seeds the bootstrap draws, per-split feature subsampling and the
+        histogram bin subsample.
     """
 
     def __init__(
@@ -94,9 +97,6 @@ class AugForestRieszRegressor(RieszEstimator):
         self.max_bins = max_bins
         self.categorical_features = categorical_features
 
-    def _resolved_loss(self) -> Loss:
-        return self.loss if self.loss is not None else SquaredLoss()
-
     def _resolved_backend(self) -> AugForestRieszBackend:
         cat = (
             tuple(int(i) for i in self.categorical_features)
@@ -116,65 +116,8 @@ class AugForestRieszRegressor(RieszEstimator):
             bootstrap=self.bootstrap,
             max_samples=self.max_samples,
             n_jobs=self.n_jobs,
-            random_state=self.random_state,
             verbose=self.verbose,
             splitter=self.splitter,
             max_bins=self.max_bins,
             categorical_features=cat,
-        )
-
-    def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            n_estimators=self.n_estimators,
-            max_depth=self.max_depth,
-            min_samples_split=self.min_samples_split,
-            min_samples_leaf=self.min_samples_leaf,
-            min_weight_fraction_leaf=self.min_weight_fraction_leaf,
-            max_features=self.max_features,
-            max_leaf_nodes=self.max_leaf_nodes,
-            min_impurity_decrease=self.min_impurity_decrease,
-            ccp_alpha=self.ccp_alpha,
-            bootstrap=self.bootstrap,
-            max_samples=self.max_samples,
-            n_jobs=self.n_jobs,
-            verbose=self.verbose,
-            splitter=self.splitter,
-            max_bins=self.max_bins,
-            categorical_features=(
-                list(int(i) for i in self.categorical_features)
-                if self.categorical_features is not None
-                else None
-            ),
-        )
-        return base
-
-    @classmethod
-    def _construct_for_load(
-        cls, *, estimand, loss, hyperparameters: dict
-    ) -> "AugForestRieszRegressor":
-        cat = hyperparameters.get("categorical_features")
-        return cls(
-            estimand=estimand,
-            loss=loss,
-            n_estimators=hyperparameters.get("n_estimators", 100),
-            max_depth=hyperparameters.get("max_depth"),
-            min_samples_split=hyperparameters.get("min_samples_split", 2),
-            min_samples_leaf=hyperparameters.get("min_samples_leaf", 1),
-            min_weight_fraction_leaf=hyperparameters.get(
-                "min_weight_fraction_leaf", 0.0
-            ),
-            max_features=hyperparameters.get("max_features", 1.0),
-            max_leaf_nodes=hyperparameters.get("max_leaf_nodes"),
-            min_impurity_decrease=hyperparameters.get("min_impurity_decrease", 0.0),
-            ccp_alpha=hyperparameters.get("ccp_alpha", 0.0),
-            bootstrap=hyperparameters.get("bootstrap", True),
-            max_samples=hyperparameters.get("max_samples"),
-            n_jobs=hyperparameters.get("n_jobs"),
-            verbose=hyperparameters.get("verbose", 0),
-            splitter=hyperparameters.get("splitter", "exact"),
-            max_bins=hyperparameters.get("max_bins", 255),
-            categorical_features=tuple(int(i) for i in cat) if cat else None,
-            init=hyperparameters.get("init"),
-            random_state=hyperparameters.get("random_state", 0),
         )

@@ -104,6 +104,8 @@ def best_split_continuous_c(
             best_gain = gain
             best_k = k
             best_threshold = 0.5 * (svals_v[k] + svals_v[k + 1])
+            if best_threshold == svals_v[k + 1] or not isfinite(best_threshold):
+                best_threshold = svals_v[k]
 
     if best_k < 0:
         return None
@@ -273,6 +275,8 @@ def best_split_continuous_user_c(
             best_gain = gain
             best_k = k
             best_threshold = 0.5 * (svals_v[k] + svals_v[k + 1])
+            if best_threshold == svals_v[k + 1] or not isfinite(best_threshold):
+                best_threshold = svals_v[k]
 
     if best_k < 0:
         return None

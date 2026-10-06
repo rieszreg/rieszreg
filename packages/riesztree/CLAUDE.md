@@ -14,7 +14,7 @@ This package depends on `rieszreg` for shared abstractions (`Estimand`, `Loss`, 
   - `_splitter_c.pyx` — Cython continuous-feature best-split sweep, used when `splitter="exact"` (the default). Includes the random-threshold variant for `splitter="random"`.
   - `_splitter_hist.pyx` — Cython histogram splitter, used when `splitter="hist"`. Per-leaf histogram accumulation + sweep over bin boundaries; quantile pre-binning via `_binner.py`.
   - `_binner.py` — quantile `BinMapper` for the histogram splitter (sklearn HGB-style; default 255 bins).
-  - `_splitter.py` — Python facade. Maps a `Loss` to a loss-kind integer + bounded clip parameters; dispatches to exact / hist / random Cython kernels; provides `register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` for users to plug a Numba `@cfunc` into the splitter for any custom `Loss`.
+  - `_splitter.py` — Python facade. Maps a `Loss` to a loss-kind integer + bounded clip parameters; dispatches to exact / hist / random Cython kernels; provides `register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` for users to plug a Numba `@cfunc` into the exact splitter for any custom `Loss`.
 - R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
 
 ## Living-doc rule (README + meta-project docs)
@@ -39,7 +39,7 @@ R-side mirrors this: R6 class `RieszTreeRegressor$new(estimand=, max_depth=, ...
 - `python/riesztree/` — `splitter.py` (per-loss leaf-loss + best-split sweep), `tree.py` (Node + traversal + serialisation), `grow.py` (depthwise + leafwise), `pruning.py` (cost-complexity), `backend.py` (`RieszTreeBackend`), `predictor.py` (`RieszTreePredictor` + loader registration), `estimator.py` (`RieszTreeRegressor` convenience subclass), `diagnostics.py` (`TreeDiagnostics`), `fast/` (`FlatTree` + Cython `predict` extension).
 - `r/riesztree/` — R6 wrapper via reticulate. `RieszTreeRegressor` subclasses `rieszreg::RieszEstimatorR6`.
 - `examples/` — runnable demonstrations of each built-in estimand (ATE, ATT, TSM, AdditiveShift, LocalShift).
-- `python/tests/` — 122 tests covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, random splitter, deprecation of the python splitter.
+- `python/tests/` — tests covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity (Cython driver vs Python grower; fit/predict leaf membership on tied data), early-stopping rollback, random splitter.
 - `python/benchmarks/` — `bench_fit.py` (locked perf grid; baseline in `BENCH_BASELINE.md`) and `bench_compare.py` (sklearn DTR / HGB, LightGBM, XGBoost comparison).
 
 ## Run tests
@@ -80,7 +80,7 @@ The per-leaf optimum α* = -C/D is universal across the four built-in Bregman lo
 
 - `SquaredLoss`: L(α*) = -C²/D.
 - `KLLoss`: L(α*) = -C + C·log(-C/D) when C < 0; +∞ when C > 0 (infeasible — disqualifies the split).
-- `BernoulliLoss`: L(α*) = D·log D - (D+C)·log(D+C) + C·log(-C) when -D < C < 0; +∞ otherwise.
+- `BernoulliLoss`: L(α*) = D·log D - (D+C)·log(D+C) + C·log(-C) when -D < C < 0; 0 at C = -D (α* = 1); +∞ otherwise.
 - `BoundedSquaredLoss(lo, hi)`: project α* into [lo, hi] and evaluate D·α*² + 2C·α*.
 
 The dispatcher lives in `splitter.make_leaf_solvers`. Custom Loss subclasses raise `NotImplementedError` with a clear message — extend the dispatcher there.
@@ -88,6 +88,12 @@ The dispatcher lives in `splitter.make_leaf_solvers`. Custom Loss subclasses rai
 ### Backend Protocol choice
 
 We implement `Backend.fit_augmented` (augmentation-style), not `MomentBackend.fit_rows`. The augmentation-style splitter handles every built-in *and* custom estimand without requiring a sieve, mirroring `forestriesz/AugForestRieszBackend`. The trade-off (M ≈ k·n training rows vs n) is irrelevant for a single tree at the dataset sizes a single tree is sensible for.
+
+`fit_augmented` bins the features via `RieszTreeBackend._bin` (for `splitter="hist"`) and hands off to `RieszTreeBackend._fit_binned(aug, aug_valid, loss, random_state=, X_binned=, mapper=)`, which grows and prunes one tree. `forestriesz.AugForestRieszBackend` bins once on the full augmented data (same `_bin`) and calls `_fit_binned` per bootstrap tree with the shared mapper.
+
+### Growth drivers
+
+`grow.py` has one per-fit `_Grower` (loss kernels, candidate-feature draws, a column-major feature copy, the `_EarlyStopping` tracker) whose `grow_depthwise()` / `grow_leafwise(max_leaf_nodes)` methods implement the two policies; `RieszTreeBackend._fit_binned` builds it once per tree. Depthwise fits with no categoricals, no `max_features` subsampling, no early stopping and a built-in loss go to the Cython whole-tree drivers (`_grow_c.grow_depthwise_hist_c`, `_grow_exact_c.grow_depthwise_exact_c`); everything else runs the Python grower, which calls the Cython per-node kernels. `_EarlyStopping` records held-out loss per split and rolls the tree back to its best partial tree.
 
 ### Predictor representation
 

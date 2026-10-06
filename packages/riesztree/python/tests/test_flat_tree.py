@@ -134,7 +134,7 @@ def test_categorical_split_predict_matches_node_walk():
     est = RieszTreeRegressor(
         estimand=ATE(treatment="a", covariates=("cat", "x")),
         max_depth=4,
-        categorical_features=(0,),
+        categorical_features=(1,),
     ).fit(df)
     feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
     a_pred = est.predict(df)

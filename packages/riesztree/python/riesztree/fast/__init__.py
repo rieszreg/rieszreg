@@ -1,16 +1,10 @@
 """Compiled fast paths for riesztree.
 
-Phase 3 contributes a flat-array ``FlatTree`` representation with a
-Cython ``predict_alpha`` loop. Subsequent phases will add Cython
-splitters (``_splitter_exact``, ``_splitter_hist``) and a registry hook
-for user-defined Numba ``@cfunc`` leaf-loss kernels.
-
-The Cython extension ``_tree_c`` is imported on demand by
-``predict_alpha``; if the extension has not been compiled (e.g. a
-fresh source checkout that has not run ``pip install -e .``), the
-facade falls back to a pure-Python tree walk. The fallback exists
-purely so the package keeps importing — for any real workload, the
-compiled extension is required.
+A flat-array ``FlatTree`` with a Cython ``predict_alpha`` loop, the Cython
+split kernels and whole-tree drivers, and the registry hook for
+user-defined Numba ``@cfunc`` leaf-loss kernels. The compiled extensions
+are required (``pip install -e .`` or ``python setup.py build_ext
+--inplace``).
 """
 
 from __future__ import annotations

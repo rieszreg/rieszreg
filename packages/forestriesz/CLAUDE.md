@@ -7,9 +7,9 @@ Random-forest backends for the [RieszReg meta-package](../README.md). Two flavor
 
 This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `Backend` / `MomentBackend` Protocols, `Diagnostics`, `RieszEstimator` orchestrator, `trace`, `AugmentedDataset`) and on `riesztree` for the per-tree augmented learner. See [`../rieszreg/DESIGN.md`](../rieszreg/DESIGN.md) for the meta-package design and the contract every implementation package follows. `forestriesz` contributes:
 
-- `AugForestRieszBackend` — `Backend.fit_augmented` Protocol implementation. Ensemble of `riesztree.RieszTreeBackend` instances over block-bootstrapped augmented rows; each tree fits a loss-aware splitter directly on the augmented dataset. Works on every estimand without per-estimand configuration. Supports all four built-in Bregman losses. When `splitter='hist'` and the config is "simple" (no categoricals, default `max_features`, no `ccp_alpha`, no leaf cap), the bin mapper is fitted once on the full augmented data and shared across joblib workers — `~2×` speedup at shallow depths. The exact-splitter path is unchanged from the per-tree default.
+- `AugForestRieszBackend` — `Backend.fit_augmented` Protocol implementation. Ensemble of `riesztree.RieszTreeBackend` instances over block-bootstrapped augmented rows; each tree fits a loss-aware splitter directly on the augmented dataset. Works on every estimand without per-estimand configuration. Supports all four built-in Bregman losses. With `splitter='hist'` the bin mapper is fitted once on the full augmented data and each tree calls `RieszTreeBackend._fit_binned` on its bootstrap rows of the shared binned matrix. `max_leaf_nodes` switches trees to best-first (leafwise) growth, as in sklearn.
 - `AugForestRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with sklearn `RandomForestRegressor`-style hyperparameters (`n_estimators`, `max_depth`, `min_samples_leaf`, `min_samples_split`, `max_features`, `bootstrap`, `max_samples`, `n_jobs`, `splitter`, `max_bins`, `categorical_features`, ...).
-- `ForestRieszBackend` — `MomentBackend.fit_rows` Protocol implementation. Computes per-row moments from the orchestrator's augmented data (grouped by `origin_index`) and packs them into EconML's linear-moment GRF.
+- `ForestRieszBackend` — `MomentBackend.fit_rows` Protocol implementation. Computes per-row moments from the orchestrator's augmented data (grouped by `origin_index`) and packs them into EconML's linear-moment GRF. `l2` is added to each row's Jacobian inside `_RieszGRF`.
 - `ForestRieszRegressor` — convenience subclass of `rieszreg.RieszEstimator` with forest-specific hyperparameters (`n_estimators`, `max_depth`, `min_samples_leaf`, `honest`, `inference`, `l2`, `riesz_feature_fns`, ...) on the constructor.
 - `forestriesz.feature_fns.default_riesz_features(estimand)` — defaults for the moment-style backend's `riesz_feature_fns` for built-in estimands (treatment indicators).
 - `predict_interval(X, alpha)` — honest-split confidence intervals on the moment-style backend for the locally constant / single-basis case.
@@ -97,9 +97,9 @@ A[i, j] = Σ_(coef, point) ∈ trace(W_i)  coef · φ_j(point)         (per-row 
 J[i]    = φ(W_i) φ(W_i)'                                           (per-row Jacobian)
 ```
 
-`_get_alpha_and_pointJ` unpacks T and returns `(A, J)` to the criterion. `_get_n_outputs_decomposition` declares all p outputs are relevant. Per-leaf solve is closed-form `θ_ℓ = (Σ J_i)^{-1} Σ A_i`; predictions are `α(z) = θ(z_split) · φ(z) + base_score`.
+`_get_alpha_and_pointJ` unpacks T and returns `(A, J)` to the criterion. `_get_n_outputs_decomposition` declares all p outputs are relevant. `_get_alpha_and_pointJ` also adds `l2 · vec(I)` to each row's J. Per-leaf solve is closed-form `θ_ℓ = (Σ J_i + n_ℓ · l2 · I)^{-1} Σ A_i`; predictions are `α(z) = θ(z_split) · φ(z) + base_score`.
 
-For TSM with `default_riesz_features([1{T=level}])`, A_i = 1 (constant), J_i = T_i (varies). Per-leaf θ = 1 / P̂(T=level | X-region) — exactly the IPW representer. The forest splits on covariates only (the sieve resolves treatment).
+For TSM with `default_riesz_features([1{T=level}])`, A_i = 1 (constant), J_i = T_i (varies). Per-leaf θ = 1 / (P̂(T=level | X-region) + l2) — the IPW representer, ridged by `l2`. The forest splits on covariates only (the sieve resolves treatment).
 
 ### Constant-basis degeneracy
 

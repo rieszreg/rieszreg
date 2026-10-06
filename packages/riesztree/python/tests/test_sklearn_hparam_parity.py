@@ -176,3 +176,24 @@ def test_save_load_roundtrips_new_hyperparams(tmp_path):
     assert loaded.max_leaf_nodes == 20
     assert loaded.random_state == 7
     assert np.allclose(est.predict(df), loaded.predict(df))
+
+
+def test_max_features_searches_past_a_draw_with_no_valid_split():
+    """ATE needs a treatment split first (covariate-only splits have zero
+    gain). With max_features=1 most root draws miss the treatment; like
+    sklearn, the search must continue through the other features rather than
+    stop at a single leaf."""
+    import pandas as pd
+
+    from riesztree import RieszTreeRegressor
+    from rieszreg import ATE
+
+    rng = np.random.default_rng(1)
+    n = 400
+    x = rng.normal(size=n)
+    a = (rng.uniform(size=n) < 1 / (1 + np.exp(-0.5 * x))).astype(float)
+    df = pd.DataFrame({"a": a, "x": x, "g": rng.normal(size=n)})
+    for seed in range(5):
+        est = RieszTreeRegressor(ATE(), max_features=1, random_state=seed).fit(df)
+        alpha = est.predict(df)
+        assert alpha[a == 1].mean() > 0 > alpha[a == 0].mean()

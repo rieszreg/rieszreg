@@ -28,7 +28,6 @@ from riesztree import (
     TSM,
 )
 from riesztree.fast._binner import fit_bin_mapper, transform
-from riesztree.tree import n_leaves
 
 
 def _make_df(n=600, p=4, seed=0):
@@ -189,8 +188,55 @@ def test_hist_handles_mixed_continuous_categorical():
     est = RieszTreeRegressor(
         estimand=ATE(treatment="a", covariates=("cat", "x")),
         max_depth=4, splitter="hist",
-        categorical_features=(0,),
+        categorical_features=(1,),
     ).fit(df)
     a_hat = est.predict(df)
     assert est.get_n_leaves() >= 2
     assert np.isfinite(a_hat).all()
+
+
+def _route(node, x):
+    while not node.is_leaf:
+        v = x[node.split_feature]
+        if node.split_kind == "categorical":
+            go_left = int(v) in node.split_left_levels
+        else:
+            go_left = v <= node.split_threshold
+        node = node.left if go_left else node.right
+    return node
+
+
+@pytest.mark.parametrize("categorical", [False, True])
+def test_hist_leaf_membership_same_at_fit_and_predict(categorical):
+    """Heavily tied data with more distinct values than bins puts quantile
+    thresholds exactly on data values. Rows tied with a threshold must land
+    on the same side at fit time (binned) and at predict time (``x <= thr``),
+    so each leaf's stored (D, C) equals the sums over the rows predict()
+    routes to it."""
+    rng = np.random.default_rng(0)
+    n = 3000
+    x0 = rng.integers(0, 600, size=n) / 10.0      # 600 distinct, many ties
+    x1 = rng.integers(0, 400, size=n) / 4.0
+    pi = 1.0 / (1.0 + np.exp(-(x0 - 30.0) / 15.0))
+    a = (rng.uniform(size=n) < pi).astype(float)
+    df = pd.DataFrame({"a": a, "x0": x0, "x1": x1})
+    est = RieszTreeRegressor(
+        estimand=ATE(treatment="a", covariates=("x0", "x1")),
+        max_depth=6, min_samples_split=2, min_samples_leaf=1,
+        splitter="hist", max_bins=64,
+        # A categorical treatment routes through the Python grower instead
+        # of the Cython driver; both must agree with predict.
+        categorical_features=(0,) if categorical else None,
+    ).fit(df)
+    aug = est.estimand_.augment(df[list(est.estimand_.feature_keys)].to_numpy(float))
+    sums: dict[int, list[float]] = {}
+    leaves = {}
+    for x, d, c in zip(aug.features, aug.is_original, aug.potential_deriv_coef):
+        leaf = _route(est.predictor_.tree, x)
+        leaves[id(leaf)] = leaf
+        acc = sums.setdefault(id(leaf), [0.0, 0.0])
+        acc[0] += d
+        acc[1] += c
+    assert len(leaves) > 4
+    for key, leaf in leaves.items():
+        np.testing.assert_allclose(sums[key], [leaf.D, leaf.C], atol=1e-8)

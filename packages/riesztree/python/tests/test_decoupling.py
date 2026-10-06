@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from scipy.optimize import minimize_scalar
 
 from rieszreg import (

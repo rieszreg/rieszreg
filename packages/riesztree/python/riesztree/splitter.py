@@ -80,14 +80,17 @@ def _leaf_loss_bernoulli(D: float, C: float) -> float:
         L(α*) = -D·log((D+C)/D) + C·log(-C/(D+C))
               = D·log D - (D+C)·log(D+C) + C·log(-C).
 
-    Outside (-D, 0): infeasible — return +∞.
+    At C = -D, α* = 1 and L(α*) = 0 (the (D+C)·log(D+C) term is 0·log 0).
+    Outside [-D, 0): infeasible — return +∞.
     """
     if D <= 0.0:
         return 0.0
     if C == 0.0:
         return 0.0
-    if not (-D < C < 0.0):
+    if not (-D <= C < 0.0):
         return float("inf")
+    if C == -D:
+        return 0.0
     return D * np.log(D) - (D + C) * np.log(D + C) + C * np.log(-C)
 
 
@@ -151,8 +154,17 @@ def make_leaf_solvers(loss: Loss):
     in via :func:`riesztree.fast.register_fast_leaf_solver`, which
     contributes both a Cython-callable leaf-loss kernel (used by
     ``splitter='exact'``) and a Python ``alpha_at_opt`` callable
-    (consumed here for the leaf-payload computation).
+    (consumed here for the leaf-payload computation). The registry is
+    checked first, as in :func:`riesztree.fast._splitter.loss_kind_for`,
+    so a registered subclass of a built-in uses the registered solver for
+    both split search and leaf values.
     """
+    # The registered cfunc is callable from Python too, so it serves the
+    # Python paths (pruning, leaf payloads).
+    from .fast._splitter import _lookup_user_kernel
+    user_entry = _lookup_user_kernel(loss)
+    if user_entry is not None:
+        return user_entry
     if isinstance(loss, SquaredLoss):
         return _leaf_loss_squared, _leaf_alpha_squared
     if isinstance(loss, KLLoss):
@@ -165,30 +177,6 @@ def make_leaf_solvers(loss: Loss):
         loss_fn = lambda D, C, _lo=lo, _hi=hi: _leaf_loss_bounded_squared(D, C, _lo, _hi)
         alpha_fn = lambda D, C, _lo=lo, _hi=hi: _leaf_alpha_bounded_squared(D, C, _lo, _hi)
         return loss_fn, alpha_fn
-
-    # User-registered loss (Phase 5 hook). The user supplied a
-    # Cython-callable leaf_loss and a Python alpha_at_opt; we wrap the
-    # leaf_loss into a Python callable (cfuncs are themselves callable
-    # from Python) so it composes with the existing Python paths
-    # (pruning, _make_leaf, holdout-loss).
-    from .fast._splitter import _USER_LOSS_REGISTRY, _lookup_user_kernel
-    user_entry = _lookup_user_kernel(loss)
-    if user_entry is not None:
-        addr, alpha_at_opt = user_entry
-        # Find the cfunc object whose address matches `addr`. The user
-        # passed it to register_fast_leaf_solver; we keep a side mapping
-        # because Python can't dereference an integer back to a Python
-        # function. ``_USER_CFUNC_OBJECTS`` is populated by
-        # register_fast_leaf_solver below.
-        from .fast._splitter import _USER_CFUNC_OBJECTS
-        cfunc_obj = _USER_CFUNC_OBJECTS.get(addr)
-        if cfunc_obj is None:
-            raise RuntimeError(
-                "Internal: user loss has a registered C-callable address "
-                "but no associated Python wrapper. Re-register via "
-                "register_fast_leaf_solver."
-            )
-        return cfunc_obj, alpha_at_opt
 
     raise NotImplementedError(
         f"riesztree has no analytic leaf solver for loss type "
@@ -214,6 +202,8 @@ def best_split_continuous(
 ):
     """Best gain split on a continuous feature for the rows in ``idx``.
 
+    Pure-Python reference for the Cython sweep in
+    :mod:`riesztree.fast._splitter_c` (the parity tests compare the two).
     Returns ``(gain, threshold, left_idx, right_idx)`` or ``None``.
     """
     vals = feature_col[idx]
@@ -252,6 +242,8 @@ def best_split_continuous(
         gain = parent_loss - L_l - L_r
         if best is None or gain > best[0]:
             thresh = 0.5 * (svals[k] + svals[k + 1])
+            if thresh == svals[k + 1] or not np.isfinite(thresh):
+                thresh = svals[k]  # midpoint rounded onto the right value
             best = (gain, float(thresh), sidx[: k + 1].copy(), sidx[k + 1:].copy())
     return best
 
@@ -280,14 +272,11 @@ def best_split_categorical(
         return None
 
     # Per-level (D, C, n_orig) sums.
-    D_lev = np.zeros(len(levels))
-    C_lev = np.zeros(len(levels))
-    n_orig_lev = np.zeros(len(levels), dtype=np.int64)
-    for r, lev in enumerate(inverse):
-        D_lev[lev] += D[idx[r]]
-        C_lev[lev] += C[idx[r]]
-        if D[idx[r]] > 0:
-            n_orig_lev[lev] += 1
+    n_lev = len(levels)
+    D_idx = D[idx]
+    D_lev = np.bincount(inverse, weights=D_idx, minlength=n_lev)
+    C_lev = np.bincount(inverse, weights=C[idx], minlength=n_lev)
+    n_orig_lev = np.bincount(inverse, weights=(D_idx > 0), minlength=n_lev).astype(np.int64)
 
     # Sort levels by α*_level.
     a_star_lev = np.array(
@@ -303,10 +292,11 @@ def best_split_categorical(
     total_orig = cum_orig[-1]
     parent_loss = leaf_loss(float(total_D), float(total_C))
 
-    # Map sorted-level index back to row indices.
-    rows_by_level: list[np.ndarray] = []
-    for lev_idx in order:
-        rows_by_level.append(idx[inverse == lev_idx])
+    # Rank of each level in the α*-sorted order; a split at k sends the
+    # levels with rank ≤ k left.
+    rank = np.empty(n_lev, dtype=np.int64)
+    rank[order] = np.arange(n_lev)
+    row_rank = rank[inverse]
 
     best = None
     for k in range(len(order) - 1):
@@ -324,13 +314,14 @@ def best_split_categorical(
             continue
         gain = parent_loss - L_l - L_r
         if best is None or gain > best[0]:
-            left_levels = order[: k + 1]
-            left_idx = np.concatenate([rows_by_level[i] for i in range(k + 1)])
-            right_idx = np.concatenate([rows_by_level[i] for i in range(k + 1, len(order))])
-            best = (
-                gain,
-                tuple(int(levels[i]) for i in left_levels),
-                left_idx,
-                right_idx,
-            )
-    return best
+            best = (gain, k)
+    if best is None:
+        return None
+    gain, k = best
+    goes_left = row_rank <= k
+    return (
+        gain,
+        tuple(int(levels[i]) for i in order[: k + 1]),
+        idx[goes_left],
+        idx[~goes_left],
+    )

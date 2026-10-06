@@ -22,7 +22,7 @@ ctypedef cnp.uint8_t u8
 
 
 def predict_alpha_c(
-    f64[:, ::1] X,
+    const f64[:, ::1] X,
     i32[::1] feature,
     f64[::1] threshold,
     i32[::1] left,

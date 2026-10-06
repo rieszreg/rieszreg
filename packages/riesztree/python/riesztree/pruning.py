@@ -25,12 +25,6 @@ def _leaves_loss_sum(node: Node) -> float:
     return _leaves_loss_sum(node.left) + _leaves_loss_sum(node.right)
 
 
-def _n_leaves(node: Node) -> int:
-    if node.is_leaf:
-        return 1
-    return _n_leaves(node.left) + _n_leaves(node.right)
-
-
 def _collapse_to_leaf(node: Node, leaf_loss) -> None:
     """Mutate ``node`` from internal to leaf, recomputing leaf payload."""
     node.is_leaf = True
@@ -45,31 +39,32 @@ def _collapse_to_leaf(node: Node, leaf_loss) -> None:
 
 
 def _weakest_link_alpha(root: Node, leaf_loss) -> tuple[float, Node | None]:
-    """Find the internal node ``t`` with the smallest ``g(t)``.
+    """Find the internal node ``t`` with the smallest ``g(t)`` in one
+    bottom-up pass (subtree loss and leaf count are accumulated, not
+    recomputed per node). Ties go to the earliest node in pre-order.
 
     Returns ``(g_min, node_to_collapse)``; when no internal node exists
     returns ``(inf, None)``.
     """
-    g_min = float("inf")
-    best: Node | None = None
+    best = (float("inf"), float("inf"), None)   # (g, preorder index, node)
+    counter = 0
 
-    def _walk(n: Node) -> None:
-        nonlocal g_min, best
+    def _walk(n: Node) -> tuple[float, int]:
+        nonlocal best, counter
         if n.is_leaf:
-            return
-        n_leaves_t = _n_leaves(n)
-        R_subtree = _leaves_loss_sum(n)
-        R_collapsed = float(leaf_loss(n.D, n.C))
-        if n_leaves_t > 1:
-            g = (R_collapsed - R_subtree) / (n_leaves_t - 1)
-            if g < g_min:
-                g_min = g
-                best = n
-        _walk(n.left)
-        _walk(n.right)
+            return float(n.leaf_loss_value), 1
+        order = counter
+        counter += 1
+        R_l, k_l = _walk(n.left)
+        R_r, k_r = _walk(n.right)
+        R_subtree, n_leaves = R_l + R_r, k_l + k_r
+        g = (float(leaf_loss(n.D, n.C)) - R_subtree) / (n_leaves - 1)
+        if (g, order) < best[:2]:
+            best = (g, order, n)
+        return R_subtree, n_leaves
 
     _walk(root)
-    return g_min, best
+    return best[0], best[2]
 
 
 def cost_complexity_prune(
@@ -91,7 +86,7 @@ def cost_complexity_prune(
     leaf_loss, _ = make_leaf_solvers(loss)
     while not root.is_leaf:
         g_min, weakest = _weakest_link_alpha(root, leaf_loss)
-        if weakest is None or g_min >= ccp_alpha:
+        if g_min >= ccp_alpha:
             break
         _collapse_to_leaf(weakest, leaf_loss)
     return root
@@ -129,8 +124,6 @@ def cost_complexity_pruning_path(root: Node, loss):
 
     while not work.is_leaf:
         g_min, weakest = _weakest_link_alpha(work, leaf_loss)
-        if weakest is None:
-            break
         _collapse_to_leaf(weakest, leaf_loss)
         alphas.append(float(max(g_min, alphas[-1])))   # keep monotonic
         impurities.append(_leaves_loss_sum(work))

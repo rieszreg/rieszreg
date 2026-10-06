@@ -64,38 +64,37 @@ alpha_hat = est.predict(df)
 - **All four built-in losses**: `SquaredLoss` (default), `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss`. Splits are loss-aware: each loss has its own analytic per-leaf objective and the splitter optimises the corresponding gain.
 - **Two growth policies**: `growth_policy="depthwise"` (default; recursive depth-first) and `"leafwise"` (best-first growth, capped by `max_leaf_nodes`).
 - **Cost-complexity pruning** via `ccp_alpha > 0`. Default off.
-- **Early stopping** via `early_stopping_rounds` + `validation_fraction`. Default off.
+- **Early stopping** via `early_stopping_rounds` + `validation_fraction`. Default off. The fitted tree is the partial tree with the best held-out loss.
 - **Categorical predictors** via `categorical_features=(col_idx, ...)`. Splits use the standard CART trick: order levels by within-level α* and sweep contiguous splits.
 - **Save / load**: directory format with JSON predictor + JSON metadata. Built-in estimands round-trip automatically.
 - **Diagnostics**: `TreeDiagnostics` extends `rieszreg.Diagnostics` with `n_leaves`, `max_depth_actual`, `mean_leaf_size`, `feature_importances` (per-feature normalised split-gain).
 - **R wrapper**: R6 mirror via reticulate.
 - **Cython prediction**: `predict` walks a flat-array tree (built once per fit) at C speed. The `Node` tree continues to back diagnostics, pruning, and serialization.
-- **Three Cython splitter paths**: `splitter="exact"` (default; per-feature threshold sweep), `splitter="hist"` (quantile-binned histogram, fastest at large `n`), `splitter="random"` (sklearn ExtraTrees-style; one uniform threshold per feature). `splitter="python"` keeps the legacy pure-Python path (deprecated, scheduled for removal in v0.0.3).
-- **Custom-loss extension hook**: `riesztree.fast.register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` plugs a Numba `@cfunc` (signature `float64(float64, float64)`) into the Cython splitter for any user `Loss` subclass.
-- **138 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, parent-minus-sibling histogram parity, random splitter, deprecation of the python splitter, sklearn-style cost-complexity pruning path.
+- **Three Cython splitter paths**: `splitter="exact"` (default; per-feature threshold sweep), `splitter="hist"` (quantile-binned histogram, fastest at large `n`), `splitter="random"` (sklearn ExtraTrees-style; one uniform threshold per feature).
+- **Custom-loss extension hook**: `riesztree.fast.register_fast_leaf_solver(LossClass, leaf_loss_cfunc, alpha_at_opt)` plugs a Numba `@cfunc` (signature `float64(float64, float64)`) into the Cython exact splitter for any user `Loss` subclass.
+- **138 Python tests** covering decoupling, Backend Protocol, growth policies, pruning, early stopping, categorical, sklearn integration, save/load round-trip per estimand, KL on TSM, BoundedSquared clipping, leaf-self-parity, sklearn-style hyperparameter parity, flat-tree predict parity, Cython↔Python splitter parity, user-loss registration, histogram splitter parity, Cython-driver vs Python-grower histogram parity, fit/predict leaf-membership agreement on tied data, early-stopping rollback, random splitter, registry-over-built-in dispatch order, sklearn-style cost-complexity pruning path.
 
 ## Hyperparameters
 
 | Knob | Default | Notes |
 |---|---|---|
-| `max_depth` | 8 | Cap on tree depth. |
+| `max_depth` | 8 | Cap on tree depth; `None` means no cap. |
 | `min_samples_split` | 20 | Minimum count of original (D > 0) augmented rows in a node before considering a split. |
 | `min_samples_leaf` | 10 | Minimum count of original rows in each child. |
 | `min_weight_fraction_leaf` | 0.0 | Sklearn parity. With unit weights, leaves must hold ≥ `ceil(min_weight_fraction_leaf · n_original)` original rows (combined with `min_samples_leaf` via `max(...)`). |
-| `max_leaf_nodes` | 31 | Cap for leafwise growth. Ignored when `growth_policy="depthwise"`. |
+| `max_leaf_nodes` | 31 | Cap for leafwise growth; `None` means no cap. Ignored when `growth_policy="depthwise"`. |
 | `max_features` | None | Per-split feature subsample. `None`, `"sqrt"`, `"log2"`, an int, or a float in `(0, 1]`. Sklearn convention. |
 | `growth_policy` | `"depthwise"` | Or `"leafwise"`. |
 | `min_impurity_decrease` | 0.0 | Reject splits with gain ≤ this threshold. |
 | `ccp_alpha` | 0.0 | Cost-complexity pruning penalty. Sklearn name. |
-| `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many splits. |
+| `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many splits, then roll back to the partial tree with the best held-out loss. |
 | `validation_fraction` | 0.1 | Held-out fraction for early stopping. Ignored when not needed. |
 | `categorical_features` | None | Sequence of column indices treated as integer category labels. |
 | `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
-| `random_state` | 0 | Seeds the per-split feature subsample under `max_features`. |
-| `splitter` | `"exact"` | One of `"exact"`, `"hist"`, `"random"`, `"python"`. See the Splitter modes section below. |
+| `init` | None | No effect on a tree: each leaf stores its loss-optimal α directly. |
+| `random_state` | 0 | Seeds the per-split feature subsample under `max_features`, the random splitter, and the histogram bin subsample. |
+| `splitter` | `"exact"` | One of `"exact"`, `"hist"`, `"random"`. See the Splitter modes section below. |
 | `max_bins` | 255 | Bins per feature when `splitter="hist"`. Sklearn HGB convention; fits in `uint8`. |
-
-`splitter="python"` is also deprecated and will be removed in v0.0.3.
 
 ## Splitter modes
 
@@ -104,9 +103,8 @@ alpha_hat = est.predict(df)
 | `"exact"` (default) | Most fits. Best partition; per-feature linear scan over distinct values. | Cython per-feature sweep with C-call dispatch into the Bregman leaf-loss kernels in `riesztree.fast._loss_kernels`. |
 | `"hist"` | Large `n` (≥ 10⁵), or inside a forest where slight discretization is fine. | Quantile pre-binning (`max_bins`, default 255) once per fit; per-leaf histogram accumulation + sweep, all in Cython. |
 | `"random"` | ExtraTrees-style forests; cheap baseline. | One uniform threshold per feature per leaf; single Cython pass. |
-| `"python"` | Legacy / debugging. Deprecated, removed in v0.0.3. | Pure-Python sweep over distinct values. |
 
-Custom user `Loss` subclasses are routed to the Cython exact / hist / random paths once registered via [`riesztree.fast.register_fast_leaf_solver`](#custom-loss-extension-hook); unregistered ones fall back to the Python path with a one-time warning.
+Custom user `Loss` subclasses run on the Cython exact splitter (`splitter="exact"`) once registered via [`riesztree.fast.register_fast_leaf_solver`](#custom-loss-extension-hook). The registry is checked before the built-ins, so a registered subclass of a built-in loss uses the registered kernel for split search and leaf values. Unregistered custom losses raise `NotImplementedError` at fit.
 
 ## Custom loss extension hook
 
@@ -157,6 +155,7 @@ The remaining ~1.35× to XGBoost at the largest cell is concentrated in the quan
 - **High variance.** A single tree has higher RMSE than a forest or booster on the same DGP — cf. `forestriesz` / `rieszboost` for accuracy-first work.
 - **No confidence intervals in v1.** Honest splits are not implemented.
 - **Constant per-leaf α only.** Linear-in-X leaves (model trees) and treatment-dimension sieves are documented as future work but not implemented.
+- **Covariate-only splits can have zero gain.** For ATE and TSM, a split on covariates alone leaves every leaf with the same α, so the tree must split on the treatment first. With small `max_features`, a node whose random draw holds no valid split searches the remaining features, as in sklearn.
 - **KL / Bernoulli + difference-of-evaluations estimands.** Splits that produce a leaf with `C > 0` (KL) or `C` outside `(-D, 0)` (Bernoulli) are disqualified. KL is intended for density-ratio estimands like `TSM`; pairing it with `ATE` will produce many disqualified splits.
 
 ## On the roadmap

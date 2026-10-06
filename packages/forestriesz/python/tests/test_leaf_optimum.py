@@ -110,6 +110,26 @@ def test_sieve_leaf_matches_closed_form_ate():
     np.testing.assert_allclose(pred, expected_pred, rtol=5e-2, atol=5e-2)
 
 
+def test_l2_ridges_the_leaf_solve_tsm():
+    """With ``l2``, a single leaf solves (mean J + l2) θ = mean A, i.e.
+    θ = Σ A / (Σ J + n · l2); for TSM that's 1 / (p̂ + l2)."""
+    rng = np.random.default_rng(0)
+    n = 400
+    df = pd.DataFrame({"a": (rng.uniform(size=n) > 0.4).astype(float), "x": rng.normal(size=n)})
+    estimand = TSM(level=1, covariates=["x"])
+    l2 = 0.5
+    p_hat = df["a"].mean()
+
+    est = ForestRieszRegressor(
+        estimand=estimand, n_estimators=1,
+        min_samples_split=10**6, min_samples_leaf=10**6,
+        max_samples=0.999, max_features=None,
+        l2=l2, init=0.0, random_state=0,
+    ).fit(df)
+    treated = df["a"].values == 1
+    np.testing.assert_allclose(est.predict(df)[treated], 1.0 / (p_hat + l2), rtol=5e-2)
+
+
 def test_vectorized_moments_match_trace():
     """The backend reads m(W_i; φ_j) off ``estimand.augment``; it must equal
     the per-row trace Σ coef · φ_j(point) for every built-in and a custom

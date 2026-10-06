@@ -11,7 +11,7 @@ Categorical splits use ``feature_index, left_levels`` (left = ``x in left_levels
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -46,6 +46,21 @@ class Node:
             else:
                 node = node.left if int(x[node.split_feature]) in node.split_left_levels else node.right
         return node.alpha
+
+
+def check_categorical(features: np.ndarray, categorical_features) -> None:
+    """Categorical columns hold integer level codes; raise on NaN or
+    non-integer values (they would be truncated or undefined downstream)."""
+    for j in categorical_features:
+        col = features[:, j]
+        bad = ~np.isfinite(col) | (col != np.round(col))
+        if bad.any():
+            raise ValueError(
+                f"Categorical column {j} must hold integer level codes; found "
+                f"{np.unique(col[bad])[:5].tolist()}. Encode categories as "
+                "integers (e.g. pandas `.cat.codes`) and handle missing values "
+                "before fitting."
+            )
 
 
 def predict_array(root: Node, X: np.ndarray) -> np.ndarray:

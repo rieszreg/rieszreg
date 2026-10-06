@@ -8,7 +8,6 @@ Locally linear with sieve: save works, load needs the user to repass
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from forestriesz import ATE, ForestRieszRegressor, TSM
 from forestriesz.feature_fns import default_riesz_features

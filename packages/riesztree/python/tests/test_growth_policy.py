@@ -1,7 +1,6 @@
 """Growth policy: depthwise + leafwise both produce reasonable trees."""
 from __future__ import annotations
 
-import numpy as np
 
 from riesztree import ATE, RieszTreeRegressor
 

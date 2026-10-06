@@ -155,18 +155,18 @@ An ensemble of `riesztree.RieszTreeBackend` instances. For each tree, original-r
 
 Augmented rows carry weights $D_r$ (1 if $z_r$ is the original observation, 0 otherwise) and $C_r$ (the trace coefficient at $z_r$). The empirical Bregman-Riesz loss decomposes as $\sum_r [D_r \tilde h(\alpha(z_r)) + C_r h'(\alpha(z_r))]$, so each leaf has a closed-form per-loss optimum. For ATE the per-leaf solve recovers $1/\hat P(A=a \mid X\text{-leaf})$; for AdditiveShift it recovers a local density-ratio estimator. No user-supplied basis functions are needed — the augmented row weights already vary per row.
 
-When `splitter="hist"` on "simple" configurations (no categoricals, default `max_features`, no `ccp_alpha`, no leaf cap, built-in loss), the bin mapper is fitted once on the full augmented training data and reused across joblib workers — `sklearn.ensemble.HistGradientBoostingRegressor` convention. Saves `n_estimators - 1` repeats of `fit_bin_mapper + transform`. The win is largest at shallow depths where per-tree binning dominates tree-build cost (~2× faster at `max_depth=8`).
+With `splitter="hist"`, the bin mapper is fitted once on the full augmented training data and every tree slices the shared binned matrix (the `sklearn.ensemble.HistGradientBoostingRegressor` convention). This saves `n_estimators - 1` repeats of `fit_bin_mapper + transform`. Setting `max_leaf_nodes` grows each tree best-first up to that many leaves, as in sklearn. `init` has no effect: each leaf stores its loss-optimal α directly.
 
 ### Moment-style: `ForestRieszBackend` (`MomentBackend.fit_rows`)
 
-Per-row moments $m(\varphi)(Z_i, Y_i)$ are computed from `rieszreg.trace(estimand, Z_i)` for each user-supplied basis function $\varphi_j$ and packed into EconML's linear-moment slot:
+Per-row moments $m(\varphi)(Z_i, Y_i)$ are computed for each basis function $\varphi_j$ from the augmented rows `estimand.augment` emits (vectorized for the built-in estimands), and packed into EconML's linear-moment slot:
 
 ```
 A[i, j] = Σ_(coef, point) ∈ trace(Z_i)  coef · φ_j(point)         (per-row moment vector)
 J[i]     = φ(Z_i) φ(Z_i)'                                          (per-row Jacobian)
 ```
 
-In each leaf the closed-form solve is `θ_ℓ = (Σ_i J_i)^{-1} Σ_i A_i`. The MSE splitting criterion picks splits that minimize sum of in-leaf residuals against this leaf optimum — exactly what the paper's reference implementation uses.
+In each leaf the closed-form solve is `θ_ℓ = (Σ_i J_i + n_ℓ · l2 · I)^{-1} Σ_i A_i`, with the optional `l2` ridge (default 0). With `l2 > 0` the forest can grow leaves with no treated or no control rows. Their θ is about `A / l2`, which gives very large α̂ for new rows landing there, so leave `l2` at 0 unless you need it. The MSE splitting criterion picks splits that minimize sum of in-leaf residuals against this leaf optimum — exactly what the paper's reference implementation uses.
 
 ## Sklearn integration
 

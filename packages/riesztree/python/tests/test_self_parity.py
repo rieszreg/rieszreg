@@ -64,3 +64,16 @@ def test_leaf_values_match_closed_form_on_same_partition():
         assert np.isclose(a_star, leaf.alpha, atol=1e-12), (
             f"leaf α*={leaf.alpha}, recomputed={a_star}, D={D_sum}, C={C_sum}"
         )
+
+
+def test_bernoulli_leaf_loss_is_continuous_at_alpha_one():
+    """At C = -D the Bernoulli leaf optimum is α* = 1 with loss 0, the limit
+    of the interior formula; it must not be treated as infeasible."""
+    from riesztree.fast._loss_kernels import py_dispatch_leaf_loss
+    from riesztree.splitter import _leaf_loss_bernoulli
+
+    D = 3.0
+    for leaf_loss in (_leaf_loss_bernoulli, lambda D, C: py_dispatch_leaf_loss(2, D, C, 0.0, 1.0)):
+        assert leaf_loss(D, -D) == 0.0
+        assert abs(leaf_loss(D, -D * (1 - 1e-9))) < 1e-6
+        assert leaf_loss(D, -1.01 * D) == float("inf")

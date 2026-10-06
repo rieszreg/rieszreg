@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Sequence
+from typing import ClassVar
 
 import numpy as np
 
@@ -28,7 +28,7 @@ from rieszreg import Loss, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 
 from .fast import FlatTree, flat_tree_from_node, predict_alpha as _flat_predict_alpha
-from .tree import Node, from_dict, to_dict
+from .tree import Node, check_categorical, from_dict, to_dict
 
 
 @dataclass
@@ -57,8 +57,14 @@ class RieszTreePredictor:
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         """Per-leaf α* sits in α-space already; return as-is."""
-        flat = self._ensure_flat_tree()
-        return _flat_predict_alpha(flat, np.asarray(features))
+        features = np.asarray(features)
+        check_categorical(features, self.categorical_features)
+        return self._predict_alpha_unchecked(features)
+
+    def _predict_alpha_unchecked(self, features: np.ndarray) -> np.ndarray:
+        """``predict_alpha`` without the categorical-code check, for callers
+        (the forest predictor) that run it once for many trees."""
+        return _flat_predict_alpha(self._ensure_flat_tree(), features)
 
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
         alpha = self.predict_alpha(features)

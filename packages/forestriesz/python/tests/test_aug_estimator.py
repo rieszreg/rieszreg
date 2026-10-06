@@ -105,3 +105,33 @@ def test_aug_custom_estimand_runs():
     pred = est.predict(df)
     assert pred.shape == (n,)
     assert np.all(np.isfinite(pred))
+
+
+def test_aug_max_leaf_nodes_caps_every_tree():
+    """``max_leaf_nodes`` grows each tree best-first up to the cap, as in
+    sklearn's RandomForestRegressor."""
+    from riesztree.tree import n_leaves
+
+    df = dgps.linear_gaussian_ate().sample(800, np.random.default_rng(0))
+    est = AugForestRieszRegressor(
+        estimand=ATE(treatment="a", covariates=["x"]),
+        n_estimators=5, max_leaf_nodes=6, random_state=0,
+    ).fit(df)
+    counts = [n_leaves(t.tree) for t in est.predictor_.trees]
+    assert max(counts) <= 6
+    assert min(counts) >= 4
+
+
+def test_aug_categorical_rejects_non_integer_codes_at_predict():
+    rng = np.random.default_rng(0)
+    n = 400
+    cat = rng.integers(0, 4, n).astype(float)
+    a = (rng.uniform(size=n) < 0.2 + 0.15 * cat).astype(float)
+    df = pd.DataFrame({"a": a, "cat": cat})
+    est = AugForestRieszRegressor(
+        estimand=ATE(treatment="a", covariates=["cat"]),
+        n_estimators=3, categorical_features=[1], random_state=0,
+    ).fit(df)
+    assert np.isfinite(est.predict(df)).all()
+    with pytest.raises(ValueError, match="integer level codes"):
+        est.predict(df.assign(cat=df["cat"] + 0.5))

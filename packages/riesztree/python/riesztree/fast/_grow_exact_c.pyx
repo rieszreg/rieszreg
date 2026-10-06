@@ -261,6 +261,10 @@ cdef void _best_split_at_leaf(
                 feat_best_gain = gain
                 feat_best_k = k
                 feat_best_thr = 0.5 * (svals[k] + svals[k + 1])
+                # Rounding can land the midpoint on the right value (or
+                # overflow); fall back to the left value, as sklearn does.
+                if feat_best_thr == svals[k + 1] or not isfinite(feat_best_thr):
+                    feat_best_thr = svals[k]
 
         if feat_best_k >= 0 and feat_best_gain > best_gain_overall:
             best_gain_overall = feat_best_gain
@@ -298,16 +302,12 @@ def grow_depthwise_exact_c(
     cdef Py_ssize_t n_aug = D.shape[0]
     cdef int n_features = features.shape[1]
 
-    # Worst-case node-count cap. Same formula as
-    # :func:`grow_depthwise_hist_c`. ``2 * n_aug + 1`` is a safe upper
-    # bound at unlimited depth (every leaf has ≥ 1 row).
-    cdef Py_ssize_t max_nodes_cap
-    if max_depth >= 31:
-        max_nodes_cap = max(2 * n_aug + 1, 1024)
-    else:
-        max_nodes_cap = (1 << (max_depth + 1)) + 1
-        if max_nodes_cap < 1024:
-            max_nodes_cap = 1024
+    # Node cap: a depth-d tree has at most 2^(d+1) - 1 nodes, and every
+    # leaf is non-empty, so there are at most 2 * n_aug - 1 nodes.
+    cdef Py_ssize_t max_nodes_cap = 2 * n_aug + 1
+    # Shift in Py_ssize_t: a C int overflows at max_depth = 30.
+    if max_depth < 31 and ((<Py_ssize_t>1) << (max_depth + 1)) + 1 < max_nodes_cap:
+        max_nodes_cap = ((<Py_ssize_t>1) << (max_depth + 1)) + 1
 
     cdef object tree = GrowableFlatTree(max_nodes_cap)
     cdef i32[::1] tree_feature = tree.feature

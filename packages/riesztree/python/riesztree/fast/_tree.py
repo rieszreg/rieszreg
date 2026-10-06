@@ -18,7 +18,7 @@ fit time; subsequent prediction is then O(n_rows × depth) at C speed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np

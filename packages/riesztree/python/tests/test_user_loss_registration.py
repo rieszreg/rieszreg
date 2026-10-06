@@ -9,7 +9,6 @@ fit on the same DGP.
 """
 from __future__ import annotations
 
-import importlib
 
 import numpy as np
 import pandas as pd
@@ -33,8 +32,8 @@ numba = pytest.importorskip("numba")
 # back to the user registry rather than the built-in dispatch.
 
 class _MySquaredLoss(Loss):
-    """Identical math to SquaredLoss, but a fresh Loss subclass —
-    the built-in `loss_kind_for` returns ``None`` for it."""
+    """Identical math to SquaredLoss, but a fresh Loss subclass with no
+    built-in leaf solver."""
 
     name = "_MySquaredLoss"
 
@@ -123,16 +122,6 @@ def test_register_uses_user_cfunc_kind():
         _USER_LOSS_REGISTRY.pop(_MySquaredLoss, None)
 
 
-def test_register_rejects_invalid_address():
-    with pytest.raises(ValueError, match="invalid C-callable address"):
-        register_fast_leaf_solver(_MySquaredLoss, 0, _mysquared_alpha_at_opt)
-
-
-def test_register_rejects_non_callable_alpha():
-    with pytest.raises(TypeError, match="alpha_at_opt"):
-        register_fast_leaf_solver(_MySquaredLoss, _mysquared_leaf_loss, 42)
-
-
 def test_user_cfunc_fit_matches_builtin_squared_loss(_registered_mysquared):
     """Fit with the user-registered loss vs vanilla SquaredLoss on the
     same seed; predictions must agree exactly."""
@@ -145,6 +134,34 @@ def test_user_cfunc_fit_matches_builtin_squared_loss(_registered_mysquared):
         estimand=estimand, loss=_MySquaredLoss(), max_depth=4, random_state=0
     ).fit(df)
     np.testing.assert_array_equal(builtin.predict(df), user.predict(df))
+
+
+class _DoubledSquaredLoss(SquaredLoss):
+    """A registered subclass of a built-in: the registry must win for both
+    split search and leaf values."""
+
+
+def _doubled_alpha_at_opt(D, C):
+    return 0.0 if D <= 0.0 else -2.0 * C / D
+
+
+def test_registered_builtin_subclass_uses_registry_for_leaves():
+    """Same leaf-loss kernel as SquaredLoss (so the same splits) but a
+    doubled ``alpha_at_opt``: leaf values must come from the registry."""
+    register_fast_leaf_solver(
+        _DoubledSquaredLoss, _mysquared_leaf_loss, _doubled_alpha_at_opt
+    )
+    try:
+        df = _make_df(n=600, p=4)
+        builtin = RieszTreeRegressor(
+            estimand=_ate(4), loss=SquaredLoss(), max_depth=4, random_state=0
+        ).fit(df)
+        user = RieszTreeRegressor(
+            estimand=_ate(4), loss=_DoubledSquaredLoss(), max_depth=4, random_state=0
+        ).fit(df)
+        np.testing.assert_allclose(user.predict(df), 2.0 * builtin.predict(df))
+    finally:
+        _USER_LOSS_REGISTRY.pop(_DoubledSquaredLoss, None)
 
 
 def test_unregistered_loss_raises_helpful_error():

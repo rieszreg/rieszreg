@@ -95,7 +95,7 @@ Backends implementing both default to `fit_augmented` for back-compat.
 | Convenience subclass (`RieszBooster`, `KernelRieszRegressor`) | `packages/<pkg>/python/<pkg>/` | rieszreg |
 | Per-package R wrapper subclassing `RieszEstimatorR6` | `packages/<pkg>/r/<pkg>/R/` | rieszreg |
 
-Implementation packages depend on `rieszreg`. They never depend on each other. If you find yourself importing from a sibling impl package, the abstraction belongs in `rieszreg`.
+Implementation packages depend on `rieszreg`. They never depend on each other. If you find yourself importing from a sibling impl package, the abstraction belongs in `rieszreg`. The one exception: forestriesz depends on riesztree, because `AugForestRieszBackend` is a bag of riesztree trees. It calls `RieszTreeBackend._bin` / `_fit_binned` and `RieszTreePredictor._predict_alpha_unchecked` directly; keep those signatures in step when editing either package.
 
 ## 6. sklearn-first
 

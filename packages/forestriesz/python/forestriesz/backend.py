@@ -70,7 +70,9 @@ class ForestRieszBackend:
         False because cross-fitting (``cross_val_predict``) does not require
         honesty; flip to True when you want ``predict_interval``.
     l2
-        Ridge added to the per-leaf Jacobian for numerical stability.
+        Ridge added to the per-leaf Jacobian: each leaf solves
+        ``(mean J + l2 · I) θ = mean A``. Default 0; see
+        ``ForestRieszRegressor`` for why ``l2 > 0`` can hurt.
     """
 
     riesz_feature_fns: list[Callable] | str | None = "auto"
@@ -89,9 +91,8 @@ class ForestRieszBackend:
     inference: bool = False
     fit_intercept: bool = True
     subforest_size: int = 4
-    l2: float = 0.01
+    l2: float = 0.0
     n_jobs: int = -1
-    random_state: int = 0
     verbose: int = 0
 
     def fit_rows(
@@ -173,6 +174,7 @@ class ForestRieszBackend:
 
         forest = _RieszGRF(
             n_outputs_riesz=p,
+            l2=self.l2,
             n_estimators=self.n_estimators,
             criterion="mse",
             max_depth=self.max_depth,

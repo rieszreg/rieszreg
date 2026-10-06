@@ -8,7 +8,6 @@ converges to the inverse propensity weights.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from forestriesz import ATE, ForestRieszRegressor
 from forestriesz.feature_fns import default_riesz_features

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from rieszreg import BernoulliLoss, BoundedSquaredLoss, KLLoss, Loss, SquaredLoss
+from rieszreg import BoundedSquaredLoss, KLLoss, Loss, SquaredLoss
 from riesztree import ATE, RieszTreeRegressor, TSM
 
 

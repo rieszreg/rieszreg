@@ -127,9 +127,9 @@ def transform(X: np.ndarray, mapper: BinMapper) -> np.ndarray:
 
     Returns a contiguous ``uint8`` array of shape ``(n, p)``. Values
     above the largest threshold land in the rightmost bin; below the
-    smallest, in bin 0. ``np.searchsorted`` with side='right' realises
-    the "right-inclusive" boundary used at fit time (see
-    :func:`fit_bin_mapper`).
+    smallest, in bin 0. ``np.searchsorted`` with side='left' puts a value
+    equal to ``thr[b]`` in bin ``b``, so binned splits (``bin <= b``) and
+    predict-time splits (``x <= thr[b]``) agree on ties.
     """
     n, p = X.shape
     out = np.empty((n, p), dtype=np.uint8)
@@ -138,7 +138,5 @@ def transform(X: np.ndarray, mapper: BinMapper) -> np.ndarray:
         if thr.size == 0:
             out[:, j] = 0
         else:
-            # searchsorted(thr, x, side='right') returns the bin index
-            # in {0, ..., len(thr)}.
-            out[:, j] = np.searchsorted(thr, X[:, j], side="right").astype(np.uint8)
+            out[:, j] = np.searchsorted(thr, X[:, j], side="left").astype(np.uint8)
     return np.ascontiguousarray(out)

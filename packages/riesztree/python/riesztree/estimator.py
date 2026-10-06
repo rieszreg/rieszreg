@@ -14,7 +14,7 @@ from typing import Sequence
 
 from sklearn.utils.validation import check_is_fitted
 
-from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator
 
 import numpy as np
 
@@ -39,8 +39,8 @@ class RieszTreeRegressor(RieszEstimator):
         Bregman-Riesz loss. ``None`` resolves to ``SquaredLoss()``. Built-in
         support: ``SquaredLoss``, ``KLLoss``, ``BernoulliLoss``,
         ``BoundedSquaredLoss``.
-    max_depth : int, default=8
-        Maximum tree depth.
+    max_depth : int or None, default=8
+        Maximum tree depth. ``None`` means unlimited.
     min_samples_split : int, default=20
         Minimum count of original (D > 0) augmented rows in a node before
         considering a split.
@@ -50,8 +50,9 @@ class RieszTreeRegressor(RieszEstimator):
         sklearn parity: leaves must contain at least
         ``ceil(min_weight_fraction_leaf * n_original_total)`` original rows
         (combined with ``min_samples_leaf`` via ``max(...)``). Default 0.0.
-    max_leaf_nodes : int, default=31
-        Cap for leafwise growth. Ignored when ``growth_policy="depthwise"``.
+    max_leaf_nodes : int or None, default=31
+        Cap for leafwise growth (``None`` means unlimited). Ignored when
+        ``growth_policy="depthwise"``.
     max_features : int, float, {"sqrt", "log2"}, or None, default=None
         Per-split feature-subsampling rule (sklearn convention).
     growth_policy : {"depthwise", "leafwise"}, default="depthwise"
@@ -62,7 +63,8 @@ class RieszTreeRegressor(RieszEstimator):
         Cost-complexity pruning penalty. ``0`` disables pruning.
     early_stopping_rounds : int or None, default=None
         Stop growing when held-out augmented loss has not improved for that
-        many consecutive accepted splits. ``None`` disables.
+        many consecutive accepted splits, then roll back to the partial tree
+        with the best held-out loss. ``None`` disables.
     validation_fraction : float, default=0.1
         Held-out fraction the orchestrator splits off before augmentation
         when early stopping is enabled. Ignored when no holdout is needed.
@@ -71,12 +73,15 @@ class RieszTreeRegressor(RieszEstimator):
         category labels; the splitter sorts levels by within-level α* and
         sweeps contiguous splits, per the standard CART convention.
     init : float or None
-        α-space initialization, threaded through to ``RieszEstimator``.
+        Accepted for API parity with the other learners. Leaves store the
+        loss-optimal α directly, so it has no effect on a tree.
     random_state : int, default=0
-        Seeds the per-split feature subsample under ``max_features``.
+        Seeds the per-split feature subsample under ``max_features``, the
+        random splitter and the histogram bin subsample.
     splitter : {"exact", "hist", "random"}, default="exact"
         Split search. ``"exact"`` scans every threshold; ``"hist"`` bins
-        each feature into ``max_bins`` quantile bins (faster on large n).
+        each feature into ``max_bins`` quantile bins (faster on large n);
+        ``"random"`` draws one random threshold per feature per node.
     max_bins : int, default=255
         Number of bins per feature for ``splitter="hist"``.
     """
@@ -85,11 +90,11 @@ class RieszTreeRegressor(RieszEstimator):
         self,
         estimand: Estimand,
         loss: Loss | None = None,
-        max_depth: int = 8,
+        max_depth: int | None = 8,
         min_samples_split: int = 20,
         min_samples_leaf: int = 10,
         min_weight_fraction_leaf: float = 0.0,
-        max_leaf_nodes: int = 31,
+        max_leaf_nodes: int | None = 31,
         max_features: object = None,
         growth_policy: str = "depthwise",
         min_impurity_decrease: float = 0.0,
@@ -126,9 +131,6 @@ class RieszTreeRegressor(RieszEstimator):
 
     # ---- backend construction ----
 
-    def _resolved_loss(self) -> Loss:
-        return self.loss if self.loss is not None else SquaredLoss()
-
     def _resolved_backend(self) -> RieszTreeBackend:
         cat = (
             tuple(int(i) for i in self.categorical_features)
@@ -154,7 +156,6 @@ class RieszTreeRegressor(RieszEstimator):
             early_stopping_rounds=self.early_stopping_rounds,
             validation_fraction=val_frac,
             categorical_features=cat,
-            random_state=self.random_state,
             splitter=self.splitter,
             max_bins=self.max_bins,
         )
@@ -184,11 +185,11 @@ class RieszTreeRegressor(RieszEstimator):
         check_is_fitted(self, "predictor_")
         return feature_importance(self.predictor_.tree, len(self.estimand_.feature_keys))
 
-    def diagnose(self, Z, **kwargs):
+    def diagnose(self, Z, y=None, **kwargs):
         """Base diagnostics plus tree extras: number of leaves, depth,
         mean leaf size and feature importances."""
         from .diagnostics import diagnose_tree
-        return diagnose_tree(self, Z, **kwargs)
+        return diagnose_tree(self, Z, y=y, **kwargs)
 
     def cost_complexity_pruning_path(self, Z=None, y=None):
         """Cost-complexity pruning path (sklearn convention).
@@ -233,57 +234,3 @@ class RieszTreeRegressor(RieszEstimator):
             loss = self.loss_
 
         return _path(tree, loss)
-
-    # ---- save/load ----
-
-    def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            max_depth=self.max_depth,
-            min_samples_split=self.min_samples_split,
-            min_samples_leaf=self.min_samples_leaf,
-            min_weight_fraction_leaf=self.min_weight_fraction_leaf,
-            max_leaf_nodes=self.max_leaf_nodes,
-            max_features=self.max_features,
-            growth_policy=self.growth_policy,
-            min_impurity_decrease=self.min_impurity_decrease,
-            ccp_alpha=self.ccp_alpha,
-            early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=self.validation_fraction,
-            splitter=self.splitter,
-            max_bins=self.max_bins,
-            categorical_features=(
-                list(int(i) for i in self.categorical_features)
-                if self.categorical_features is not None
-                else None
-            ),
-        )
-        return base
-
-    @classmethod
-    def _construct_for_load(
-        cls, *, estimand, loss, hyperparameters: dict
-    ) -> "RieszTreeRegressor":
-        cat = hyperparameters.get("categorical_features")
-        return cls(
-            estimand=estimand,
-            loss=loss,
-            max_depth=hyperparameters.get("max_depth", 8),
-            min_samples_split=hyperparameters.get("min_samples_split", 20),
-            min_samples_leaf=hyperparameters.get("min_samples_leaf", 10),
-            min_weight_fraction_leaf=hyperparameters.get(
-                "min_weight_fraction_leaf", 0.0
-            ),
-            max_leaf_nodes=hyperparameters.get("max_leaf_nodes", 31),
-            max_features=hyperparameters.get("max_features"),
-            growth_policy=hyperparameters.get("growth_policy", "depthwise"),
-            min_impurity_decrease=hyperparameters.get("min_impurity_decrease", 0.0),
-            ccp_alpha=hyperparameters.get("ccp_alpha", 0.0),
-            early_stopping_rounds=hyperparameters.get("early_stopping_rounds"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.1),
-            categorical_features=tuple(int(i) for i in cat) if cat else None,
-            init=hyperparameters.get("init"),
-            random_state=hyperparameters.get("random_state", 0),
-            splitter=hyperparameters.get("splitter", "exact"),
-            max_bins=hyperparameters.get("max_bins", 255),
-        )
