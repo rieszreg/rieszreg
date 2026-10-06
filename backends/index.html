@@ -527,7 +527,10 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#pick-a-backend" id="toc-pick-a-backend" class="nav-link active" data-scroll-target="#pick-a-backend">Pick a backend</a></li>
+  <li><a href="#pick-a-backend" id="toc-pick-a-backend" class="nav-link active" data-scroll-target="#pick-a-backend">Pick a backend</a>
+  <ul class="collapse">
+  <li><a href="#the-same-setting-under-different-names" id="toc-the-same-setting-under-different-names" class="nav-link" data-scroll-target="#the-same-setting-under-different-names">The same setting under different names</a></li>
+  </ul></li>
   <li><a href="#compose-explicitly" id="toc-compose-explicitly" class="nav-link" data-scroll-target="#compose-explicitly">Compose explicitly</a></li>
   <li><a href="#adding-a-backend" id="toc-adding-a-backend" class="nav-link" data-scroll-target="#adding-a-backend">Adding a backend</a>
   <ul class="collapse">
@@ -563,7 +566,7 @@ window.Quarto = {
 </header>
 
 
-<p>A backend fits the Riesz representer for a given estimand and loss. Four implementation packages ship today; each slots into <code>RieszEstimator</code> through one of two Protocols. <code>rieszboost</code> and <code>krrr</code> consume the augmented dataset of evaluation points with weights <span class="math inline">\((D_r, C_r)\)</span> (<code>Backend.fit_augmented</code>). <code>forestriesz</code> ships <em>both</em>: an augmentation-style <code>AugForestRieszRegressor</code> that works on every estimand without per-estimand configuration (<code>Backend.fit_augmented</code>), and a moment-style <code>ForestRieszRegressor</code> that consumes original rows plus a user-supplied list of basis functions (<code>MomentBackend.fit_rows</code>) and supports honest-split confidence intervals. <code>riesznet</code> consumes original rows plus per-row moments via <code>MomentBackend.fit_rows</code>, training a PyTorch model with autograd.</p>
+<p>A backend fits the Riesz representer for a given estimand and loss. Five implementation packages ship today; each slots into <code>RieszEstimator</code> through one of two Protocols. <code>rieszboost</code> and <code>krrr</code> consume the augmented dataset of evaluation points with weights <span class="math inline">\((D_r, C_r)\)</span> (<code>Backend.fit_augmented</code>). <code>forestriesz</code> ships <em>both</em>: an augmentation-style <code>AugForestRieszRegressor</code> that works on every estimand without per-estimand configuration (<code>Backend.fit_augmented</code>), and a moment-style <code>ForestRieszRegressor</code> that consumes original rows plus a user-supplied list of basis functions (<code>MomentBackend.fit_rows</code>) and supports honest-split confidence intervals. <code>riesznet</code> consumes the augmented dataset through <code>Backend.fit_augmented</code>, grouping it by original row to train a PyTorch model with autograd on minibatches of rows.</p>
 <section id="pick-a-backend" class="level2">
 <h2 class="anchored" data-anchor-id="pick-a-backend">Pick a backend</h2>
 <table class="caption-top table">
@@ -637,11 +640,79 @@ window.Quarto = {
 <td><strong>Convenience class</strong></td>
 <td><code>rieszboost.RieszBooster</code></td>
 <td><code>krrr.KernelRieszRegressor</code></td>
-<td><code>forestriesz.AugForestRieszRegressor</code> (works on every estimand without per-estimand configuration) and <code>forestriesz.ForestRieszRegressor</code> (moment-style; user supplies a list of basis functions; supports CIs)</td>
+<td><code>forestriesz.AugForestRieszRegressor</code> (recommended; works on every estimand) and <code>forestriesz.ForestRieszRegressor</code> (the published ForestRiesz method, kept for comparison; supports CIs)</td>
 <td><code>riesznet.RieszNet</code> (default MLP); <code>riesznet.TorchBackend</code> for arbitrary <code>nn.Module</code> factories</td>
 </tr>
 </tbody>
 </table>
+<p>A fifth learner, <a href="../backends/tree.html"><code>riesztree</code></a>, fits a single decision tree (<code>RieszTreeRegressor</code>). It is fast and easy to inspect, and it supports all four losses.</p>
+<section id="the-same-setting-under-different-names" class="level3">
+<h3 class="anchored" data-anchor-id="the-same-setting-under-different-names">The same setting under different names</h3>
+<p>Each learner names its settings after the library it follows (xgboost, sklearn, PyTorch). This table lines them up.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Setting</th>
+<th><code>RieszBooster</code></th>
+<th><code>KernelRieszRegressor</code></th>
+<th><code>AugForestRieszRegressor</code></th>
+<th><code>RieszTreeRegressor</code></th>
+<th><code>RieszNet</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Amount of fitting</td>
+<td><code>n_estimators</code> (trees)</td>
+<td>—</td>
+<td><code>n_estimators</code> (trees)</td>
+<td><code>max_depth</code>, <code>max_leaf_nodes</code></td>
+<td><code>epochs</code></td>
+</tr>
+<tr class="even">
+<td>Step size</td>
+<td><code>learning_rate</code></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>learning_rate</code></td>
+</tr>
+<tr class="odd">
+<td>Regularization</td>
+<td><code>reg_lambda</code>, <code>max_depth</code></td>
+<td><code>lambda_grid</code> (chosen automatically)</td>
+<td><code>min_samples_leaf</code>, <code>max_depth</code></td>
+<td><code>min_samples_leaf</code>, <code>ccp_alpha</code></td>
+<td><code>weight_decay</code>, <code>dropout</code></td>
+</tr>
+<tr class="even">
+<td>Early stopping</td>
+<td><code>early_stopping_rounds</code></td>
+<td>—</td>
+<td>—</td>
+<td><code>early_stopping_rounds</code></td>
+<td><code>early_stopping_rounds</code></td>
+</tr>
+<tr class="odd">
+<td>Held-out fraction</td>
+<td><code>validation_fraction=0.1</code></td>
+<td><code>validation_fraction=0.2</code></td>
+<td>—</td>
+<td><code>validation_fraction=0.1</code></td>
+<td><code>validation_fraction=0.1</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>validation_fraction</code> is used only when early stopping is on. <code>KernelRieszRegressor</code> always holds out rows, because it picks λ from <code>lambda_grid</code> by held-out loss. Passing <code>eval_set=</code> to <code>fit</code> replaces the internal split in every learner.</p>
+</section>
 </section>
 <section id="compose-explicitly" class="level2">
 <h2 class="anchored" data-anchor-id="compose-explicitly">Compose explicitly</h2>
@@ -682,7 +753,7 @@ window.Quarto = {
 <span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    backend<span class="op">=</span>ForestRieszBackend(n_estimators<span class="op">=</span><span class="dv">500</span>),</span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="co"># Neural network (moment-style backend; fit_rows path)</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="co"># Neural network (augmentation-style backend; fit_augmented path)</span></span>
 <span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>est <span class="op">=</span> RieszEstimator(</span>
 <span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(),</span>
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    backend<span class="op">=</span>TorchBackend(</span>
@@ -691,7 +762,7 @@ window.Quarto = {
 <span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>        epochs<span class="op">=</span><span class="dv">300</span>,</span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>    ),</span>
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The convenience classes are thin subclasses that bake in the backend and surface backend-specific hyperparameters as constructor args, so that they fit cleanly into <code>GridSearchCV</code>. See the <a href="../backends/boosting.html">boosting</a>, <a href="../backends/kernel.html">kernel</a>, <a href="../backends/forest.html">forest</a>, and <a href="../backends/neural.html">neural</a> pages for each.</p>
+<p>The convenience classes are thin subclasses that bake in the backend and surface backend-specific hyperparameters as constructor args, so that they fit cleanly into <code>GridSearchCV</code>. See the <a href="../backends/boosting.html">boosting</a>, <a href="../backends/kernel.html">kernel</a>, <a href="../backends/forest.html">forest</a>, <a href="../backends/tree.html">tree</a>, and <a href="../backends/neural.html">neural</a> pages for each.</p>
 </section>
 <section id="adding-a-backend" class="level2">
 <h2 class="anchored" data-anchor-id="adding-a-backend">Adding a backend</h2>
@@ -700,9 +771,9 @@ window.Quarto = {
 <section id="pick-an-entry-point" class="level3">
 <h3 class="anchored" data-anchor-id="pick-an-entry-point">Pick an entry point</h3>
 <p>Two Protocols live in <code>rieszreg.backends.base</code>. Each backend implements one.</p>
-<p><code>Backend.fit_augmented(aug_train, aug_valid, loss, …)</code> is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an <code>AugmentedDataset</code> of pseudo-rows with <code>is_original</code> and <code>potential_deriv_coef</code> columns. The empirical Bregman-Riesz loss at <span class="math inline">\(\alpha\)</span> is the sum over augmented rows <span class="math inline">\(r\)</span> of <span class="math inline">\(D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))\)</span>, where <span class="math inline">\(D_r\)</span> is <code>is_original</code> and <span class="math inline">\(C_r\)</span> is <code>potential_deriv_coef</code>. Reference learners using this entry point: kernel ridge (<code>KernelRidgeBackend</code>), gradient boosting (<code>XGBoostBackend</code>, <code>SklearnBackend</code>), and random forests (<code>AugForestRieszBackend</code>).</p>
-<p><code>MomentBackend.fit_rows(rows_train, rows_valid, estimand, loss, …)</code> is for learners whose loss decomposes per original row. You receive raw rows plus the estimand, and you call <code>rieszreg.trace(estimand, row, y)</code> per row to read the <span class="math inline">\((c_j, a_j)\)</span> pairs. Each row contributes a single loss term, so there is no <span class="math inline">\(k+1\)</span>-fold augmentation blow-up. Reference learners using this entry point: random forests (<code>ForestRieszBackend</code>) and neural nets (<code>TorchBackend</code>).</p>
-<p>Pick by your learner’s natural loss decomposition. Closed-form linear solves and gradient boosting fit <code>fit_augmented</code>, because the augmented sum has the same shape as a per-row weighted regression. Random forests and neural nets fit <code>fit_rows</code>, because each original row is a single training example to the underlying learner. When both fit, pick <code>fit_augmented</code>: the orchestrator dispatches to the moment path only when <code>fit_rows</code> is the only method present.</p>
+<p><code>Backend.fit_augmented(aug_train, aug_valid, loss, …)</code> is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an <code>AugmentedDataset</code> of pseudo-rows with <code>is_original</code> and <code>potential_deriv_coef</code> columns. The empirical Bregman-Riesz loss at <span class="math inline">\(\alpha\)</span> is the sum over augmented rows <span class="math inline">\(r\)</span> of <span class="math inline">\(D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))\)</span>, where <span class="math inline">\(D_r\)</span> is <code>is_original</code> and <span class="math inline">\(C_r\)</span> is <code>potential_deriv_coef</code>. Reference learners using this entry point: kernel ridge (<code>KernelRidgeBackend</code>), gradient boosting (<code>XGBoostBackend</code>, <code>SklearnBackend</code>), random forests (<code>AugForestRieszBackend</code>), and neural nets (<code>TorchBackend</code>, which groups the augmented rows by <code>origin_index</code> to minibatch over original rows).</p>
+<p><code>MomentBackend.fit_rows(X_train, X_valid, estimand, loss, *, aug_train, aug_valid, …)</code> is for learners that fit on the original rows and need the estimand itself. You receive the original-row feature arrays (columns in <code>estimand.feature_keys</code> order), the estimand, and the same augmented datasets <code>fit_augmented</code> would get. The augmented rows give every evaluation point <span class="math inline">\(a_j\)</span> with coefficient <span class="math inline">\(c_j = -C_r\)</span> and the original row it came from (<code>origin_index</code>), so each row’s moment is one vectorised group-by. Each row is a single training example to the learner. Reference learner using this entry point: the EconML-based random forest (<code>ForestRieszBackend</code>), which also reads the estimand to pick its basis functions.</p>
+<p>Pick <code>fit_augmented</code> unless your learner needs the original-row matrix or the estimand: the augmented dataset already carries each row’s moment through <code>origin_index</code>. The orchestrator dispatches to the moment path only when <code>fit_rows</code> is the only method present.</p>
 </section>
 <section id="minimum-viable-wrapper" class="level3">
 <h3 class="anchored" data-anchor-id="minimum-viable-wrapper">Minimum viable wrapper</h3>
@@ -764,31 +835,24 @@ window.Quarto = {
 <section id="moment-style" class="level4">
 <h4 class="anchored" data-anchor-id="moment-style">Moment-style</h4>
 <p>Replace <code>fit_augmented</code> with <code>fit_rows</code>. The predictor stays the same.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> trace</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyMomentBackend:</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, learning_rate<span class="op">=</span><span class="fl">1e-3</span>):</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_rate <span class="op">=</span> learning_rate</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_rows(<span class="va">self</span>, rows_train, rows_valid, estimand, loss,</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>                 <span class="op">*</span>, base_score, random_state, hyperparams,</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>                 ys_train<span class="op">=</span><span class="va">None</span>, ys_valid<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        <span class="co"># For each row i, trace(...) returns the pairs (c_j, a_j) where</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        <span class="co"># m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). Each row's contribution</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        <span class="co"># to the empirical loss is α(Z_i)² − 2 · sum_j c_j · α(a_j) for</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        <span class="co"># squared loss; the general Bregman form lives on `loss`.</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>        moments <span class="op">=</span> []</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i, row <span class="kw">in</span> <span class="bu">enumerate</span>(rows_train):</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>            y_i <span class="op">=</span> ys_train[i] <span class="cf">if</span> ys_train <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="va">None</span></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>            moments.append(trace(estimand, row, y_i))</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> my_moment_fit(</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>            rows_train, moments,</span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>            learning_rate<span class="op">=</span><span class="va">self</span>.learning_rate,</span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>            random_state<span class="op">=</span>random_state,</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        predictor <span class="op">=</span> MyLearnerPredictor(params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> FitResult(predictor<span class="op">=</span>predictor)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyMomentBackend:</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, learning_rate<span class="op">=</span><span class="fl">1e-3</span>):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_rate <span class="op">=</span> learning_rate</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_rows(<span class="va">self</span>, X_train, X_valid, estimand, loss,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                 <span class="op">*</span>, aug_train, aug_valid, base_score, random_state, hyperparams):</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). The augmented rows carry every</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># point a_j, its coefficient c_j = -C_r, and the row i it came from.</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        points <span class="op">=</span> aug_train.features</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        coefs, row <span class="op">=</span> <span class="op">-</span>aug_train.potential_deriv_coef, aug_train.origin_index</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> my_moment_fit(</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>            X_train, points, coefs, row,</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>            learning_rate<span class="op">=</span><span class="va">self</span>.learning_rate,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>            random_state<span class="op">=</span>random_state,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        predictor <span class="op">=</span> MyLearnerPredictor(params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> FitResult(predictor<span class="op">=</span>predictor)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>Backend</code>, <code>MomentBackend</code>, <code>Predictor</code>, and <code>FitResult</code> are all importable from <code>rieszreg.backends</code>. The Protocols are structural (<code>typing.Protocol</code>), so your wrapper does not need to inherit from anything as long as the method signatures match.</p>
 </section>
 </section>

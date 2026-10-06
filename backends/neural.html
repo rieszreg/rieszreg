@@ -563,15 +563,15 @@ window.Quarto = {
 
 
 <p><code>riesznet</code> trains the Riesz representer α(x) with a PyTorch model, in the spirit of <a href="https://arxiv.org/abs/2110.03031">Chernozhukov et al.&nbsp;(2021), <em>RieszNet and ForestRiesz</em></a>. It fits the Riesz representer only — outcome regression is handled separately.</p>
-<p><code>rieszreg</code> exposes the entry point as <code>MomentBackend.fit_rows</code>. The neural backend uses the per-row moment formulation: for each original row <code>z_i</code>,</p>
+<p>The backend implements <code>Backend.fit_augmented</code> and groups the augmented rows by original row: for each original row <code>z_i</code>,</p>
 <p><span class="math display">\[
-L_i = \psi(\alpha(x_i)) - \sum_{j} c_j \cdot \varphi'(\alpha(p_j))
+L_i = \tilde h(\alpha(z_i)) - \sum_{j} c_j \cdot h'(\alpha(p_j))
 \]</span></p>
-<p>where the <code>(c_j, p_j)</code> pairs come from <code>rieszreg.trace(estimand, z_i)</code> and the model produces α via a Bregman link. The training loop minimizes the mean of <code>L_i</code> with autograd; no augmented dataset is built.</p>
+<p>where the <code>(c_j, p_j)</code> pairs are the evaluation points of <code>m</code> at <code>z_i</code> and the model produces α via a Bregman link. These points come from the augmented dataset the orchestrator builds with <code>estimand.augment</code>, so the built-in estimands need no per-row Python work. Each minibatch evaluates the network only at its own rows’ points. The training loop minimizes the mean of <code>L_i</code> with autograd.</p>
 <section id="two-surfaces" class="level2">
 <h2 class="anchored" data-anchor-id="two-surfaces">Two surfaces</h2>
 <ul>
-<li><strong><code>RieszNet</code></strong> — convenience class with a default MLP. Surfaces <code>hidden_sizes</code>, <code>activation</code>, <code>dropout</code>, <code>learning_rate</code>, <code>weight_decay</code>, <code>epochs</code>, <code>device</code>, <code>dtype</code>. Trains full-batch.</li>
+<li><strong><code>RieszNet</code></strong> — convenience class with a default MLP. Surfaces <code>hidden_sizes</code>, <code>activation</code>, <code>dropout</code>, <code>learning_rate</code>, <code>weight_decay</code>, <code>epochs</code>, <code>batch_size</code>, <code>device</code>, <code>dtype</code>.</li>
 <li><strong><code>TorchBackend</code></strong> — power-user surface. Pass any <code>nn.Module</code> factory and any optimizer factory. Compose with <code>rieszreg.RieszEstimator</code> for full control.</li>
 </ul>
 </section>
@@ -1020,9 +1020,9 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f84ee6c52e0&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f7ae4a71820&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f84ee6c52e0&gt;,
+         estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f7ae4a71820&gt;,
          learning_rate=0.005, validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
@@ -1503,13 +1503,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   background-color: var(--sklearn-color-fitted-level-3);
 }
 </style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f84267008f0&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f7ad935ac60&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f8426969100&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f7ad97e1100&gt;,
          validation_fraction=0.2)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszNet</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszNet(early_stopping_rounds=30, epochs=400,
-         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f84267008f0&gt;,
+         estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f7ad935ac60&gt;,
          learning_rate=0.005,
-         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f8426969100&gt;,
+         loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f7ad97e1100&gt;,
          validation_fraction=0.2)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> rn.predict(df)</span>
@@ -1979,7 +1979,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f8426515bc0&gt;,
+</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f7ad8f99d00&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -1990,7 +1990,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
                                     snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f84269690a0&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f8426515bc0&gt;,
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f7ad912fc80&gt;)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>RieszEstimator</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>RieszEstimator(backend=TorchBackend(module_factory=&lt;function my_factory at 0x7f7ad8f99d00&gt;,
                                     optimizer_factory=functools.partial(&lt;class 'torch.optim.adamw.AdamW'&gt;, lr=0.0003, weight_decay=0.001),
                                     scheduler_factory=None,
                                     epochs=300,
@@ -2001,7 +2001,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
                                     early_stopping_rounds=30,
                                     validation_fraction=0.2,
                                     snapshot_epochs=()),
-               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f84269690a0&gt;)</pre></div> </div></div></div></div>
+               estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f7ad912fc80&gt;)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> est.predict(df)</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"α̂ range: [</span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">min</span>()<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>alpha_hat<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:.3f}</span><span class="ss">]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -2066,7 +2066,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="even">
 <td><code>device</code></td>
 <td><code>"cpu"</code></td>
-<td>Also <code>"cuda"</code>, <code>"mps"</code>, <code>"auto"</code>.</td>
+<td>Also <code>"cuda"</code>, <code>"mps"</code>, <code>"auto"</code>. <code>"auto"</code> skips MPS when <code>dtype="float64"</code>.</td>
 </tr>
 <tr class="odd">
 <td><code>dtype</code></td>
@@ -2090,13 +2090,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </tr>
 <tr class="odd">
 <td><code>validation_fraction</code></td>
-<td><code>0.0</code></td>
-<td>Hold out for early stopping.</td>
+<td><code>0.1</code></td>
+<td>Held-out fraction for early stopping. Used only when <code>early_stopping_rounds</code> is set and no <code>eval_set</code> is passed.</td>
 </tr>
 <tr class="even">
 <td><code>early_stopping_rounds</code></td>
 <td><code>None</code></td>
-<td>Patience (in epochs) for validation Riesz loss.</td>
+<td>Patience (in epochs) for validation Riesz loss. The best-validation weights are restored at the end. With <code>None</code>, all <code>epochs</code> run and the final weights are kept.</td>
 </tr>
 <tr class="odd">
 <td><code>random_state</code></td>
@@ -2178,7 +2178,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <pre><code>max abs diff after round-trip: 9.48e+00</code></pre>
 </div>
 </div>
-<p>Save writes <code>state_dict.pt</code> (PyTorch weights, on CPU) plus <code>predictor.json</code> (carries the factory’s module + qualname, the input dim, and the Bregman-loss spec). Load re-imports the factory by qualname, rebuilds the module, and calls <code>load_state_dict</code>.</p>
+<p>Save writes <code>state_dict.pt</code> (PyTorch weights, on CPU) plus <code>predictor.json</code> (carries the factory’s module + qualname, the input dim, and the Bregman-loss spec). Load re-imports the factory by qualname, rebuilds the module, and calls <code>load_state_dict</code>. A model saved on a GPU loads and predicts on a machine without one; it runs on the CPU.</p>
 <p>For built-in estimands the metadata round-trips automatically. For a custom <code>Estimand</code>, pass <code>estimand=</code> to <code>load</code>.</p>
 </section>
 <section id="sklearn-integration" class="level2">

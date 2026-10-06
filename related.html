@@ -492,7 +492,7 @@ ul.task-list li input[type="checkbox"] {
 <p>What’s distinctive here:</p>
 <ul>
 <li>The <code>Backend</code> / <code>MomentBackend</code> split, exposed as a stable Protocol, lets a third-party learner package depend on <code>rieszreg</code> and ship as its own PyPI / CRAN release. New learners do not require a PR upstream.</li>
-<li>The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting via <code>fit_augmented</code>) vs moment-style (forests, neural nets via <code>fit_rows</code>).</li>
+<li>The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting, trees, neural nets via <code>fit_augmented</code>) vs moment-style (the EconML-based forest via <code>fit_rows</code>).</li>
 <li>Cross-language Python + R coverage at the family level via R6 wrappers per package, not just bindings to a Python core.</li>
 </ul>
 
