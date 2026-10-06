@@ -529,7 +529,6 @@ window.Quarto = {
   <ul>
   <li><a href="#pick-a-backend" id="toc-pick-a-backend" class="nav-link active" data-scroll-target="#pick-a-backend">Pick a backend</a>
   <ul class="collapse">
-  <li><a href="#where-to-start" id="toc-where-to-start" class="nav-link" data-scroll-target="#where-to-start">Where to start</a></li>
   <li><a href="#the-same-setting-under-different-names" id="toc-the-same-setting-under-different-names" class="nav-link" data-scroll-target="#the-same-setting-under-different-names">The same setting under different names</a></li>
   </ul></li>
   <li><a href="#compose-explicitly" id="toc-compose-explicitly" class="nav-link" data-scroll-target="#compose-explicitly">Compose explicitly</a></li>
@@ -647,17 +646,6 @@ window.Quarto = {
 </tbody>
 </table>
 <p>A fifth learner, <a href="../backends/tree.html"><code>riesztree</code></a>, fits a single decision tree (<code>RieszTreeRegressor</code>). It is fast and easy to inspect, and it supports all four losses.</p>
-<section id="where-to-start" class="level3">
-<h3 class="anchored" data-anchor-id="where-to-start">Where to start</h3>
-<p>Start with <code>RieszBooster</code> at its default settings. For <span class="math inline">\(n\)</span> in the low thousands to tens of thousands of rows it is a good first choice. In a cross-fit ATE simulation with the defaults, the one-step estimate had bias of about <span class="math inline">\(-0.001\)</span> and 95% intervals covered the truth at least 95% of the time.</p>
-<p>Switch when your problem fits another learner’s strengths:</p>
-<ul>
-<li><strong>Kernel ridge (<code>krrr</code>)</strong> for small <span class="math inline">\(n\)</span> or a smooth, low-dimensional <span class="math inline">\(\alpha\)</span>.</li>
-<li><strong>Neural net (<code>riesznet</code>)</strong> for large <span class="math inline">\(n\)</span>, many covariates, or image and text features.</li>
-<li><strong>Forest (<code>forestriesz</code>)</strong> when you need confidence intervals on <span class="math inline">\(\alpha(z)\)</span> (<code>ForestRieszRegressor</code> with <code>honest=True, inference=True</code>).</li>
-<li><strong>Single tree (<code>riesztree</code>)</strong> when you want a rule you can read.</li>
-</ul>
-</section>
 <section id="the-same-setting-under-different-names" class="level3">
 <h3 class="anchored" data-anchor-id="the-same-setting-under-different-names">The same setting under different names</h3>
 <p>Each learner names its settings after the library it follows (xgboost, sklearn, PyTorch). This table lines them up.</p>
@@ -828,7 +816,7 @@ window.Quarto = {
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.validation_fraction <span class="op">=</span> validation_fraction</span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_augmented(<span class="va">self</span>, aug_train, aug_valid, loss,</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>                      <span class="op">*</span>, base_score, random_state):</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>                      <span class="op">*</span>, base_score, random_state, hyperparams):</span>
 <span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Each augmented row contributes D · h_tilde(α) + C · h'(α) to the loss.</span></span>
 <span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Translate (features, D, C) into whatever your learner consumes.</span></span>
 <span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> my_learner_fit(</span>
@@ -852,7 +840,7 @@ window.Quarto = {
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_rate <span class="op">=</span> learning_rate</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_rows(<span class="va">self</span>, X_train, X_valid, estimand, loss,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                 <span class="op">*</span>, aug_train, aug_valid, base_score, random_state):</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                 <span class="op">*</span>, aug_train, aug_valid, base_score, random_state, hyperparams):</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). The augmented rows carry every</span></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># point a_j, its coefficient c_j = -C_r, and the row i it came from.</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        points <span class="op">=</span> aug_train.features</span>

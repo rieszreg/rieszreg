@@ -502,7 +502,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#api-surface-rieszboost" id="toc-api-surface-rieszboost" class="nav-link" data-scroll-target="#api-surface-rieszboost">API surface (rieszboost)</a></li>
   <li><a href="#api-surface-krrr" id="toc-api-surface-krrr" class="nav-link" data-scroll-target="#api-surface-krrr">API surface (krrr)</a></li>
   <li><a href="#api-surface-forestriesz" id="toc-api-surface-forestriesz" class="nav-link" data-scroll-target="#api-surface-forestriesz">API surface (forestriesz)</a></li>
-  <li><a href="#api-surface-riesztree" id="toc-api-surface-riesztree" class="nav-link" data-scroll-target="#api-surface-riesztree">API surface (riesztree)</a></li>
   <li><a href="#api-surface-riesznet" id="toc-api-surface-riesznet" class="nav-link" data-scroll-target="#api-surface-riesznet">API surface (riesznet)</a></li>
   <li><a href="#parity" id="toc-parity" class="nav-link" data-scroll-target="#parity">Parity</a></li>
   <li><a href="#cross-fitting-and-tuning-from-r" id="toc-cross-fitting-and-tuning-from-r" class="nav-link" data-scroll-target="#cross-fitting-and-tuning-from-r">Cross-fitting and tuning from R</a></li>
@@ -548,10 +547,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_krrr</span>(<span class="st">"/path/to/RieszReg/.venv/bin/python"</span>)</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># or, for the forest backend:</span></span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_forestriesz</span>(<span class="st">"/path/to/RieszReg/.venv/bin/python"</span>)</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># or, for the single-tree backend:</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_riesztree</span>(<span class="st">"/path/to/RieszReg/.venv/bin/python"</span>)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># or, for the neural backend:</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_riesznet</span>(<span class="st">"/path/to/RieszReg/.venv/bin/python"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># or, for the neural backend:</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">use_python_riesznet</span>(<span class="st">"/path/to/RieszReg/.venv/bin/python"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>use_python_&lt;pkg&gt;()</code> accepts a path to a Python interpreter or a virtualenv directory and forwards to the appropriate reticulate function. It also imports the Python package so subsequent calls have no per-call import overhead.</p>
 </section>
 <section id="api-surface-rieszboost" class="level2">
@@ -746,52 +743,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <p>The R wrapper exposes the moment-style <code>ForestRieszRegressor</code>. It handles ATE, ATT and TSM through the default treatment-indicator basis. The augmentation-style <code>AugForestRieszRegressor</code> is Python-only in v1; call it from R via reticulate when you need a fully estimand-agnostic forest fit.</p>
 </section>
-<section id="api-surface-riesztree" class="level2">
-<h2 class="anchored" data-anchor-id="api-surface-riesztree">API surface (riesztree)</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>R</th>
-<th>Python equivalent</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>RieszTreeRegressor$new(estimand, loss, max_depth, min_samples_split, min_samples_leaf, max_leaf_nodes, growth_policy, ccp_alpha, early_stopping_rounds, splitter, ...)</code></td>
-<td><code>riesztree.RieszTreeRegressor(...)</code></td>
-</tr>
-<tr class="even">
-<td>&nbsp;&nbsp;<code>$fit(df, eval_set=)</code></td>
-<td><code>.fit(Z, eval_set=)</code></td>
-</tr>
-<tr class="odd">
-<td>&nbsp;&nbsp;<code>$predict(df)</code></td>
-<td><code>.predict(Z)</code></td>
-</tr>
-<tr class="even">
-<td>&nbsp;&nbsp;<code>$score(df)</code></td>
-<td><code>.score(Z)</code></td>
-</tr>
-<tr class="odd">
-<td>&nbsp;&nbsp;<code>$diagnose(df)</code></td>
-<td><code>.diagnose(Z)</code></td>
-</tr>
-<tr class="even">
-<td>&nbsp;&nbsp;<code>$save(path)</code></td>
-<td><code>.save(path)</code></td>
-</tr>
-<tr class="odd">
-<td><code>load_riesz_tree_regressor(path)</code></td>
-<td><code>RieszTreeRegressor.load(path)</code></td>
-</tr>
-</tbody>
-</table>
-<p><code>categorical_features</code> takes 1-based R column positions.</p>
-</section>
 <section id="api-surface-riesznet" class="level2">
 <h2 class="anchored" data-anchor-id="api-surface-riesznet">API surface (riesznet)</h2>
 <table class="caption-top table">
@@ -829,7 +780,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tbody>
 </table>
 <p>The R wrapper exposes the simple-MLP convenience surface only. Custom torch architectures (custom <code>nn.Module</code> factory, custom optimizer, custom scheduler) are Python-only — define the factory in Python at module top level and call into Python via reticulate. <code>TorchBackend</code> direct construction is also Python-only in v1.</p>
-<p>R6’s <code>$method()</code> syntax maps to Python’s <code>.method()</code>. The wrappers convert integer-typed arguments (<code>n_estimators</code>, <code>max_depth</code>, <code>random_state</code>, <code>epochs</code>, and so on) with <code>as.integer()</code>, so <code>n_estimators = 200</code> and <code>n_estimators = 200L</code> both work. Other arguments are converted by reticulate.</p>
+<p>R6’s <code>$method()</code> syntax maps to Python’s <code>.method()</code>. Integer-typed kwargs (<code>n_estimators</code>, <code>max_depth</code>, <code>random_state</code>, <code>early_stopping_rounds</code>, <code>n_landmarks</code>, <code>n_features</code>, <code>cg_max_iter</code>, <code>min_samples_leaf</code>, <code>subforest_size</code>, <code>epochs</code>, <code>batch_size</code>) take an <code>L</code> suffix in R: <code>n_estimators = 200L</code>. Other kwargs are auto-converted by reticulate.</p>
 <p>Data frames are converted to pandas column by column. Numeric and logical columns pass through as numbers. Factor columns are converted through their labels, so a treatment coded <code>factor(c("0", "1"))</code> arrives as 0/1. ATE and ATT need the treatment coded 0/1 and stop with an error otherwise.</p>
 </section>
 <section id="parity" class="level2">

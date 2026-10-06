@@ -558,54 +558,49 @@ window.Quarto = {
 </header>
 
 
-<p>This page sketches how to wire <code>rieszreg</code>’s cross-fit <span class="math inline">\(\hat\alpha\)</span> into mature DML/TMLE libraries. The recipes use the synthetic ATE data frame <code>df</code> from the <a href="../index.html#quickstart">landing-page quickstart</a>. Install the relevant external package locally and adapt the code to your data.</p>
+<p>This page sketches how to wire <code>rieszreg</code>’s cross-fit <span class="math inline">\(\hat\alpha\)</span> into mature DML/TMLE libraries. The recipes use the synthetic ATE setup from the <a href="../index.html#quickstart">landing-page quickstart</a>. The code is illustrative — install the relevant external package locally and adapt to your data.</p>
 <section id="doubleml-python" class="level2">
 <h2 class="anchored" data-anchor-id="doubleml-python">DoubleML (Python)</h2>
-<p><code>DoubleML</code> separates the estimator class (<code>DoubleMLPLR</code>, <code>DoubleMLIRM</code>, …) from the nuisance learners. <code>DoubleMLIRM</code> expects a propensity classifier in its <code>ml_m</code> slot. For ATE the Riesz representer at <span class="math inline">\(A = 1\)</span> is <span class="math inline">\(\alpha(1, x) = 1/\pi(x)\)</span>, so a Riesz learner can stand in for that classifier. The wrapper below is a regular sklearn classifier. DoubleML clones it and fits it once per fold, so <span class="math inline">\(\hat\alpha\)</span> is cross-fit on the same folds as the outcome model.</p>
+<p><code>DoubleML</code> separates the estimator class (<code>DoubleMLPLR</code>, <code>DoubleMLIRM</code>, …) from the nuisance learners. To use a <code>rieszreg</code>-fit Riesz representer, wrap the booster as a <code>predict_proba</code>-exposing classifier shim and hand it to <code>DoubleMLIRM</code>’s <code>ml_m</code> slot.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> doubleml <span class="im">as</span> dml</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.base <span class="im">import</span> BaseEstimator, ClassifierMixin, clone</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> GradientBoostingRegressor</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.ensemble <span class="im">import</span> GradientBoostingRegressor</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> KFold, cross_val_predict</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg <span class="im">import</span> ATE</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszboost <span class="im">import</span> RieszBooster</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RieszPropensity(ClassifierMixin, BaseEstimator):</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Propensity classifier backed by a Riesz learner: π̂(x) = 1 / α̂(1, x)."""</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, learner<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learner <span class="op">=</span> learner</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit(<span class="va">self</span>, X, d):</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Z = (treatment, covariates); column 0 is the treatment.</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learner_ <span class="op">=</span> clone(<span class="va">self</span>.learner).fit(np.column_stack([d, X]))</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.classes_ <span class="op">=</span> np.array([<span class="dv">0</span>, <span class="dv">1</span>])</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_proba(<span class="va">self</span>, X):</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        alpha_1 <span class="op">=</span> <span class="va">self</span>.learner_.predict(np.column_stack([np.ones(<span class="bu">len</span>(X)), X]))</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        pi_hat <span class="op">=</span> np.clip(<span class="fl">1.0</span> <span class="op">/</span> np.maximum(alpha_1, <span class="fl">1e-6</span>), <span class="fl">0.01</span>, <span class="fl">0.99</span>)</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> np.column_stack([<span class="dv">1</span> <span class="op">-</span> pi_hat, pi_hat])</span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict(<span class="va">self</span>, X):</span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (<span class="va">self</span>.predict_proba(X)[:, <span class="dv">1</span>] <span class="op">&gt;</span> <span class="fl">0.5</span>).astype(<span class="bu">int</span>)</span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>dml_data <span class="op">=</span> dml.DoubleMLData(df, y_col<span class="op">=</span><span class="st">"y"</span>, d_cols<span class="op">=</span><span class="st">"a"</span>, x_cols<span class="op">=</span>[<span class="st">"x"</span>])</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>irm <span class="op">=</span> dml.DoubleMLIRM(</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    dml_data,</span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    ml_g<span class="op">=</span>GradientBoostingRegressor(n_estimators<span class="op">=</span><span class="dv">200</span>, max_depth<span class="op">=</span><span class="dv">3</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    ml_m<span class="op">=</span>RieszPropensity(RieszBooster(estimand<span class="op">=</span>ATE())),</span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    n_folds<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>irm.fit()</span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(irm.summary)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This recipe was run with DoubleML 0.11.4 on the quickstart data (true ATE 29.5). It gave an estimate of 29.52 with SE 0.08. <code>irm.summary</code> reports the point estimate, SE, and 95% CI.</p>
-<p><code>DoubleMLIRM</code> clips and inverts the propensity, so this route only covers ATE-type estimands where <span class="math inline">\(\hat\alpha\)</span> is an inverse propensity. For continuous shifts, stochastic interventions, and custom estimands, use the <a href="../estimation/custom.html">custom-code</a> DML/TMLE pattern.</p>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Cross-fit α̂ via rieszreg.</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>cv      <span class="op">=</span> KFold(n_splits<span class="op">=</span><span class="dv">5</span>, shuffle<span class="op">=</span><span class="va">True</span>, random_state<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>booster <span class="op">=</span> RieszBooster(</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    n_estimators<span class="op">=</span><span class="dv">400</span>, learning_rate<span class="op">=</span><span class="fl">0.05</span>, max_depth<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>booster.fit(df[[<span class="st">"a"</span>, <span class="st">"x"</span>]])</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Wrap booster as a propensity classifier: π̂(x) = 1 / α̂(a=1, x).</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> _RieszAsClassifier:</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit(<span class="va">self</span>, X, y): <span class="cf">return</span> <span class="va">self</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_proba(<span class="va">self</span>, X):</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>        df_ <span class="op">=</span> pd.DataFrame({<span class="st">"a"</span>: np.ones(<span class="bu">len</span>(X)), <span class="st">"x"</span>: X[:, <span class="dv">0</span>]})</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>        alpha_1 <span class="op">=</span> booster.predict(df_)</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        pi_hat  <span class="op">=</span> np.clip(<span class="fl">1.0</span> <span class="op">/</span> np.maximum(alpha_1, <span class="fl">1e-6</span>), <span class="fl">1e-6</span>, <span class="dv">1</span> <span class="op">-</span> <span class="fl">1e-6</span>)</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> np.column_stack([<span class="dv">1</span> <span class="op">-</span> pi_hat, pi_hat])</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Pass into DoubleMLIRM in place of a propensity learner.</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>dml_data <span class="op">=</span> dml.DoubleMLData(df, y_col<span class="op">=</span><span class="st">"y"</span>, d_cols<span class="op">=</span><span class="st">"a"</span>, x_cols<span class="op">=</span>[<span class="st">"x"</span>])</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>plr <span class="op">=</span> dml.DoubleMLIRM(</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    dml_data,</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    ml_g<span class="op">=</span>GradientBoostingRegressor(n_estimators<span class="op">=</span><span class="dv">200</span>, max_depth<span class="op">=</span><span class="dv">3</span>, random_state<span class="op">=</span><span class="dv">0</span>),</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    ml_m<span class="op">=</span>_RieszAsClassifier(),</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    n_folds<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>plr.fit()</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(plr.summary)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>plr.summary</code> reports point estimate, SE, and 95% CI. The wrap-around is needed because <code>DoubleMLIRM</code> expects a propensity classifier; for Riesz functionals where <span class="math inline">\(\hat\alpha\)</span> is not a simple inverse-propensity (continuous shifts, stochastic interventions), the cleaner integration is the <a href="../estimation/custom.html">custom-code</a> DML/TMLE pattern.</p>
 </section>
 <section id="doubleml-r" class="level2">
 <h2 class="anchored" data-anchor-id="doubleml-r">DoubleML (R)</h2>
-<p>The R port has the same API, with nuisance learners from <a href="https://mlr3.mlr-org.com/"><code>mlr3</code></a>. The block below is an untested sketch. It fits <span class="math inline">\(\hat\alpha\)</span> but does not finish the hand-off: you still need an <code>mlr3</code> learner that returns <span class="math inline">\(\hat\pi\)</span> from it.</p>
+<p>The R port has the same API. Pass the <code>RieszBooster</code> R6 wrapper through reticulate to provide <span class="math inline">\(\hat\alpha\)</span>, and let <code>DoubleML::DoubleMLIRM</code> handle the outcome learner via <a href="https://mlr3.mlr-org.com/"><code>mlr3</code></a>.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(DoubleML)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mlr3learners)</span>
@@ -630,7 +625,7 @@ window.Quarto = {
 </section>
 <section id="tlverse-r" class="level2">
 <h2 class="anchored" data-anchor-id="tlverse-r">tlverse (R)</h2>
-<p><code>tmle3</code> from <a href="https://tlverse.org/">tlverse</a> is TMLE-native and accepts pre-fit nuisances through its <code>Likelihood_factor</code> API. You can pass cross-fit <span class="math inline">\(\hat\alpha\)</span> as a fixed treatment-mechanism factor, and <code>tmle3</code> performs the targeting step. The block below is an untested sketch of the first half of that recipe.</p>
+<p><code>tmle3</code> from <a href="https://tlverse.org/">tlverse</a> is TMLE-native and accepts pre-fit nuisances through its <code>Likelihood_factor</code> API. Pass cross-fit <span class="math inline">\(\hat\alpha\)</span> as a fixed treatment-mechanism factor, and <code>tmle3</code> performs the targeting step.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tmle3)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>booster <span class="ot">&lt;-</span> RieszBooster<span class="sc">$</span><span class="fu">new</span>(</span>
