@@ -38,6 +38,9 @@ class SquaredLoss(Loss):
         del potential_deriv_coef, eta
         return np.maximum(2.0 * is_original, hessian_floor)
 
+    def curvature_eta(self, eta):
+        return np.full(np.shape(eta), 2.0)
+
     def best_constant_init(self, m_bar: float) -> float:
         return float(m_bar)
 

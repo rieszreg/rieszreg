@@ -160,3 +160,12 @@ def test_subclass_loss_pattern():
         + pdc * loss.potential_deriv(alpha)
     )
     np.testing.assert_allclose(loss.aug_loss_alpha(is_original, pdc, alpha), expected)
+
+
+@pytest.mark.parametrize(
+    "loss", [SquaredLoss(), KLLoss(), BernoulliLoss(), BoundedSquaredLoss(lo=0.5, hi=3.0)]
+)
+def test_curvature_eta_is_gauss_newton_term(loss):
+    """curvature_eta(η) = h''(α) · (dα/dη)², the base-class numerical form."""
+    eta = np.linspace(-2.0, 2.0, 9)
+    np.testing.assert_allclose(loss.curvature_eta(eta), Loss.curvature_eta(loss, eta), rtol=1e-6)

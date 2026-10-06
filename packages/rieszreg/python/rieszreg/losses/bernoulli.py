@@ -68,6 +68,10 @@ class BernoulliLoss(Loss):
         alpha = self.link_to_alpha(eta)
         return np.maximum(is_original * alpha * (1.0 - alpha), hessian_floor)
 
+    def curvature_eta(self, eta):
+        alpha = self.link_to_alpha(eta)
+        return alpha * (1.0 - alpha)  # h''(α) · (α(1 − α))² = α(1 − α)
+
     def best_constant_init(self, m_bar: float) -> float:
         # Sigmoid link: α ∈ (0, 1). Clip m̄ to the interior.
         eps = float(np.exp(-self.max_abs_eta))

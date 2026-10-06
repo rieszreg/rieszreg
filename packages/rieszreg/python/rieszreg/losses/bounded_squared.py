@@ -83,6 +83,10 @@ class BoundedSquaredLoss(Loss):
         )
         return np.maximum(h, hessian_floor)
 
+    def curvature_eta(self, eta):
+        sigma = self._sigma(eta)
+        return 2.0 * (self._R() * sigma * (1.0 - sigma)) ** 2
+
     def best_constant_init(self, m_bar: float) -> float:
         # Scaled-sigmoid link: α ∈ (lo, hi). Clip m̄ to the interior.
         eps = (self.hi - self.lo) * float(np.exp(-self.max_abs_eta))

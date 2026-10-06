@@ -201,3 +201,25 @@ def test_joblib_supports_clone_after_load(tmp_path):
     cloned = clone(loaded)
     assert cloned.estimand.name == "ATE"
     assert not hasattr(cloned, "predictor_")
+
+
+def test_plain_estimator_round_trips_explicit_backend(tmp_path):
+    """A RieszEstimator with an explicit dataclass backend saves the backend's
+    settings, so the loaded model can be refit and cloned."""
+    from sklearn.base import clone
+
+    from rieszboost import ATE, XGBoostBackend
+    from rieszreg import RieszEstimator
+
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=300)
+    a = (rng.uniform(size=300) < 1 / (1 + np.exp(-x))).astype(float)
+    df = pd.DataFrame({"a": a, "x": x})
+    backend = XGBoostBackend(n_estimators=30, learning_rate=0.1, hessian_floor=2.0)
+    est = RieszEstimator(estimand=ATE(), backend=backend).fit(df)
+    est.save(tmp_path / "m")
+
+    loaded = RieszEstimator.load(tmp_path / "m")
+    assert loaded.backend == backend
+    np.testing.assert_allclose(loaded.predict(df), est.predict(df))
+    np.testing.assert_allclose(clone(loaded).fit(df).predict(df), est.predict(df))

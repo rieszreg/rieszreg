@@ -105,12 +105,17 @@ class RieszBooster(RieszEstimator):
     _BOOSTING_LOOP_PARAMS = (
         "n_estimators", "learning_rate", "early_stopping_rounds", "validation_fraction",
     )
+    # Tree knobs routed via `hyperparams`; only XGBoostBackend consumes them.
+    _TREE_PARAMS = ("max_depth", "reg_lambda", "subsample")
 
     def _resolved_backend(self) -> Backend:
         if self.backend is not None:
             defaults = inspect.signature(RieszBooster.__init__).parameters
+            checked = self._BOOSTING_LOOP_PARAMS
+            if not isinstance(self.backend, XGBoostBackend):
+                checked = checked + self._TREE_PARAMS
             overridden = [
-                name for name in self._BOOSTING_LOOP_PARAMS
+                name for name in checked
                 if getattr(self, name) != defaults[name].default
             ]
             if overridden:
@@ -118,11 +123,13 @@ class RieszBooster(RieszEstimator):
                     f"RieszBooster(backend={self.backend!r}) was given explicitly "
                     f"along with non-default {overridden}, but these boosting-loop "
                     "knobs are only applied when RieszBooster builds its own "
-                    "backend (backend=None) -- an explicit backend is used as-is, "
-                    "so they'd be silently ignored. Set them on the backend object "
-                    "itself instead, e.g. XGBoostBackend(n_estimators=..., "
-                    "learning_rate=..., early_stopping_rounds=..., "
-                    "validation_fraction=...)."
+                    "backend (backend=None), and max_depth / reg_lambda / "
+                    "subsample only reach an XGBoostBackend -- an explicit "
+                    "backend is used as-is, so they'd be silently ignored. Set "
+                    "them on the backend object itself instead, e.g. "
+                    "XGBoostBackend(n_estimators=..., learning_rate=..., "
+                    "early_stopping_rounds=..., validation_fraction=...), or on "
+                    "the base learner of a SklearnBackend."
                 )
             return self.backend
         return XGBoostBackend(
@@ -140,32 +147,3 @@ class RieszBooster(RieszEstimator):
             "reg_lambda": self.reg_lambda,
             "subsample": self.subsample,
         }
-
-    def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            n_estimators=self.n_estimators,
-            learning_rate=self.learning_rate,
-            early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=self.validation_fraction,
-            max_depth=self.max_depth,
-            reg_lambda=self.reg_lambda,
-            subsample=self.subsample,
-        )
-        return base
-
-    @classmethod
-    def _construct_for_load(cls, *, estimand, loss, hyperparameters: dict) -> "RieszBooster":
-        return cls(
-            estimand=estimand,
-            loss=loss,
-            n_estimators=hyperparameters.get("n_estimators", 200),
-            learning_rate=hyperparameters.get("learning_rate", 0.05),
-            max_depth=hyperparameters.get("max_depth", 4),
-            reg_lambda=hyperparameters.get("reg_lambda", 1.0),
-            subsample=hyperparameters.get("subsample", 1.0),
-            early_stopping_rounds=hyperparameters.get("early_stopping_rounds"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.1),
-            init=hyperparameters.get("init"),
-            random_state=hyperparameters.get("random_state", 0),
-        )

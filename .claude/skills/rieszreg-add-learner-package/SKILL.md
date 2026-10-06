@@ -63,7 +63,7 @@ Return a `Predictor` with `predict_eta()` and `predict_alpha()` (link applied). 
 
 ## 5. Numerical stability
 
-Encapsulate all backend-specific stability tricks inside the backend itself. Examples: xgboost's `hessian_floor=2.0` for counterfactual rows; KL/Bernoulli `max_eta` clipping; per-loss link functions enforcing valid prediction ranges. The meta-package does not impose stability tricks; the `Backend` is responsible.
+Encapsulate all backend-specific stability tricks inside the backend itself. Examples: xgboost's loss-aware `hessian_floor="auto"` for counterfactual rows; KL/Bernoulli `max_eta` clipping; per-loss link functions enforcing valid prediction ranges. The meta-package does not impose stability tricks; the `Backend` is responsible.
 
 ## 6. Fast-default + customizable-internals
 

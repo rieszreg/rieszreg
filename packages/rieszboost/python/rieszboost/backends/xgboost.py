@@ -15,7 +15,7 @@ import numpy as np
 import xgboost as xgb
 
 from rieszreg.augmentation import AugmentedDataset
-from rieszreg.backends.base import FitResult, Predictor, register_predictor_loader
+from rieszreg.backends.base import FitResult, register_predictor_loader
 from rieszreg.losses import Loss
 
 
@@ -36,9 +36,10 @@ class XGBoostPredictor:
     def predict_eta(self, features: np.ndarray) -> np.ndarray:
         dmat = xgb.DMatrix(np.asarray(features, dtype=float))
         rng = self._iter_range()
-        if rng is not None:
-            return self.booster.predict(dmat, iteration_range=rng)
-        return self.booster.predict(dmat)
+        kw = {} if rng is None else {"iteration_range": rng}
+        # xgboost returns float32; apply the link in float64 so saturating
+        # links (sigmoid) keep α̂ strictly inside their domain.
+        return self.booster.predict(dmat, **kw).astype(np.float64)
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
@@ -92,31 +93,31 @@ def _make_objective(
     is_original: np.ndarray,
     potential_deriv_coef: np.ndarray,
     loss: Loss,
-    hessian_floor: float,
+    hessian_floor: float | str,
     gradient_only: bool,
 ):
     def obj(preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
         del dtrain
+        # xgboost passes float32 margins; a saturated link rounds to its bound.
+        preds = preds.astype(np.float64)
         grad = loss.aug_grad_eta(is_original, potential_deriv_coef, preds)
         if gradient_only:
             hess = np.ones_like(grad)
+        elif hessian_floor == "auto":
+            # Floor each row at an observed row's curvature at its current
+            # prediction (1e-6 backstop for α̂ near the link's boundary).
+            floor = np.maximum(loss.curvature_eta(preds), 1e-6)
+            hess = loss.aug_hess_eta(is_original, potential_deriv_coef, preds, floor)
         else:
             hess = loss.aug_hess_eta(is_original, potential_deriv_coef, preds, hessian_floor)
         return grad, hess
     return obj
 
 
-def _make_metric(
-    is_original_val: np.ndarray,
-    potential_deriv_coef_val: np.ndarray,
-    n_val_rows: int,
-    loss: Loss,
-):
+def _make_metric(aug_valid: AugmentedDataset, loss: Loss):
     def metric(predt: np.ndarray, dval) -> tuple[str, float]:
         del dval
-        alpha = loss.link_to_alpha(predt)
-        per_row = loss.aug_loss_alpha(is_original_val, potential_deriv_coef_val, alpha)
-        return "riesz_loss", float(np.sum(per_row) / n_val_rows)
+        return "riesz_loss", aug_valid.mean_loss(loss, loss.link_to_alpha(predt.astype(np.float64)))
     return metric
 
 
@@ -127,13 +128,21 @@ class XGBoostBackend:
     (hessian_floor, gradient_only). Other xgboost passthrough params
     (max_depth, reg_lambda, subsample) come via ``hyperparams`` from
     RieszBooster.
+
+    ``hessian_floor`` is the lower bound on each row's Hessian. Counterfactual
+    rows have a true Hessian of 0 (except under ``BoundedSquaredLoss``, whose
+    link adds a term), so without a floor xgboost's Newton leaf step
+    ``-G / (H + λ)`` blows up. ``"auto"`` (default) floors each row at
+    ``loss.curvature_eta(η̂)``, the Gauss-Newton curvature of an observed row
+    at the current prediction: 2 for ``SquaredLoss``, α̂ for ``KLLoss``,
+    α̂(1 − α̂) for ``BernoulliLoss``. A float sets a fixed floor.
     """
 
     n_estimators: int = 200
     learning_rate: float = 0.05
     early_stopping_rounds: int | None = None
     validation_fraction: float = 0.0
-    hessian_floor: float = 2.0
+    hessian_floor: float | str = "auto"
     gradient_only: bool = False
 
     def fit_augmented(
@@ -156,17 +165,13 @@ class XGBoostBackend:
             **hyperparams,
         }
 
+        # The held-out metric only drives early stopping; without it, skip the
+        # per-round evaluation entirely.
         evals: list[tuple] = []
         custom_metric = None
-        if aug_valid is not None:
-            dvalid = xgb.DMatrix(aug_valid.features)
-            evals = [(dvalid, "valid")]
-            custom_metric = _make_metric(
-                aug_valid.is_original,
-                aug_valid.potential_deriv_coef,
-                aug_valid.n_rows,
-                loss,
-            )
+        if self.early_stopping_rounds is not None and aug_valid is not None:
+            evals = [(xgb.DMatrix(aug_valid.features), "valid")]
+            custom_metric = _make_metric(aug_valid, loss)
         elif self.early_stopping_rounds is not None:
             raise ValueError(
                 "early_stopping_rounds was set but no validation data was "

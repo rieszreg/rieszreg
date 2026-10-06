@@ -13,10 +13,12 @@ The augmentation engine produces per-row quadratic ($a$) and linear ($b$) coeffi
 The default. Boosts in η-space; the predictor applies the loss spec's link to convert to α.
 
 ```python
-XGBoostBackend(hessian_floor=2.0, gradient_only=False)
+XGBoostBackend(hessian_floor="auto", gradient_only=False)
 ```
 
-`hessian_floor` is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have $H = 2a = 0$; without a floor, xgboost's leaf-weight Newton step (`-G/(H+λ)`) is degenerate at those leaves. The default of 2.0 matches the natural Hessian on original rows.
+`hessian_floor` is the lower bound on the per-row Hessian fed to xgboost. Counterfactual rows have $H = 0$ (except under `BoundedSquaredLoss`, whose scaled-sigmoid link adds a term); without a floor, xgboost's leaf-weight Newton step (`-G/(H+λ)`) is degenerate at those leaves. The default `"auto"` floors each row at the Gauss-Newton curvature of an observed row at the current prediction, $h''(\hat\alpha)\,(d\alpha/d\eta)^2$, which is the exact curvature for every built-in loss except `BoundedSquaredLoss`. That is $2$ for `SquaredLoss`, $\hat\alpha$ for `KLLoss`, and $\hat\alpha(1-\hat\alpha)$ for `BernoulliLoss`. Each loss then takes Newton steps on its own scale. Pass a float for a fixed floor.
+
+With `BernoulliLoss` the `"auto"` steps are large, so a fit converges in far fewer trees. Use early stopping (`early_stopping_rounds` with `validation_fraction`) rather than a fixed `n_estimators`.
 
 `gradient_only` short-circuits the second-order Hessian and uses $H = 1$ everywhere — first-order gradient boosting (Friedman 2001 / Lee-Schuler Algorithm 2). Set `True` to reproduce the Lee-Schuler reference implementation exactly.
 
@@ -29,7 +31,7 @@ XGBoostBackend(hessian_floor=2.0, gradient_only=False)
 | `max_depth` | 4 | Drop to 2–3 for extrapolation outliers | Shallow trees can't carve out a high-magnitude leaf for a single point. |
 | `learning_rate` | 0.05 | Drop to 0.02 for harder problems | Smaller updates per tree; pair with higher `n_estimators`. |
 | `n_estimators` + `early_stopping_rounds` | 200, `None` | Set `n_estimators=1000-2000` and `early_stopping_rounds=20` | The validation split picks the iteration count. |
-| `validation_fraction` | 0.0 | Set to 0.2 with `early_stopping_rounds` | Internal split for early stopping. Alternative: pass `eval_set=` explicitly. |
+| `validation_fraction` | 0.1 | Raise to 0.2 with `early_stopping_rounds` | Internal split for early stopping. Used only when `early_stopping_rounds` is set. Alternative: pass `eval_set=` explicitly. |
 | `reg_lambda` | 1.0 | Bump to 5–10 for low-overlap data | xgboost L2 on leaf weights; damps the magnitude of any single leaf. |
 | `subsample` | 1.0 | Try 0.5–0.8 with very large $n$ | Stochastic boosting. |
 
@@ -38,7 +40,7 @@ XGBoostBackend(hessian_floor=2.0, gradient_only=False)
 | Knob | Default | When to change |
 |---|---|---|
 | `gradient_only` | `False` | Set `True` to reproduce Lee-Schuler Algorithm 2 / Friedman 2001 exactly. |
-| `hessian_floor` | `2.0` | Lower bound on the per-row Hessian. The default matches the natural Hessian of original-data rows. |
+| `hessian_floor` | `"auto"` | Lower bound on the per-row Hessian. `"auto"` uses an observed row's curvature at the current prediction (2 for `SquaredLoss`); a float sets a fixed floor. |
 
 See the [diagnostics page](../diagnostics.qmd) for the warnings each knob addresses.
 
@@ -47,6 +49,8 @@ See the [diagnostics page](../diagnostics.qmd) for the warnings each knob addres
 To use a non-tree base learner, pass a `base_learner_factory`: a zero-arg callable returning a fresh sklearn-compatible regressor each round.
 
 The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction.
+
+Base learners with an unset `random_state` are seeded from the estimator's `random_state`, so fits are reproducible. As with `XGBoostBackend`, the model is cut back to the best round only when `early_stopping_rounds` is set. Otherwise all `n_estimators` rounds are kept, even when you pass `eval_set=`. `max_depth`, `reg_lambda` and `subsample` on `RieszBooster` apply to `XGBoostBackend` only. Set tree settings on the base learner instead.
 
 ::: {.panel-tabset group="lang"}
 

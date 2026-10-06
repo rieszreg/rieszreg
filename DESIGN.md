@@ -238,7 +238,7 @@ This is the contract every implementation package must meet. Section structure f
 - **[your package]** `FitResult` shape must match the protocol so `RieszEstimator` can orchestrate uniformly.
 
 ### 2.2 Backend implementations
-- **[your package]** Concrete backends live in `<pkg>/backends/`. Examples in the wild: `XGBoostBackend(hessian_floor=2.0, gradient_only=False)` ([backends/xgboost.py:93](rieszboost/python/rieszboost/backends/xgboost.py:93)), `SklearnBackend(base_learner_factory)` ([backends/sklearn.py:93](rieszboost/python/rieszboost/backends/sklearn.py:93)), `KernelRidgeBackend` (krrr), `ForestRieszBackend` (forestriesz; moment-style, satisfies `MomentBackend.fit_rows`).
+- **[your package]** Concrete backends live in `<pkg>/backends/`. Examples in the wild: `XGBoostBackend(hessian_floor="auto", gradient_only=False)` ([backends/xgboost.py:93](rieszboost/python/rieszboost/backends/xgboost.py:93)), `SklearnBackend(base_learner_factory)` ([backends/sklearn.py:93](rieszboost/python/rieszboost/backends/sklearn.py:93)), `KernelRidgeBackend` (krrr), `ForestRieszBackend` (forestriesz; moment-style, satisfies `MomentBackend.fit_rows`).
 - **[design rule]** Lazy-import optional heavy deps (xgboost, lightgbm, JAX, keops, torch) via `__getattr__` so the package is importable without them. Reference: [__init__.py:52-64](rieszboost/python/rieszboost/__init__.py:52).
 
 ### 2.3 Hyperparameter tuning
@@ -248,7 +248,7 @@ This is the contract every implementation package must meet. Section structure f
 - **[your package]** If your backend has heuristic resolutions (krrr's `median`, `scott`, `silverman` length-scale), document them and accept both string and numeric forms.
 
 ### 2.4 Numerical stability
-- **[your package]** Encapsulate all backend-specific stability tricks inside the backend itself. Examples: xgboost's `hessian_floor=2.0` for counterfactual rows; KL/Bernoulli `max_eta` clipping; per-loss link functions enforcing valid prediction ranges.
+- **[your package]** Encapsulate all backend-specific stability tricks inside the backend itself. Examples: xgboost's loss-aware `hessian_floor="auto"` for counterfactual rows; KL/Bernoulli `max_eta` clipping; per-loss link functions enforcing valid prediction ranges.
 - **[design rule]** The meta-package does not impose stability tricks; the `Backend` is responsible.
 
 ### 2.5 Fast-default + customizable-internals

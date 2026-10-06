@@ -61,4 +61,4 @@ xgboost with `gradient_only=True` and `reg_lambda=0` sets each leaf to `−mean(
 
 The augmentation, gradient, and loss in `rieszboost` reproduce Lee-Schuler's reference implementation up to numerical differences from the tree backend. With `gradient_only=True` and `learning_rate=lr_ref/2`, you can use `rieszboost` as a drop-in replacement.
 
-For most users, leaving `gradient_only=False` (default) is preferred: xgboost's second-order step with our `hessian_floor=2.0` actually fits α₀ slightly better at matched hyperparameters. The cross-check is here so future engine changes don't silently drift away from the reference.
+For most users, leaving `gradient_only=False` (default) is preferred: xgboost's second-order step with our Hessian floor (2 for squared loss) actually fits α₀ slightly better at matched hyperparameters. The cross-check is here so future engine changes don't silently drift away from the reference.

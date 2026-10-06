@@ -125,3 +125,22 @@ def test_xgb_vs_sklearn_additive_shift_continuous():
     ).fit(df)
     corr = float(np.corrcoef(xgb_b.predict(df), skl_b.predict(df))[0, 1])
     assert corr > 0.85, f"AdditiveShift backends drifted: Pearson={corr:.3f}"
+
+
+def test_eval_set_without_early_stopping_keeps_every_round():
+    """Both backends keep all n_estimators rounds when early stopping is off,
+    so passing eval_set only reports, never truncates."""
+    from sklearn.tree import DecisionTreeRegressor
+
+    df, _ = _binary_df(300, seed=3)
+    valid, _ = _binary_df(100, seed=4)
+    sk = SklearnBackend(
+        base_learner_factory=lambda: DecisionTreeRegressor(max_depth=2), n_estimators=25
+    )
+    xgb_backend = XGBoostBackend(n_estimators=25)
+    for backend in (sk, xgb_backend):
+        est = RieszBooster(estimand=ATE(), backend=backend)
+        with_eval = est.fit(df, eval_set=valid).predict(df)
+        assert est.best_iteration_ is None
+        plain = RieszBooster(estimand=ATE(), backend=backend).fit(df).predict(df)
+        np.testing.assert_allclose(with_eval, plain)

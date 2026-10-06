@@ -61,6 +61,9 @@ class KLLoss(Loss):
         alpha = np.exp(self._clip(eta))
         return np.maximum(is_original * alpha, hessian_floor)
 
+    def curvature_eta(self, eta):
+        return np.exp(self._clip(eta))  # h''(α) · α² = α
+
     def best_constant_init(self, m_bar: float) -> float:
         # Exp link: α > 0. Floor m̄ at the smallest α the link can represent.
         eps = float(np.exp(-self.max_eta))
