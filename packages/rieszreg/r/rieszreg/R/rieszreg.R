@@ -42,20 +42,38 @@ use_python_rieszreg <- function(python = NULL, required = TRUE) {
 }
 
 
+# Numeric vector -> 1-d numpy array (a length-1 R vector stays an array).
+.vec <- function(x) reticulate::np_array(as.numeric(x), dtype = "float64")
+
+# Factor and character columns are converted through their labels, so
+# factor(c("0", "1")) becomes 0/1 rather than the integer codes 1/2.
+.numeric_column <- function(x, name) {
+  if (!is.factor(x) && !is.character(x)) return(as.numeric(x))
+  out <- suppressWarnings(as.numeric(as.character(x)))
+  bad <- is.na(out) & !is.na(x)
+  if (any(bad)) {
+    stop(sprintf(
+      "Column '%s' has non-numeric values (%s). Recode it as numbers, e.g. treated = 1, control = 0, or drop it from the data.",
+      name, paste(utils::head(unique(as.character(x[bad])), 5), collapse = ", ")
+    ), call. = FALSE)
+  }
+  out
+}
+
 #' Convert an R data.frame to a pandas DataFrame.
 #'
-#' Numeric columns flow through unchanged. Use this on the predictor
-#' data.frame `Z` of `fit(Z, y)` calls; the outcome `y` is passed
-#' separately as a numeric vector.
+#' Numeric and logical columns flow through as numbers. Factor columns are
+#' converted through their labels, so `factor(c("0", "1"))` becomes 0/1.
+#' Use this on the predictor data.frame `Z` of `fit(Z, y)` calls; the
+#' outcome `y` is passed separately as a numeric vector.
 #'
 #' @param data An R data.frame.
 #' @return A pandas DataFrame (Python object, `convert = FALSE`).
 #' @export
 df_to_py <- function(data) {
-  cols <- colnames(data)
   py_dict <- list()
-  for (k in cols) {
-    py_dict[[k]] <- as.numeric(data[[k]])
+  for (k in colnames(data)) {
+    py_dict[[k]] <- .vec(.numeric_column(data[[k]], k))
   }
   pd <- reticulate::import("pandas", convert = FALSE)
   pd$DataFrame(reticulate::r_to_py(py_dict))
@@ -121,6 +139,17 @@ AdditiveShift <- function(delta, treatment = "a", covariates = NULL) {
 LocalShift <- function(delta, threshold, treatment = "a", covariates = NULL) {
   .module()$LocalShift(delta = delta, threshold = threshold,
                        treatment = treatment, covariates = .cov(covariates))
+}
+
+
+#' Squared L2 norm of the outcome regression: theta = E[mu(X)^2], with
+#' m(alpha)(z, y) = alpha(x) * y. Its Riesz representer is mu(x) = E[Y | X = x],
+#' so fitting it is a regression of y on the covariates. Requires `y` at fit.
+#' @param covariates Character vector of covariate column names. `NULL`
+#'   (default) uses every column of the data.
+#' @export
+OutcomeRegNormSq <- function(covariates = NULL) {
+  .module()$OutcomeRegNormSq(covariates = .cov(covariates))
 }
 
 
@@ -215,10 +244,10 @@ RieszEstimatorR6 <- R6::R6Class(
     fit = function(Z, y = NULL, eval_set = NULL, eval_y = NULL) {
       Z_py <- df_to_py(Z)
       args <- list(Z = Z_py)
-      if (!is.null(y)) args$y <- as.numeric(y)
+      if (!is.null(y)) args$y <- .vec(y)
       if (!is.null(eval_set)) {
         args$eval_set <- df_to_py(eval_set)
-        if (!is.null(eval_y)) args$eval_y <- as.numeric(eval_y)
+        if (!is.null(eval_y)) args$eval_y <- .vec(eval_y)
       }
       do.call(self$py$fit, args)
       invisible(self)
@@ -235,7 +264,7 @@ RieszEstimatorR6 <- R6::R6Class(
     #' @param y Optional held-out outcome vector for Y-dependent estimands.
     score = function(Z, y = NULL) {
       args <- list(df_to_py(Z))
-      if (!is.null(y)) args$y <- as.numeric(y)
+      if (!is.null(y)) args$y <- .vec(y)
       reticulate::py_to_r(do.call(self$py$score, args))
     },
 
@@ -244,7 +273,7 @@ RieszEstimatorR6 <- R6::R6Class(
     #' @param y Optional held-out outcome vector for Y-dependent estimands.
     riesz_loss = function(Z, y = NULL) {
       args <- list(df_to_py(Z))
-      if (!is.null(y)) args$y <- as.numeric(y)
+      if (!is.null(y)) args$y <- .vec(y)
       reticulate::py_to_r(do.call(self$py$riesz_loss, args))
     },
 
@@ -256,8 +285,11 @@ RieszEstimatorR6 <- R6::R6Class(
 
     #' Diagnostics. Returns a list mirroring the Python `Diagnostics` dataclass.
     #' @param Z Held-out predictor data.frame.
-    diagnose = function(Z, ...) {
-      d <- self$py$diagnose(df_to_py(Z), ...)
+    #' @param y Optional held-out outcome vector for Y-dependent estimands.
+    diagnose = function(Z, y = NULL, ...) {
+      args <- list(df_to_py(Z), ...)
+      if (!is.null(y)) args$y <- .vec(y)
+      d <- do.call(self$py$diagnose, args)
       list(
         n = reticulate::py_to_r(d$n),
         rms = reticulate::py_to_r(d$rms),
@@ -277,12 +309,11 @@ RieszEstimatorR6 <- R6::R6Class(
     print = function(...) {
       cat("<", class(self)[[1]], ">\n", sep = "")
       cat("  estimand   :", reticulate::py_to_r(self$estimand$name), "\n")
-      best_iter <- tryCatch(reticulate::py_to_r(self$py$best_iteration_),
-                            error = function(e) NULL)
-      if (!is.null(best_iter)) {
-        cat("  best_iter  :", best_iter, "\n")
-        bs <- tryCatch(reticulate::py_to_r(self$py$best_score_),
-                       error = function(e) NULL)
+      if (reticulate::py_has_attr(self$py, "predictor_")) {
+        cat("  status     : fitted\n")
+        best_iter <- reticulate::py_to_r(self$py$best_iteration_)
+        if (!is.null(best_iter)) cat("  best_iter  :", best_iter, "\n")
+        bs <- reticulate::py_to_r(self$py$best_score_)
         if (!is.null(bs)) cat("  best_score :", bs, "\n")
       } else {
         cat("  status     : unfitted\n")

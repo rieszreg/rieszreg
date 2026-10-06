@@ -46,14 +46,16 @@ use_python_rieszboost <- function(python = NULL, required = TRUE) {
 # ---- Backends (rieszboost-specific) ----
 
 #' Default backend: data augmentation + xgboost custom objective.
-#' @param hessian_floor Lower bound on per-row Hessian (default 2.0).
+#' @param hessian_floor Lower bound on per-row Hessian. `"auto"` (default)
+#'   uses an observed row's curvature at the current prediction (2 for
+#'   `SquaredLoss()`); a number sets a fixed floor.
 #' @param gradient_only If TRUE, disable second-order Newton step (Friedman 2001 mode).
 #' @export
 XGBoostBackend <- function(n_estimators = 200L,
                            learning_rate = 0.05,
                            early_stopping_rounds = NULL,
                            validation_fraction = 0.0,
-                           hessian_floor = 2.0,
+                           hessian_floor = "auto",
                            gradient_only = FALSE) {
   args <- list(
     n_estimators = as.integer(n_estimators),

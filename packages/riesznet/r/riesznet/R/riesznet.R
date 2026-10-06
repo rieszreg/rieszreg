@@ -55,7 +55,8 @@ use_python_riesznet <- function(python = NULL, required = TRUE) {
 #' Subclass of [rieszreg::RieszEstimatorR6] that defaults the backend to a
 #' simple MLP trained with Adam and surfaces the simple-MLP knobs
 #' (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`,
-#' `epochs`, `device`) on the constructor.
+#' `epochs`, `batch_size`, `device`) on the constructor. `batch_size` is the
+#' number of rows per minibatch; `NULL` trains full-batch.
 #'
 #' Custom torch architectures are Python-only. R users who need a custom
 #' `nn.Module` write the factory in Python and call into Python via reticulate.
@@ -72,6 +73,7 @@ RieszNet <- R6::R6Class(
                           learning_rate = 1e-3,
                           weight_decay = 0.0,
                           epochs = 200L,
+                          batch_size = 64L,
                           device = "cpu",
                           dtype = "float32",
                           grad_clip_norm = NULL,
@@ -96,6 +98,8 @@ RieszNet <- R6::R6Class(
         validation_fraction = validation_fraction,
         random_state = as.integer(random_state)
       )
+      # NULL batch_size means full-batch training (Python None).
+      args["batch_size"] <- list(if (is.null(batch_size)) NULL else as.integer(batch_size))
       if (!is.null(grad_clip_norm)) args$grad_clip_norm <- grad_clip_norm
       if (!is.null(loss)) args$loss <- loss
       if (!is.null(init)) args$init <- init
