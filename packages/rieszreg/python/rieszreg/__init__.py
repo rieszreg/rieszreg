@@ -26,6 +26,7 @@ from .augmentation import AugmentedDataset
 from .backends import (
     Backend,
     FitResult,
+    HoldoutBackend,
     MomentBackend,
     Predictor,
     load_predictor,
@@ -69,6 +70,7 @@ __all__ = [
     "Estimand",
     "FiniteEvalEstimand",
     "FitResult",
+    "HoldoutBackend",
     "KLLoss",
     "LinearForm",
     "LocalShift",

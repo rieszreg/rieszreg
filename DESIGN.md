@@ -51,7 +51,7 @@ The `Backend` / `MomentBackend` Protocol method signatures pass only:
 
 Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. For example: `RieszBooster(n_estimators=200, max_depth=3, early_stopping_rounds=10)` builds `XGBoostBackend(n_estimators=200, max_depth=3, early_stopping_rounds=10)` in `_resolved_backend()`. The orchestrator does not see `n_estimators` or `max_depth`.
 
-`validation_fraction` is per-package, not tier-1. Backends that use a held-out slice for fit-time logic (early stopping in `XGBoostBackend` / `SklearnBackend` / `TorchBackend`, λ selection in `KernelRidgeBackend`) expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr(backend, "validation_fraction", 0.0)` and produces the row-level split before augmentation. Backends that don't use a holdout for fit-time logic (`ForestRieszBackend`, `AugForestRieszBackend`) don't expose it; users wanting held-out loss reporting on a forest pass `eval_set=` at fit time.
+`validation_fraction` is per-package, not tier-1. Backends that use a held-out slice for fit-time logic (early stopping in `XGBoostBackend` / `SklearnBackend` / `TorchBackend` / `RieszTreeBackend`, λ selection in `KernelRidgeBackend`) implement the optional `HoldoutBackend` protocol: a `holdout_fraction()` method returning the fraction of rows to hold out for this fit, or 0 when the fit won't use them. The backend decides, so `XGBoostBackend` returns its `validation_fraction` only when `early_stopping_rounds` is set, while `KernelRidgeBackend` always needs its holdout for λ selection. The orchestrator calls `rieszreg.backends.holdout_fraction(backend)` and produces the row-level split before augmentation. That helper falls back to a `validation_fraction` attribute when the backend has no `holdout_fraction()` method; new backends should implement the method. Backends that don't use a holdout for fit-time logic (`ForestRieszBackend`, `AugForestRieszBackend`) implement neither; users wanting held-out loss reporting on a forest pass `eval_set=` at fit time.
 
 ### The "would-be-ignored" lint test
 
@@ -62,7 +62,7 @@ Before adding a kwarg to a tier-1 object, ask: **"would any plausible backend ig
 - ❌ `RieszEstimator(early_stopping_rounds=...)` — kernel ridge and forests ignore. Tier 3.
 - ❌ `RieszEstimator(epochs=...)` — only neural backends. Tier 3.
 - ❌ `diagnose(booster=...)` — the kwarg name claims every estimator is a booster. Use `estimator=`.
-- ❌ `RieszEstimator(validation_fraction=...)` — forest backends don't use the held-out slice for fit-time logic, only reporting. Tier 3 → on the backends that use it (XGBoost, Sklearn, KernelRidge, Torch); read by the orchestrator via `getattr` for the split.
+- ❌ `RieszEstimator(validation_fraction=...)` — forest backends don't use the held-out slice for fit-time logic, only reporting. Tier 3 → on the backends that use it (XGBoost, Sklearn, KernelRidge, Torch), which report the split they need through `holdout_fraction()`.
 - ✅ `RieszEstimator(random_state=...)` — every backend seeds randomness somewhere.
 - ✅ `RieszEstimator(init=...)` — every loss has `best_constant_init(m_bar)`; every backend gets `base_score` from it.
 
@@ -242,7 +242,7 @@ This is the contract every implementation package must meet. Section structure f
 
 ### 2.3 Hyperparameter tuning
 - **[design rule]** Tuning uses sklearn `GridSearchCV` / `HalvingGridSearchCV` / `RandomizedSearchCV`. No bespoke `tune_riesz()`.
-- **[from rieszreg]** The orchestrator performs the row-level holdout split. With explicit `eval_set=` at fit time it uses that; otherwise it reads `validation_fraction` off the backend via `getattr` and splits before augmentation. Backends that need the holdout for fit-time logic (early stopping, λ selection) expose `validation_fraction` as a constructor attribute.
+- **[from rieszreg]** The orchestrator performs the row-level holdout split. With explicit `eval_set=` at fit time it uses that; otherwise it asks the backend through `holdout_fraction(backend)` and splits before augmentation. Backends that need the holdout for fit-time logic (early stopping, λ selection) expose `validation_fraction` as a constructor attribute and implement `holdout_fraction()` (the `HoldoutBackend` protocol), returning 0 for fits that won't use the holdout.
 - **[your package]** Expose backend-specific hyperparameters as constructor args (boosting: `n_estimators`, `learning_rate`, `max_depth`, `reg_lambda`, `subsample`, `early_stopping_rounds`, `validation_fraction`; kernel: `lambda_grid`, `validation_fraction`, `solver`, `n_landmarks`, `n_features`, `cg_tol`). Forest-style backends, which do not use the holdout for fit-time logic, do not expose `validation_fraction`.
 - **[your package]** If your backend has heuristic resolutions (krrr's `median`, `scott`, `silverman` length-scale), document them and accept both string and numeric forms.
 
@@ -323,7 +323,7 @@ This is the contract every implementation package must meet. Section structure f
 - **sklearn integration**: `cross_val_predict`, `Pipeline`, `get_params` round-trip.
 - **Serialization round-trip** per estimand.
 - **Backend equivalence on identical data** if your package has multiple internal modes (boosting backends, kernel solvers).
-- **Edge cases**: ndarray vs DataFrame, single-sample, holdout-split edges (when the backend exposes `validation_fraction`).
+- **Edge cases**: ndarray vs DataFrame, single-sample, holdout-split edges (when the backend implements `holdout_fraction()`), including that fits which don't use the holdout train on every row.
 - **Reference parity** *(required when a prior implementation exists)*: every implementation package must include at least one test that cross-checks its predictions against a *self-contained* re-derivation of any prior implementation of the same algorithm.
 
   **What counts as a parity test**: the reference must come from a different code path or a different mathematical formulation than your wrapper's. Either is fine: an external repo's algorithm inlined in the test file, or your own re-derivation of the algorithm via a different formulation (closed-form leaf solve, dual problem, alternative basis). What does *not* count is hand-replicating the wrapper's own packing / call sequence and asserting bit-identity — that just tests the wrapper against a copy of itself.

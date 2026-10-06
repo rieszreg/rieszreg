@@ -115,7 +115,7 @@ def test_backend_implementing_both_defaults_to_fit_augmented(df):
 
 def test_moment_path_passes_validation_rows(df):
     backend = _MomentOnlyBackend()
-    backend.validation_fraction = 0.2
+    backend.holdout_fraction = lambda: 0.2
     est = RieszEstimator(
         estimand=ATE(),
         backend=backend,
@@ -123,6 +123,6 @@ def test_moment_path_passes_validation_rows(df):
     )
     est.fit(df)
     assert backend.calls == ["fit_rows"]
-    # With backend.validation_fraction=0.2, train has 40 rows, valid has 10.
+    # With a holdout fraction of 0.2, train has 40 rows, valid has 10.
     assert backend.last_X.shape == (40, 2)
     assert backend.last_aug.n_rows == 40

@@ -45,3 +45,11 @@ def test_backend_via_riesz_estimator(binary_ate_data):
     assert est.predictor_.kind == "krrr"
     # Riesz loss is a finite number
     assert np.isfinite(est.riesz_loss(df))
+
+
+def test_holdout_fraction_is_always_validation_fraction():
+    """λ selection always uses the held-out rows, so krrr asks for them on every fit."""
+    from krrr.backend import KernelRidgeBackend
+
+    assert KernelRidgeBackend(validation_fraction=0.25).holdout_fraction() == 0.25
+    assert KernelRidgeBackend(validation_fraction=0.0).holdout_fraction() == 0.0

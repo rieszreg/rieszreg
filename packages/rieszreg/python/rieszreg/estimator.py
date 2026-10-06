@@ -24,7 +24,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 
 from ._omp import warn_if_multi_backend_omp
-from .backends import Backend, load_predictor
+from .backends import Backend, holdout_fraction, load_predictor
 from .estimands.base import Estimand, FiniteEvalEstimand, estimand_from_spec
 from .losses import Loss, SquaredLoss, loss_from_spec
 
@@ -273,11 +273,10 @@ class RieszEstimator(BaseEstimator):
             list(Z.columns) if _is_dataframe(Z) else _n_columns(Z)
         )
 
-        # Resolve validation slice. Backends that use a held-out slice for
-        # fit-time logic (early stopping, λ selection) expose
-        # `validation_fraction` as a constructor attribute; the orchestrator
-        # reads it via getattr and performs the split before augmentation.
-        val_frac = float(getattr(backend, "validation_fraction", 0.0) or 0.0)
+        # Resolve validation slice. The backend says how many rows it needs
+        # held out for this fit (HoldoutBackend); the split happens before
+        # augmentation so a row's augmented copies stay on one side.
+        val_frac = holdout_fraction(backend)
         if eval_set is not None:
             if _is_dataframe(Z) and not _is_dataframe(eval_set):
                 warnings.warn(

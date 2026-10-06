@@ -21,6 +21,11 @@ The ``RieszEstimator`` orchestrator builds the augmented dataset in both
 cases; it calls ``fit_rows`` when a backend defines only that method and
 ``fit_augmented`` otherwise.
 
+A backend that uses held-out rows (early stopping, λ selection) also
+implements ``HoldoutBackend.holdout_fraction``. The orchestrator splits off
+that fraction of rows before augmentation and passes them as the
+validation data.
+
 Concrete backends live in implementation packages (rieszboost, krrr,
 forestriesz, ...).
 """
@@ -123,6 +128,32 @@ class MomentBackend(Protocol):
         random_state: int,
     ) -> FitResult:
         ...
+
+
+class HoldoutBackend(Protocol):
+    """Optional capability of a ``Backend`` or ``MomentBackend``: held-out rows.
+
+    ``holdout_fraction()`` returns the fraction of training rows to hold out
+    for this fit, or 0 when the fit won't use held-out rows (for example,
+    early stopping is off). The orchestrator splits the rows before
+    augmentation and passes the held-out part as ``aug_valid``. An
+    ``eval_set`` passed to ``fit`` replaces the split.
+    """
+
+    def holdout_fraction(self) -> float:
+        ...
+
+
+def holdout_fraction(backend) -> float:
+    """The fraction of training rows the orchestrator holds out for ``backend``.
+
+    Calls ``backend.holdout_fraction()`` when the backend defines it.
+    Otherwise reads a ``validation_fraction`` attribute, or 0 without one.
+    """
+    method = getattr(backend, "holdout_fraction", None)
+    if callable(method):
+        return float(method())
+    return float(getattr(backend, "validation_fraction", 0.0) or 0.0)
 
 
 # ----- Predictor loader registry (used by RieszEstimator.load) -----

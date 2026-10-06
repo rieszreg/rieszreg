@@ -157,3 +157,34 @@ def test_gridsearchcv_tunes_sklearn_backend_fields():
     ).fit(df)
     assert grid.best_estimator_.backend.learning_rate == grid.best_params_["backend__learning_rate"]
     assert len(grid.best_estimator_.predictor_.learners) == 15
+
+
+@pytest.mark.parametrize("backend_name", ["xgboost", "sklearn"])
+def test_backend_holds_out_rows_only_under_early_stopping(backend_name):
+    """Both backends default to validation_fraction=0.1 and hold rows out only
+    when early_stopping_rounds is set, so a fit without early stopping trains
+    on every row."""
+    from sklearn.tree import DecisionTreeRegressor
+
+    from rieszboost import SklearnBackend, XGBoostBackend
+
+    def make(**kw):
+        if backend_name == "xgboost":
+            return XGBoostBackend(n_estimators=200, **kw)
+        return SklearnBackend(
+            lambda: DecisionTreeRegressor(max_depth=3, random_state=0), n_estimators=200, **kw
+        )
+
+    df, _ = _simulate_df(500, seed=7)
+    assert make().validation_fraction == 0.1
+    assert make().holdout_fraction() == 0.0
+    assert make(early_stopping_rounds=10).holdout_fraction() == 0.1
+
+    no_es = RieszBooster(estimand=rieszboost.ATE(), backend=make()).fit(df)
+    all_rows = RieszBooster(estimand=rieszboost.ATE(), backend=make(validation_fraction=0.0)).fit(df)
+    np.testing.assert_array_equal(no_es.predict(df), all_rows.predict(df))
+
+    # Early stopping works with the backend alone: without held-out rows the
+    # fit would raise, and best_score_ is set only when early stopping ran.
+    es = RieszBooster(estimand=rieszboost.ATE(), backend=make(early_stopping_rounds=10)).fit(df)
+    assert es.best_iteration_ is not None and es.best_score_ is not None

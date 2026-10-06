@@ -138,8 +138,6 @@ class RieszBooster(RieszEstimator):
             reg_lambda=self.reg_lambda,
             subsample=self.subsample,
             early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=(
-                self.validation_fraction if self.early_stopping_rounds is not None else 0.0
-            ),
+            validation_fraction=self.validation_fraction,
             n_jobs=self.n_jobs,
         )

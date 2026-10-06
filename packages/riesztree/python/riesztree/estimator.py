@@ -137,12 +137,6 @@ class RieszTreeRegressor(RieszEstimator):
             if self.categorical_features is not None
             else ()
         )
-        # Validation fraction is only consumed when a holdout is needed.
-        val_frac = (
-            float(self.validation_fraction)
-            if self.early_stopping_rounds is not None
-            else 0.0
-        )
         return RieszTreeBackend(
             max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,
@@ -154,7 +148,7 @@ class RieszTreeRegressor(RieszEstimator):
             min_impurity_decrease=self.min_impurity_decrease,
             ccp_alpha=self.ccp_alpha,
             early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=val_frac,
+            validation_fraction=self.validation_fraction,
             categorical_features=cat,
             splitter=self.splitter,
             max_bins=self.max_bins,

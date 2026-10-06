@@ -56,7 +56,7 @@ Return a `Predictor` with `predict_eta()` and `predict_alpha()` (link applied). 
 
 - All learner-specific knobs (`n_estimators`, `learning_rate`, `epochs`, `kernel`, `lambda_grid`, `solver`, ...) live as constructor args on the concrete backend dataclass. **Never on `RieszEstimator`.** **Never in the Protocol method kwargs.**
 - Convenience subclasses surface them as their own `__init__` args and forward via `_resolved_backend()`.
-- If the backend uses a held-out slice for fit-time logic (early stopping, λ selection), expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr(backend, "validation_fraction", 0.0)` and produces the row-level split before augmentation. Backends that don't use the holdout for fit-time logic don't expose it.
+- If the backend uses a held-out slice for fit-time logic (early stopping, λ selection), expose `validation_fraction` as a constructor attribute and implement `holdout_fraction()` (the `HoldoutBackend` protocol in `rieszreg.backends`). It returns the fraction to hold out for this fit, or 0 when the fit won't use the holdout (e.g. early stopping off). The orchestrator calls `rieszreg.backends.holdout_fraction(backend)` and produces the row-level split before augmentation. Backends that don't use the holdout for fit-time logic implement neither. Subclass `sklearn.base.BaseEstimator` so `GridSearchCV` reaches backend fields through `backend__<field>`.
 - Tuning uses sklearn `GridSearchCV` / `HalvingGridSearchCV` / `RandomizedSearchCV`. **No bespoke `tune_riesz()`.**
 - Sample-splitting and cross-fitting use `cross_val_predict`. **No bespoke `crossfit()`.**
 - Heuristic resolutions (e.g. krrr's `median`, `scott`, `silverman` length-scale): document them and accept both string and numeric forms.
@@ -99,7 +99,7 @@ Implement directory-format save/load: binary payload (booster.ubj, predictor.job
 - **sklearn integration**: `cross_val_predict`, `Pipeline`, `get_params` round-trip.
 - **Serialization round-trip** per estimand.
 - **Backend equivalence on identical data** if your package has multiple internal modes (boosting backends, kernel solvers).
-- **Edge cases**: ndarray vs DataFrame, single-sample, holdout-split edges (when the backend exposes `validation_fraction`).
+- **Edge cases**: ndarray vs DataFrame, single-sample, holdout-split edges (when the backend implements `holdout_fraction()`), including that fits which don't use the holdout train on every row.
 - **Property-based (Hypothesis) tests** for tracer linearity, loss round-trips, estimand factory specs, augmentation determinism (most are inherited from rieszreg's suite; re-run if you reach into the tracer).
 - **Estimator-consistency suite** — required. Use `rieszreg.testing.dgps`. On a small set of analytically tractable DGPs (linear-Gaussian ATE, binary-treatment logistic α₀, ...), with proper tuning and growing n, the learned α̂ must approach the true α₀ (or its functional).
 - **R parity test** (`r/<pkg>/tests/testthat/test-parity.R`) confirming bitwise-identical Python ↔ R predictions.

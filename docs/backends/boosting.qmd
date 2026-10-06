@@ -24,6 +24,8 @@ With `BernoulliLoss` the `"auto"` steps are large, so a fit converges in far few
 
 `max_depth`, `reg_lambda`, `subsample`, `learning_rate`, `n_estimators`, `early_stopping_rounds`, `validation_fraction` and `n_jobs` are `XGBoostBackend` fields; `RieszBooster` forwards its constructor args of the same names when it builds the backend.
 
+Both backends default to `validation_fraction=0.1` and hold rows out only when `early_stopping_rounds` is set. `XGBoostBackend(early_stopping_rounds=20)` holds out 10% of the rows for early stopping. A fit without early stopping trains on every row.
+
 Both backends have sklearn's `get_params` and `set_params`. In Python, `GridSearchCV` tunes any backend field through `backend__<field>`. This reaches `hessian_floor` and `gradient_only`, which `RieszBooster` does not take directly:
 
 ```python

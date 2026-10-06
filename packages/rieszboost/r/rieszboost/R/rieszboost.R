@@ -50,7 +50,7 @@ use_python_rieszboost <- function(python = NULL, required = TRUE) {
 #'   Boosting and tree settings.
 #' @param early_stopping_rounds,validation_fraction Early stopping: stop after
 #'   `early_stopping_rounds` rounds without held-out improvement, holding out
-#'   `validation_fraction` of the rows.
+#'   `validation_fraction` of the rows (only used when early stopping is on).
 #' @param hessian_floor Lower bound on per-row Hessian. `"auto"` (default)
 #'   uses an observed row's curvature at the current prediction (2 for
 #'   `SquaredLoss()`); a number sets a fixed floor.
@@ -63,7 +63,7 @@ XGBoostBackend <- function(n_estimators = 200L,
                            reg_lambda = 1.0,
                            subsample = 1.0,
                            early_stopping_rounds = NULL,
-                           validation_fraction = 0.0,
+                           validation_fraction = 0.1,
                            hessian_floor = "auto",
                            gradient_only = FALSE,
                            n_jobs = NULL) {
@@ -96,7 +96,7 @@ SklearnBackend <- function(base_learner_factory,
                            n_estimators = 200L,
                            learning_rate = 0.05,
                            early_stopping_rounds = NULL,
-                           validation_fraction = 0.0) {
+                           validation_fraction = 0.1) {
   args <- list(
     base_learner_factory = base_learner_factory,
     n_estimators = as.integer(n_estimators),

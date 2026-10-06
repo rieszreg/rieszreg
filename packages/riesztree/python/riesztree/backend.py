@@ -63,7 +63,8 @@ class RieszTreeBackend:
         many consecutive accepted splits. ``None`` (default) disables.
     validation_fraction
         Held-out fraction the orchestrator splits off before augmentation
-        when early stopping or pruning needs a holdout. Default 0.0.
+        for early stopping. Rows are held out only when
+        ``early_stopping_rounds`` is set. Default 0.1.
     categorical_features
         Tuple of column indices (into the estimand's ``feature_keys``)
         whose values should be treated as integer category labels rather
@@ -89,10 +90,14 @@ class RieszTreeBackend:
     min_impurity_decrease: float = 0.0
     ccp_alpha: float = 0.0
     early_stopping_rounds: int | None = None
-    validation_fraction: float = 0.0
+    validation_fraction: float = 0.1
     categorical_features: tuple[int, ...] = field(default_factory=tuple)
     splitter: str = "exact"
     max_bins: int = 255      # used when splitter == "hist"
+
+    def holdout_fraction(self) -> float:
+        """Rows to hold out: ``validation_fraction`` under early stopping, else 0."""
+        return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
 
     def fit_augmented(
         self,

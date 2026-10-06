@@ -123,6 +123,7 @@ Three pieces: a backend class implementing one Protocol method, a predictor clas
 
 ```python
 import numpy as np
+from sklearn.base import BaseEstimator
 from rieszreg.backends import (
     FitResult, register_predictor_loader,
 )
@@ -150,12 +151,11 @@ class MyLearnerPredictor:
         return cls(params=params, base_score=base_score, loss=loss)
 
 
-class MyLearnerBackend:
+class MyLearnerBackend(BaseEstimator):
     """Augmentation-style wrapper around `my_learner_fit`."""
 
-    def __init__(self, regularization=1.0, validation_fraction=0.0):
+    def __init__(self, regularization=1.0):
         self.regularization = regularization
-        self.validation_fraction = validation_fraction
 
     def fit_augmented(self, aug_train, aug_valid, loss,
                       *, base_score, random_state):
@@ -232,7 +232,7 @@ print(f"Pearson(α̂, α₀) = {np.corrcoef(alpha_hat, alpha_true)[0, 1]:.3f}")
 
 ### Sklearn composition
 
-`RieszEstimator` already inherits from `sklearn.base.BaseEstimator`. Composition with `cross_val_predict`, `GridSearchCV`, `clone`, and `Pipeline` works as long as the wrapper plays by sklearn's two structural rules.
+`RieszEstimator` already inherits from `sklearn.base.BaseEstimator`. Subclass `BaseEstimator` in your backend too. It gives the backend `get_params` and `set_params`, which `GridSearchCV` needs to reach backend settings. Composition with `cross_val_predict`, `GridSearchCV`, `clone`, and `Pipeline` works as long as the wrapper plays by sklearn's two structural rules.
 
 **The constructor stores its arguments by name without modification.** `MyLearnerBackend.__init__` writes `self.regularization = regularization` and stops. No coercion, no validation, no derived attributes. `clone(MyLearnerBackend(regularization=0.1))` then returns a fresh equivalent object, which sklearn relies on between folds.
 
@@ -259,7 +259,20 @@ print(grid.best_params_)
 
 `backend__regularization` is sklearn's nested-parameter syntax. It forwards to `est.backend.regularization` so any backend hyperparameter exposed as a constructor attribute is reachable.
 
-If your backend uses a held-out slice for fit-time logic such as early stopping or regularization-path selection, expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr` and splits the rows before augmentation. Backends that compute their own internal CV or that don't need a holdout leave the attribute off.
+If your backend uses held-out rows for fit-time logic such as early stopping or regularization-path selection, add a `holdout_fraction()` method. It returns the fraction of rows to hold out for this fit, or 0 when the fit won't use them. The orchestrator calls it, splits the rows before augmentation, and passes the held-out part as `aug_valid`:
+
+```python
+class MyEarlyStoppingBackend(BaseEstimator):
+    def __init__(self, early_stopping_rounds=None, validation_fraction=0.1):
+        self.early_stopping_rounds = early_stopping_rounds
+        self.validation_fraction = validation_fraction
+
+    def holdout_fraction(self):
+        # Hold rows out only when early stopping will use them.
+        return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
+```
+
+An `eval_set` passed to `fit` replaces the split. A backend with a `validation_fraction` attribute but no `holdout_fraction()` method gets that fraction held out on every fit. Backends that compute their own internal CV or that don't need a holdout define neither.
 
 ### Save, load, conformance
 

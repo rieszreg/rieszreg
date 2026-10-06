@@ -43,7 +43,7 @@ The `Backend` / `MomentBackend` Protocol method signatures pass only:
 
 Backend-specific knobs live as constructor args on the concrete backend dataclass. Convenience subclasses of `RieszEstimator` surface them as their own `__init__` args and forward via `_resolved_backend()`. Example: `RieszBooster(n_estimators=200, max_depth=3)` builds `XGBoostBackend(n_estimators=200, max_depth=3)` in `_resolved_backend()`. The orchestrator does not see `n_estimators` or `max_depth`.
 
-`validation_fraction` is per-backend, not tier-1. Backends that use a held-out slice for fit-time logic expose `validation_fraction` as a constructor attribute. The orchestrator reads it via `getattr(backend, "validation_fraction", 0.0)` and produces the row-level split before augmentation. Backends that don't use a holdout for fit-time logic don't expose it; users wanting held-out loss reporting on those backends pass `eval_set=` at fit time.
+`validation_fraction` is per-backend, not tier-1. Backends that use a held-out slice for fit-time logic expose `validation_fraction` as a constructor attribute and implement the optional `HoldoutBackend` protocol: `holdout_fraction()` returns the fraction to hold out for this fit, or 0 when the fit won't use it. The orchestrator calls `rieszreg.backends.holdout_fraction(backend)` and produces the row-level split before augmentation; that helper falls back to a bare `validation_fraction` attribute for backends without the method. Backends that don't use a holdout for fit-time logic implement neither; users wanting held-out loss reporting on those backends pass `eval_set=` at fit time.
 
 ## 3. The "would-be-ignored" lint test
 
@@ -56,7 +56,7 @@ Examples the rule catches:
 - ❌ `RieszEstimator(early_stopping_rounds=...)` — kernel ridge and forests ignore. Tier 3.
 - ❌ `RieszEstimator(epochs=...)` — only neural backends. Tier 3.
 - ❌ `diagnose(booster=...)` — name claims every estimator is a booster. Use `estimator=`.
-- ❌ `RieszEstimator(validation_fraction=...)` — forest backends don't use the held-out slice for fit-time logic. Tier 3 → on backends that need it; the orchestrator reads via `getattr` for the split.
+- ❌ `RieszEstimator(validation_fraction=...)` — forest backends don't use the held-out slice for fit-time logic. Tier 3 → on backends that need it, which report the split through `holdout_fraction()`.
 - ✅ `RieszEstimator(random_state=...)` — every backend seeds randomness somewhere.
 - ✅ `RieszEstimator(init=...)` — every loss has `best_constant_init(m_bar)`; every backend gets `base_score` from it.
 

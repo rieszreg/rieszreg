@@ -126,13 +126,19 @@ class SklearnBackend(BaseEstimator):
     zero-arg callable returning a fresh sklearn-compatible regressor. Base
     learners that expose an unset ``random_state`` are seeded from the
     estimator's ``random_state``. Has sklearn's ``get_params`` /
-    ``set_params``, so ``GridSearchCV`` can tune ``backend__<field>``."""
+    ``set_params``, so ``GridSearchCV`` can tune ``backend__<field>``.
+    ``validation_fraction`` of the rows is held out only when
+    ``early_stopping_rounds`` is set."""
 
     base_learner_factory: Callable[[], Any]
     n_estimators: int = 200
     learning_rate: float = 0.05
     early_stopping_rounds: int | None = None
-    validation_fraction: float = 0.0
+    validation_fraction: float = 0.1
+
+    def holdout_fraction(self) -> float:
+        """Rows to hold out: ``validation_fraction`` under early stopping, else 0."""
+        return self.validation_fraction if self.early_stopping_rounds is not None else 0.0
 
     def fit_augmented(
         self,
@@ -152,8 +158,9 @@ class SklearnBackend(BaseEstimator):
         have_valid = aug_valid is not None
         if self.early_stopping_rounds is not None and not have_valid:
             raise ValueError(
-                "early_stopping_rounds requires validation data — pass "
-                "`validation_fraction>0` or `eval_set=...` to RieszBooster."
+"early_stopping_rounds needs validation data: set "
+                "validation_fraction > 0 (on RieszBooster, or on the backend "
+                "when you pass one) or pass eval_set= to fit."
             )
         if have_valid:
             F_val = np.full(aug_valid.features.shape[0], base_score)

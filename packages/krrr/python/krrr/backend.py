@@ -57,6 +57,10 @@ class KernelRidgeBackend:
     validation_fraction: float = 0.2
     keep_path: bool = True
 
+    def holdout_fraction(self) -> float:
+        """Rows to hold out for λ selection: always ``validation_fraction``."""
+        return self.validation_fraction
+
     def fit_augmented(
         self,
         aug_train: AugmentedDataset,
