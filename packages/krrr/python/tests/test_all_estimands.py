@@ -20,15 +20,17 @@ from krrr import (
 )
 
 
-@pytest.mark.parametrize("estimand_factory,kwargs", [
-    (ATE, dict(treatment="a", covariates=("x",))),
-    (ATT, dict(treatment="a", covariates=("x",))),
-    (TSM, dict(level=1, treatment="a", covariates=("x",))),
-    (AdditiveShift, dict(delta=0.3, treatment="a", covariates=("x",))),
-    (LocalShift, dict(delta=0.3, threshold=1.0, treatment="a", covariates=("x",))),
+@pytest.mark.parametrize("estimand_factory,kwargs,data", [
+    (ATE, dict(treatment="a", covariates=("x",)), "binary_ate_data"),
+    (ATT, dict(treatment="a", covariates=("x",)), "binary_ate_data"),
+    (TSM, dict(level=1, treatment="a", covariates=("x",)), "binary_ate_data"),
+    (AdditiveShift, dict(delta=0.3, treatment="a", covariates=("x",)), "continuous_a_data"),
+    (LocalShift, dict(delta=0.3, threshold=1.0, treatment="a", covariates=("x",)), "continuous_a_data"),
 ])
-def test_estimand_fits_and_predicts(continuous_a_data, estimand_factory, kwargs):
-    df = continuous_a_data
+def test_estimand_fits_and_predicts(request, estimand_factory, kwargs, data):
+    df = request.getfixturevalue(data)
+    if isinstance(df, tuple):  # binary_ate_data returns (df, truth, pi)
+        df = df[0]
     estimand = estimand_factory(**kwargs)
     krr = KernelRieszRegressor(
         estimand=estimand,

@@ -1,4 +1,4 @@
-"""TorchBackend satisfies MomentBackend; TorchPredictor satisfies Predictor."""
+"""TorchBackend satisfies Backend; TorchPredictor satisfies Predictor."""
 
 from __future__ import annotations
 
@@ -11,14 +11,13 @@ from riesznet import RieszNet, TorchBackend, TorchPredictor
 from riesznet.modules import build_adam, build_mlp
 
 
-def test_backend_exposes_fit_rows_only():
+def test_backend_exposes_fit_augmented():
     backend = TorchBackend(
         module_factory=functools.partial(build_mlp),
         optimizer_factory=functools.partial(build_adam),
     )
-    assert callable(getattr(backend, "fit_rows", None))
-    # Moment-style: must NOT advertise fit_augmented (orchestrator dispatches on this).
-    assert not hasattr(backend, "fit_augmented")
+    assert callable(getattr(backend, "fit_augmented", None))
+    assert not hasattr(backend, "fit_rows")
 
 
 def test_predictor_protocol_surface():
@@ -60,7 +59,7 @@ def test_load_works_after_plain_import(tmp_path, linear_gaussian_ate_df):
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
-def test_rieszreg_orchestrator_dispatches_to_fit_rows(linear_gaussian_ate_df):
+def test_rieszreg_orchestrator_composes_with_torch_backend(linear_gaussian_ate_df):
     """End-to-end: composing TorchBackend with rieszreg.RieszEstimator works."""
     from rieszreg import ATE, RieszEstimator
 

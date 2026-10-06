@@ -35,9 +35,9 @@ packages/<pkg>/
 
 Both Protocols live in `packages/rieszreg/python/rieszreg/backends/base.py`. Both return `FitResult(predictor, best_iteration, best_score, history)`. Pick whichever fits your learner's natural loss decomposition:
 
-- **`Backend.fit_augmented(aug_train, aug_valid, loss, ...)`** — for learners whose loss decomposes naturally over the augmented `(a, b)` evaluation points. Use for kernel ridge, gradient boosting, anything that wants the augmented dataset pre-computed for it. Reference impls: `KernelRidgeBackend` (krrr), `XGBoostBackend` / `SklearnBackend` (rieszboost).
+- **`Backend.fit_augmented(aug_train, aug_valid, loss, ...)`** — for learners that fit directly on the augmented `(a, b)` evaluation points. Use for kernel ridge, gradient boosting, trees, neural nets (group by `origin_index` for per-row minibatches), anything that wants the augmented dataset pre-computed for it. Reference impls: `KernelRidgeBackend` (krrr), `XGBoostBackend` / `SklearnBackend` (rieszboost), `RieszTreeBackend` (riesztree), `TorchBackend` (riesznet).
 
-- **`MomentBackend.fit_rows(rows_train, rows_valid, estimand, loss, *, ys_train=None, ys_valid=None, ...)`** — for learners whose loss decomposes per original sample row. Compute per-row moments via `rieszreg.trace(estimand, row, y)` directly, avoiding the augmentation blow-up. Use for random forests, neural nets. Reference impls: `ForestRieszBackend` (forestriesz), `TorchBackend` (riesznet).
+- **`MomentBackend.fit_rows(X_train, X_valid, estimand, loss, *, aug_train, aug_valid, ...)`** — for learners that fit on the original sample rows and need the estimand itself (e.g. to pick a sieve basis). `X_*` are float arrays in `estimand.feature_keys` order; `aug_*` are their augmentations, which you group by `origin_index` to form per-row moments; never loop `trace` over rows. Reference impl: `ForestRieszBackend` (forestriesz).
 
 The orchestrator dispatches at fit time based on which Protocol the backend exposes. Backends implementing both default to `fit_augmented` for back-compat.
 

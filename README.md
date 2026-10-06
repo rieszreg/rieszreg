@@ -58,7 +58,7 @@ A few existing tools cover overlapping ground.
 What's distinctive here:
 
 - The `Backend` / `MomentBackend` split, exposed as a stable Protocol, lets a third-party learner package depend on `rieszreg` and ship as its own PyPI/CRAN release. New learners do not require a PR upstream.
-- The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting via `fit_augmented`) vs. moment-style (forests, neural nets via `fit_rows`).
+- The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting, trees, neural nets via `fit_augmented`) vs. moment-style (the EconML-based forest via `fit_rows`).
 - Cross-language Python + R coverage at the family level via R6 wrappers per package, not just bindings to a Python core.
 
 ## Tests
@@ -89,7 +89,7 @@ RETICULATE_PYTHON=$(uv run python -c 'import sys; print(sys.executable)') \
 
 ## Contributing a new learner package
 
-[`DESIGN.md`](DESIGN.md) (Part B) is the contract: depend on `rieszreg`, implement either the `Backend` Protocol (augmentation-style — for kernel ridge, gradient boosting) or the `MomentBackend` Protocol (moment-style — for random forests, neural nets), satisfy the sklearn-conformance subset, contribute docs pages to `docs/`, follow the doc-tone and living-doc rules. The pre-commit hook at `.githooks/pre-commit` enforces the doc-tone and API-changes-update-docs rules; activate it once per clone with `bash scripts/setup-hooks.sh`. The `lint-docs` job in `.github/workflows/test.yml` mirrors the doc-tone check in CI.
+[`DESIGN.md`](DESIGN.md) (Part B) is the contract: depend on `rieszreg`, implement either the `Backend` Protocol (augmentation-style — for kernel ridge, gradient boosting, trees, neural nets) or the `MomentBackend` Protocol (moment-style — for learners that fit on the original rows, such as the EconML-based forest), satisfy the sklearn-conformance subset, contribute docs pages to `docs/`, follow the doc-tone and living-doc rules. The pre-commit hook at `.githooks/pre-commit` enforces the doc-tone and API-changes-update-docs rules; activate it once per clone with `bash scripts/setup-hooks.sh`. The `lint-docs` job in `.github/workflows/test.yml` mirrors the doc-tone check in CI.
 
 ## References
 

@@ -1,20 +1,25 @@
 """Backend protocol: the swappable component that consumes the per-row data
 and a Loss and produces a fitted Predictor.
 
-Two entry points are supported. A backend implements at most one:
+Two entry points are supported. A backend implements one; if it has both,
+the orchestrator calls ``fit_augmented``:
 
-  * ``fit_augmented`` — for learners whose loss decomposes naturally over
-    augmented evaluation points (kernel ridge, gradient boosting). Receives an
-    ``AugmentedDataset`` of (a, b) coefficients at concrete evaluation points.
-    Implementations: ``KernelRidgeBackend`` (krrr), ``XGBoostBackend`` /
-    ``SklearnBackend`` (rieszboost).
-  * ``fit_rows`` — for learners whose loss decomposes per original sample row
-    (random forests, neural nets). Receives raw ``rows`` plus the ``Estimand``
-    so the backend can compute per-row moments via ``rieszreg.trace`` directly.
-    Implementations: ``ForestRieszBackend`` (forestriesz).
+  * ``fit_augmented`` — for learners that fit directly on the augmented
+    evaluation points (kernel ridge, gradient boosting, trees, neural nets).
+    Receives an ``AugmentedDataset`` of (a, b) coefficients at concrete
+    evaluation points. Implementations: ``KernelRidgeBackend`` (krrr),
+    ``XGBoostBackend`` / ``SklearnBackend`` (rieszboost), ``RieszTreeBackend``
+    (riesztree), ``AugForestRieszBackend`` (forestriesz), ``TorchBackend``
+    (riesznet).
+  * ``fit_rows`` — for learners that fit on the original sample rows and use
+    the augmented data only to form per-row moments. Receives the
+    original-row feature matrix, the ``Estimand`` and the augmented data
+    (grouped back to rows by ``origin_index``). Implementation:
+    ``ForestRieszBackend`` (forestriesz).
 
-The ``RieszEstimator`` orchestrator dispatches by looking for ``fit_rows``
-first; if absent, it builds the augmented dataset and calls ``fit_augmented``.
+The ``RieszEstimator`` orchestrator builds the augmented dataset in both
+cases; it calls ``fit_rows`` when a backend defines only that method and
+``fit_augmented`` otherwise.
 
 Concrete backends live in implementation packages (rieszboost, krrr,
 forestriesz, ...).
@@ -71,7 +76,7 @@ class Backend(Protocol):
 
     Implementers consume a precomputed ``AugmentedDataset`` of (a, b)
     coefficients at evaluation points. The orchestrator builds the augmented
-    dataset by tracing the estimand on each input row before calling.
+    dataset with ``estimand.augment`` before calling.
 
     Method kwargs are universal: data, ``base_score``, ``random_state``,
     and ``hyperparams`` (a dict for backend-specific passthrough). All
@@ -96,30 +101,29 @@ class Backend(Protocol):
 class MomentBackend(Protocol):
     """Moment-style backend Protocol.
 
-    Alternative to ``Backend`` for learners that consume raw rows + the
-    estimand directly. Useful for random forests and neural nets where each
-    sample row contributes an independent loss term — these learners benefit
-    from per-row moment evaluation rather than the augmented (a, b) view.
-
-    Same calling convention as ``Backend.fit_augmented``: data, ``base_score``,
-    ``random_state``, and ``hyperparams``. ``ys_train`` / ``ys_valid`` carry
-    the per-row outcome (sklearn-style) for estimands whose ``m`` reads it;
-    they are ``None`` otherwise. Learner-specific knobs live on the concrete
-    backend.
+    Alternative to ``Backend`` for learners that fit on the original rows
+    and read per-row moments off the augmented data (random forests solving
+    a local moment equation). ``X_train`` / ``X_valid`` are
+    ``(n, len(estimand.feature_keys))`` float arrays with columns in
+    ``feature_keys`` order; ``aug_train`` / ``aug_valid`` are their
+    augmentations (``estimand.augment``, outcome included). The validation
+    arguments are ``None`` without a validation set. ``base_score``,
+    ``random_state`` and ``hyperparams`` are as in ``Backend.fit_augmented``;
+    learner-specific knobs live on the concrete backend.
     """
 
     def fit_rows(
         self,
-        rows_train: list[dict[str, Any]],
-        rows_valid: list[dict[str, Any]] | None,
+        X_train: np.ndarray,
+        X_valid: np.ndarray | None,
         estimand: "Estimand",
         loss: Loss,
         *,
+        aug_train: AugmentedDataset,
+        aug_valid: AugmentedDataset | None,
         base_score: float,
         random_state: int,
         hyperparams: dict[str, Any],
-        ys_train: list | None = None,
-        ys_valid: list | None = None,
     ) -> FitResult:
         ...
 

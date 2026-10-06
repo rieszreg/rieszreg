@@ -11,8 +11,12 @@ Composes with `sklearn.model_selection.GridSearchCV`, `cross_val_predict`,
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import warnings
-from typing import Sequence
+from importlib import import_module
+from numbers import Real
+from pathlib import Path
 
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -22,20 +26,11 @@ from sklearn.utils.validation import check_is_fitted
 from ._omp import warn_if_multi_backend_omp
 from .backends import Backend, load_predictor
 from .estimands.base import Estimand, FiniteEvalEstimand, estimand_from_spec
-from .estimands.tracer import trace
 from .losses import Loss, SquaredLoss, loss_from_spec
 
 
 def _is_dataframe(Z) -> bool:
     return hasattr(Z, "columns") and hasattr(Z, "iloc")
-
-
-def _missing_columns_message(estimand: Estimand, missing, columns) -> str:
-    return (
-        f"The data is missing columns {missing} needed by {estimand.name}; "
-        f"it has columns {list(columns)}. Tell the estimand your column "
-        "names, e.g. ATE(treatment=\"treated\", covariates=[\"age\", \"income\"])."
-    )
 
 
 def _n_columns(Z) -> int:
@@ -45,94 +40,45 @@ def _n_columns(Z) -> int:
     return 1 if arr.ndim == 1 else arr.shape[1]
 
 
-def _rows_from_Z(Z, estimand: Estimand) -> list[dict]:
-    """Convert ndarray or DataFrame Z into a list of row-dicts keyed by
-    `estimand.feature_keys`. Ndarray input is interpreted column-by-column in
-    `feature_keys` order; DataFrame columns are matched by name.
-
-    Hot path during fit (the augmentation engine consumes row-dicts).
-    Predict-only paths should use :func:`_features_from_Z` instead, which
-    skips the row-dict pivot entirely.
-    """
-    if _is_dataframe(Z):
-        cols_needed = list(estimand.feature_keys)
-        missing = [c for c in cols_needed if c not in Z.columns]
-        if missing:
-            raise ValueError(_missing_columns_message(estimand, missing, Z.columns))
-        # Vectorise the per-column extraction: one .to_numpy() per column
-        # rather than O(n*p) .iloc lookups. The downstream consumers see
-        # the same list-of-dicts shape.
-        col_arrs = {k: Z[k].to_numpy() for k in cols_needed}
-        n = len(Z)
-        return [
-            {k: col_arrs[k][i] for k in cols_needed}
-            for i in range(n)
-        ]
-
-    arr = np.asarray(Z)
-    if arr.ndim == 1:
-        arr = arr.reshape(-1, 1)
-    if arr.shape[1] != len(estimand.feature_keys):
-        raise ValueError(
-            f"Estimand {estimand.name!r} expects {len(estimand.feature_keys)} "
-            f"feature columns ({estimand.feature_keys}), got Z.shape[1]="
-            f"{arr.shape[1]}."
-        )
-    return [
-        {k: arr[i, j] for j, k in enumerate(estimand.feature_keys)}
-        for i in range(arr.shape[0])
-    ]
-
-
 def _features_from_Z(Z, estimand: Estimand) -> np.ndarray:
-    """Fast DataFrame/ndarray → ``feature_keys``-ordered float ndarray.
+    """DataFrame/ndarray → ``feature_keys``-ordered float ndarray.
 
-    Skips the ``list[dict]`` pivot used by the fit path. Used by the
-    predict-only entry points (where the augmentation engine isn't
-    needed) so prediction stays at numpy / Cython speed end-to-end.
+    DataFrame columns are matched by name (compared as strings, so integer
+    column labels work); ndarray columns are taken in ``feature_keys`` order.
     """
+    keys = list(estimand.feature_keys)
     if _is_dataframe(Z):
-        cols_needed = list(estimand.feature_keys)
-        missing = [c for c in cols_needed if c not in Z.columns]
+        position = {str(c): i for i, c in enumerate(Z.columns)}
+        missing = [k for k in keys if str(k) not in position]
         if missing:
-            raise ValueError(_missing_columns_message(estimand, missing, Z.columns))
-        return Z[cols_needed].to_numpy(dtype=float)
+            raise ValueError(
+                f"The data is missing columns {missing} needed by {estimand.name}; "
+                f"it has columns {list(Z.columns)}. Tell the estimand your column "
+                "names, e.g. ATE(treatment=\"treated\", covariates=[\"age\", \"income\"])."
+            )
+        return Z.iloc[:, [position[str(k)] for k in keys]].to_numpy(dtype=float)
 
     arr = np.asarray(Z, dtype=float)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
-    if arr.shape[1] != len(estimand.feature_keys):
+    if arr.shape[1] != len(keys):
         raise ValueError(
-            f"Estimand {estimand.name!r} expects {len(estimand.feature_keys)} "
-            f"feature columns ({estimand.feature_keys}), got Z.shape[1]="
-            f"{arr.shape[1]}."
+            f"Estimand {estimand.name!r} expects {len(keys)} feature columns "
+            f"({estimand.feature_keys}), got Z.shape[1]={arr.shape[1]}."
         )
     return arr
 
 
-def _ys_from_y(y, n: int) -> list | None:
-    """Coerce `y` (a sklearn-style outcome vector) into a list of per-row
-    scalars aligned with the rows. Returns None when `y is None`. Raises if
-    the length doesn't match `n`."""
+def _ys_from_y(y, n: int) -> np.ndarray | None:
+    """Coerce `y` into a flat float array aligned with the rows (None stays None)."""
     if y is None:
         return None
-    if hasattr(y, "to_numpy"):
-        y_arr = y.to_numpy()
-    else:
-        y_arr = np.asarray(y)
-    if y_arr.ndim > 1:
-        y_arr = y_arr.reshape(-1)
+    y_arr = np.asarray(y, dtype=float).reshape(-1)
     if len(y_arr) != n:
         raise ValueError(
             f"len(y)={len(y_arr)} does not match number of rows in Z ({n})."
         )
-    return list(y_arr)
-
-
-def _features_from_rows(rows: Sequence[dict], estimand: Estimand) -> np.ndarray:
-    return np.asarray(
-        [[row[k] for k in estimand.feature_keys] for row in rows], dtype=float
-    )
+    return y_arr
 
 
 def _check_outcome_not_covariate(estimand, feats: np.ndarray, ys) -> None:
@@ -157,30 +103,52 @@ def _check_outcome_not_covariate(estimand, feats: np.ndarray, ys) -> None:
             )
 
 
-def _split_Z(Z, y, validation_fraction: float, random_state: int):
+def _split_Z(Z, y, validation_fraction: float, random_state):
     """Split (Z, y) into train/valid by `validation_fraction`. `y=None` is
-    threaded through unchanged. Returns `(Z_train, Z_valid, y_train, y_valid)`
-    where the validation halves are `None` when `validation_fraction <= 0`."""
-    n = len(Z) if _is_dataframe(Z) else len(np.asarray(Z))
-    if validation_fraction <= 0:
-        return Z, None, y, None
-    idx = np.arange(n)
+    threaded through unchanged. Returns `(Z_train, Z_valid, y_train, y_valid)`."""
     tr_idx, va_idx = train_test_split(
-        idx, test_size=validation_fraction, random_state=random_state
+        np.arange(len(Z)), test_size=validation_fraction, random_state=random_state
     )
-    if _is_dataframe(Z):
-        Z_train, Z_valid = Z.iloc[tr_idx], Z.iloc[va_idx]
-    else:
-        arr = np.asarray(Z)
-        Z_train, Z_valid = arr[tr_idx], arr[va_idx]
-    if y is None:
-        return Z_train, Z_valid, None, None
-    if hasattr(y, "iloc"):
-        y_train, y_valid = y.iloc[tr_idx], y.iloc[va_idx]
-    else:
-        y_arr = np.asarray(y)
-        y_train, y_valid = y_arr[tr_idx], y_arr[va_idx]
-    return Z_train, Z_valid, y_train, y_valid
+
+    def take(a, idx):
+        return a.iloc[idx] if hasattr(a, "iloc") else np.asarray(a)[idx]
+
+    ys = (None, None) if y is None else (take(y, tr_idx), take(y, va_idx))
+    return take(Z, tr_idx), take(Z, va_idx), *ys
+
+
+def _jsonable(value) -> bool:
+    try:
+        json.dumps(value, default=_json_default)
+        return True
+    except TypeError:
+        return False
+
+
+def _backend_spec(backend) -> dict | None:
+    """``{"module", "qualname", "params"}`` for a dataclass backend whose
+    fields are all JSON-serializable, else None (the backend isn't saved)."""
+    if not dataclasses.is_dataclass(backend):
+        return None
+    params = {f.name: getattr(backend, f.name) for f in dataclasses.fields(backend) if f.init}
+    cls = type(backend)
+    return {"module": cls.__module__, "qualname": cls.__qualname__, "params": params} if _jsonable(params) else None
+
+
+def _backend_from_spec(spec: dict):
+    obj = import_module(spec["module"])
+    for part in spec["qualname"].split("."):
+        obj = getattr(obj, part)
+    return obj(**spec["params"])
+
+
+def _json_default(obj):
+    """JSON fallback for numpy scalars / arrays in saved metadata."""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(f"{type(obj).__name__} is not JSON serializable")
 
 
 class RieszEstimator(BaseEstimator):
@@ -216,9 +184,10 @@ class RieszEstimator(BaseEstimator):
     estimand_ : Estimand
         The estimand with its columns resolved against the training data.
     n_features_in_ : int
-        Number of columns α̂ is a function of (treatment + covariates).
+        Number of columns of ``X`` seen at fit.
     feature_names_in_ : ndarray of str
-        Those column names, in the order α̂ uses them.
+        Column names of ``X`` seen at fit. Defined only when ``X`` was a
+        DataFrame. α̂ itself reads ``estimand_.feature_keys``.
     loss_ : Loss
         The loss used for fitting.
     """
@@ -299,6 +268,15 @@ class RieszEstimator(BaseEstimator):
         # reads it via getattr and performs the split before augmentation.
         val_frac = float(getattr(backend, "validation_fraction", 0.0) or 0.0)
         if eval_set is not None:
+            if _is_dataframe(Z) and not _is_dataframe(eval_set):
+                warnings.warn(
+                    "Z is a DataFrame but eval_set is an array without column "
+                    f"names. Its columns are read in the order "
+                    f"{list(estimand.feature_keys)}; pass a DataFrame to match "
+                    "columns by name.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             Z_train, Z_valid = Z, eval_set
             y_train, y_valid = y, eval_y
         elif val_frac > 0:
@@ -309,55 +287,29 @@ class RieszEstimator(BaseEstimator):
             Z_train, Z_valid = Z, None
             y_train, y_valid = y, None
 
-        # Augmentation: dispatch via `estimand.augment(features, ys)`.
-        # Built-in subclasses override with vectorised numpy; custom estimands
-        # use the inherited Tracer-based default.
         feats_train = _features_from_Z(Z_train, estimand)
-        n_train = feats_train.shape[0]
-        ys_train = _ys_from_y(y_train, n_train)
+        ys_train = _ys_from_y(y_train, feats_train.shape[0])
+        has_valid = Z_valid is not None and len(Z_valid) > 0
+        if has_valid:
+            feats_valid = _features_from_Z(Z_valid, estimand)
+            ys_valid = _ys_from_y(y_valid, feats_valid.shape[0])
+        else:
+            feats_valid = ys_valid = None
         if getattr(self.estimand, "covariates", ()) is None:
             _check_outcome_not_covariate(estimand, feats_train, ys_train)
         aug_train = estimand.augment(feats_train, ys=ys_train)
+        aug_valid = estimand.augment(feats_valid, ys=ys_valid) if has_valid else None
 
-        if Z_valid is not None and len(Z_valid) > 0:
-            feats_valid = _features_from_Z(Z_valid, estimand)
-            ys_valid = _ys_from_y(y_valid, feats_valid.shape[0])
-            aug_valid = estimand.augment(feats_valid, ys=ys_valid)
-        else:
-            feats_valid = None
-            ys_valid = None
-            aug_valid = None
-
-        # Resolve init in α-space, then convert to η.
-        # Default (init=None): use the constant that minimizes the empirical
-        # Riesz loss. For any Bregman loss with strictly convex φ this is
-        # m̄ = E[m(Z, 1)] (FOC ψ'(a) = φ''(a)·m̄ collapses to a = m̄ via
-        # ψ'(t) = t·φ''(t)). Each loss projects m̄ into its α-domain.
-        # Built-in subclasses carry the closed-form m_bar as a class attribute;
-        # custom estimands fall back to a per-row trace.
-        init_arg = self.init
-        if init_arg is None:
-            mbar_builtin = estimand.m_bar
-            if mbar_builtin is not None and ys_train is None:
-                m_bar = float(mbar_builtin)
-            else:
-                rows_train = _rows_from_Z(Z_train, estimand)
-                if ys_train is None:
-                    m_bar = float(np.mean(
-                        [sum(c for c, _ in trace(estimand, z)) for z in rows_train]
-                    ))
-                else:
-                    m_bar = float(np.mean(
-                        [
-                            sum(c for c, _ in trace(estimand, z, y_i))
-                            for z, y_i in zip(rows_train, ys_train)
-                        ]
-                    ))
+        # init=None: the constant minimizing the empirical Riesz loss. For any
+        # Bregman loss with strictly convex h that is m̄ = E[m(Z, 1)], and
+        # Σ_r C_r = −Σ_i m(Z_i, 1), so m̄ falls out of the augmentation.
+        if self.init is None:
+            m_bar = -float(aug_train.potential_deriv_coef.sum()) / aug_train.n_rows
             init_alpha = loss.best_constant_init(m_bar)
-        elif isinstance(init_arg, (int, float)):
-            init_alpha = float(init_arg)
+        elif isinstance(self.init, Real):
+            init_alpha = float(self.init)
         else:
-            raise ValueError(f"init must be float or None; got {init_arg!r}")
+            raise ValueError(f"init must be float or None; got {self.init!r}")
         base_score = float(loss.alpha_to_eta(init_alpha))
 
         common_kwargs = dict(
@@ -366,27 +318,13 @@ class RieszEstimator(BaseEstimator):
             hyperparams=self._backend_hyperparams(),
         )
 
-        # Dispatch: moment-style backends consume rows + estimand directly.
-        # Augmentation-style backends receive a precomputed AugmentedDataset.
-        # Backends implementing both default to fit_augmented for back-compat.
-        uses_moment_path = hasattr(backend, "fit_rows") and not hasattr(backend, "fit_augmented")
-        if uses_moment_path:
-            # Moment backends consume row-dicts; materialise from the feature
-            # ndarrays we already built.
-            rows_train = _rows_from_Z(Z_train, estimand)
-            rows_valid = (
-                _rows_from_Z(Z_valid, estimand)
-                if Z_valid is not None and len(Z_valid) > 0
-                else None
-            )
+        # Moment-style backends also take the feature arrays + estimand;
+        # everything else (including backends implementing both) gets only
+        # the augmented data.
+        if hasattr(backend, "fit_rows") and not hasattr(backend, "fit_augmented"):
             result = backend.fit_rows(
-                rows_train,
-                rows_valid,
-                estimand,
-                loss,
-                ys_train=ys_train,
-                ys_valid=ys_valid,
-                **common_kwargs,
+                feats_train, feats_valid, estimand, loss,
+                aug_train=aug_train, aug_valid=aug_valid, **common_kwargs,
             )
         else:
             result = backend.fit_augmented(aug_train, aug_valid, loss, **common_kwargs)
@@ -397,13 +335,28 @@ class RieszEstimator(BaseEstimator):
         self.base_score_ = base_score
         self.loss_ = loss
         self.estimand_ = estimand
-        self.n_features_in_ = len(estimand.feature_keys)
-        self.feature_names_in_ = np.asarray(estimand.feature_keys, dtype=object)
+        self._set_input_attributes(Z)
         return self
+
+    def _set_input_attributes(self, Z) -> None:
+        self.n_features_in_ = _n_columns(Z)
+        if _is_dataframe(Z):
+            self.feature_names_in_ = np.asarray([str(c) for c in Z.columns], dtype=object)
+        elif hasattr(self, "feature_names_in_"):
+            del self.feature_names_in_
 
     def _features(self, Z) -> np.ndarray:
         """Check the estimator is fitted and pull α̂'s input columns from Z."""
         check_is_fitted(self, "predictor_")
+        if hasattr(self, "feature_names_in_") and not _is_dataframe(Z):
+            warnings.warn(
+                f"{type(self).__name__} was fit on a DataFrame but got an array "
+                f"without column names. Array columns are read in the order "
+                f"{list(self.estimand_.feature_keys)}; pass a DataFrame to match "
+                "columns by name.",
+                UserWarning,
+                stacklevel=3,
+            )
         return _features_from_Z(Z, self.estimand_)
 
     def predict(self, Z) -> np.ndarray:
@@ -415,11 +368,7 @@ class RieszEstimator(BaseEstimator):
         """Mean per-row Riesz loss of the fitted α̂ on (Z, y) under ``loss``."""
         feats = self._features(Z)
         aug = self.estimand_.augment(feats, ys=_ys_from_y(y, feats.shape[0]))
-        alpha = self.loss_.link_to_alpha(self.predictor_.predict_eta(aug.features))
-        return float(
-            np.sum(loss.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha))
-            / aug.n_rows
-        )
+        return aug.mean_loss(loss, self.predictor_.predict_alpha(aug.features))
 
     def riesz_loss(self, Z, y=None) -> float:
         """Mean per-row Riesz loss on (Z, y) under the loss the estimator was
@@ -442,14 +391,15 @@ class RieszEstimator(BaseEstimator):
         """
         return -self._loss_on(Z, y, SquaredLoss())
 
-    def diagnose(self, Z, **kwargs):
+    def diagnose(self, Z, y=None, **kwargs):
         """Health checks on α̂ over Z: magnitude, extreme values (a sign of
         poor overlap / near-positivity violations), and held-out Riesz loss.
         Returns a `Diagnostics` object; call ``.summary()`` for a report.
-        Keyword arguments (``extreme_threshold``, ``extreme_fraction_warn``)
-        are forwarded to `rieszreg.diagnose`."""
+        Pass ``y`` when the estimand's functional reads the outcome. Keyword
+        arguments (``extreme_threshold``, ``extreme_fraction_warn``) are
+        forwarded to `rieszreg.diagnose`."""
         from .diagnostics import diagnose
-        return diagnose(estimator=self, Z=Z, **kwargs)
+        return diagnose(estimator=self, Z=Z, y=y, **kwargs)
 
     # ---- serialization ----
 
@@ -468,9 +418,6 @@ class RieszEstimator(BaseEstimator):
         will save fine, but `.load(path)` will require the user to pass
         `estimand=...` explicitly.
         """
-        import json
-        from pathlib import Path
-
         check_is_fitted(self, "predictor_")
 
         path = Path(path)
@@ -487,18 +434,26 @@ class RieszEstimator(BaseEstimator):
             "base_score": self.base_score_,
             "best_iteration": self.best_iteration_,
             "best_score": self.best_score_,
+            "n_features_in": self.n_features_in_,
+            "feature_names_in": (
+                list(self.feature_names_in_) if hasattr(self, "feature_names_in_") else None
+            ),
             "estimator_class": type(self).__name__,
             "hyperparameters": self._save_hyperparameters(),
         }
         with open(path / "metadata.json", "w") as f:
-            json.dump(metadata, f, indent=2)
+            json.dump(metadata, f, indent=2, default=_json_default)
 
     def _save_hyperparameters(self) -> dict:
-        """Snapshot of constructor args for round-trip. Subclasses extend."""
-        return {
-            "init": self.init,
-            "random_state": self.random_state,
-        }
+        """JSON-serializable constructor args for round-trip. Params that
+        can't be written as JSON (callables, custom objects) are skipped and
+        come back as their defaults; subclasses add special cases."""
+        params = self.get_params(deep=False)
+        hp = {k: v for k, v in params.items() if k not in ("estimand", "loss", "backend") and _jsonable(v)}
+        backend = _backend_spec(params.get("backend"))
+        if backend is not None:
+            hp["backend"] = backend
+        return hp
 
     @classmethod
     def load(cls, path, *, estimand: Estimand | None = None) -> "RieszEstimator":
@@ -512,9 +467,6 @@ class RieszEstimator(BaseEstimator):
         Implementation packages register loaders at import time, so importing
         the relevant package (e.g. `import rieszboost`) is enough.
         """
-        import json
-        from pathlib import Path
-
         path = Path(path)
         with open(path / "metadata.json") as f:
             metadata = json.load(f)
@@ -556,17 +508,17 @@ class RieszEstimator(BaseEstimator):
         instance.base_score_ = metadata["base_score"]
         instance.loss_ = loss
         instance.estimand_ = estimand
-        instance.n_features_in_ = len(metadata["feature_keys"])
-        instance.feature_names_in_ = np.asarray(metadata["feature_keys"], dtype=object)
+        # Models saved before these keys existed: fall back to the estimand.
+        instance.n_features_in_ = metadata.get("n_features_in", len(metadata["feature_keys"]))
+        if metadata.get("feature_names_in") is not None:
+            instance.feature_names_in_ = np.asarray(metadata["feature_names_in"], dtype=object)
         return instance
 
     @classmethod
     def _construct_for_load(cls, *, estimand, loss, hyperparameters: dict):
-        """Build an unfit instance from saved hyperparameters. Subclasses
-        override to consume their additional knobs."""
-        return cls(
-            estimand=estimand,
-            loss=loss,
-            init=hyperparameters.get("init"),
-            random_state=hyperparameters.get("random_state", 0),
-        )
+        """Build an unfit instance from saved hyperparameters."""
+        names = set(cls._get_param_names())
+        kwargs = {k: v for k, v in hyperparameters.items() if k in names}
+        if "backend" in kwargs:
+            kwargs["backend"] = _backend_from_spec(kwargs["backend"])
+        return cls(estimand=estimand, loss=loss, **kwargs)

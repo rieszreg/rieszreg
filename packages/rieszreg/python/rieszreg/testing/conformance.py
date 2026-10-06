@@ -24,8 +24,8 @@ def assert_clone_roundtrip(make_estimator: Callable):
 
 
 def assert_get_params_round_trip(make_estimator: Callable):
-    """`set_params(**get_params())` is idempotent."""
+    """Rebuilding from `get_params()` gives the same params."""
     est = make_estimator()
     params = est.get_params(deep=False)
-    twin = type(est)(**{k: v for k, v in params.items() if k in params})
+    twin = type(est)(**params)
     assert twin.get_params(deep=False) == params

@@ -180,9 +180,9 @@ class RieszTreeRegressor(RieszEstimator):
     @property
     def feature_importances_(self) -> np.ndarray:
         """Share of total split gain attributed to each column of
-        ``feature_names_in_`` (sums to 1 unless the tree is a single leaf)."""
+        ``estimand_.feature_keys`` (sums to 1 unless the tree is a single leaf)."""
         check_is_fitted(self, "predictor_")
-        return feature_importance(self.predictor_.tree, self.n_features_in_)
+        return feature_importance(self.predictor_.tree, len(self.estimand_.feature_keys))
 
     def diagnose(self, Z, **kwargs):
         """Base diagnostics plus tree extras: number of leaves, depth,

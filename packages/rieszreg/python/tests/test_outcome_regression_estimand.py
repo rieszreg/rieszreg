@@ -63,22 +63,14 @@ def test_vectorised_augment_matches_base_default():
     assert _signature(slow) == _signature(fast)
 
 
-def test_m_bar_empirical_equals_mean_y():
-    """Orchestrator falls back to empirical mean when `m_bar = None`. For
-    OutcomeRegNormSq, that empirical mean equals E[Y]: each row's trace
-    yields a single (coef=y_i, point) pair, so mean(Σ coef) = mean(y)."""
+def test_m_bar_from_augmentation_equals_mean_y():
+    """The orchestrator's default init reads m̄ = −ΣC / n off the augmented
+    data; for OutcomeRegNormSq that is E[Y]."""
     rng = np.random.default_rng(0)
-    n = 200
-    X = rng.normal(size=n)
-    y = rng.normal(loc=2.5, scale=1.5, size=n)
-    e = OutcomeRegNormSq(covariates=("x",))
-    rows = [{"x": float(X[i])} for i in range(n)]
-    m_bar_emp = float(np.mean([
-        sum(c for c, _ in trace(e, z, y_i))
-        for z, y_i in zip(rows, y)
-    ]))
-    assert abs(m_bar_emp - float(y.mean())) < 1e-12
-    assert e.m_bar is None  # documents the fallback path
+    X = rng.normal(size=(200, 1))
+    y = rng.normal(loc=2.5, scale=1.5, size=200)
+    aug = OutcomeRegNormSq(covariates=("x",)).augment(X, ys=y)
+    assert abs(-aug.potential_deriv_coef.sum() / aug.n_rows - y.mean()) < 1e-12
 
 
 def test_trace_yields_single_point_per_row():

@@ -21,7 +21,6 @@ from riesztree import (
     TSM,
 )
 from riesztree.fast import (
-    FlatTree,
     flat_tree_from_node,
     node_from_flat_tree,
     predict_alpha,
@@ -57,7 +56,7 @@ def test_flat_tree_round_trip_predicts_identically():
     flat = flat_tree_from_node(est.predictor_.tree)
     rebuilt = node_from_flat_tree(flat)
 
-    feats = df[list(est.feature_names_in_)].to_numpy(dtype=np.float64)
+    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
     a_node = node_predict_array(est.predictor_.tree, feats)
     a_round = node_predict_array(rebuilt, feats)
     np.testing.assert_array_equal(a_node, a_round)
@@ -72,7 +71,7 @@ def test_cython_predict_matches_node_walk(max_depth):
     bit-for-bit on continuous-only trees."""
     df = _make_df(p=8, n=500)
     est = RieszTreeRegressor(estimand=_ate_estimand(8), max_depth=max_depth).fit(df)
-    feats = df[list(est.feature_names_in_)].to_numpy(dtype=np.float64)
+    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
 
     flat = flat_tree_from_node(est.predictor_.tree)
     a_cython = predict_alpha(flat, feats)            # Cython tight loop
@@ -86,7 +85,7 @@ def test_python_fallback_matches_cython():
     the two implementations."""
     df = _make_df(p=8, n=500)
     est = RieszTreeRegressor(estimand=_ate_estimand(8), max_depth=6).fit(df)
-    feats = df[list(est.feature_names_in_)].to_numpy(dtype=np.float64)
+    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
     flat = flat_tree_from_node(est.predictor_.tree)
     np.testing.assert_array_equal(
         _predict_alpha_python(flat, feats), predict_alpha(flat, feats)
@@ -114,7 +113,7 @@ def test_flat_predict_matches_node_per_loss(loss_cls, estimand_factory):
         else loss_cls()
     )
     est = RieszTreeRegressor(estimand=estimand, loss=loss, max_depth=3).fit(df)
-    feats = df[list(est.feature_names_in_)].to_numpy(dtype=np.float64)
+    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
     a_pred = est.predict(df)                   # goes through predictor (flat path)
     a_node = node_predict_array(est.predictor_.tree, feats)
     np.testing.assert_allclose(a_pred, a_node, atol=0, rtol=0)
@@ -137,7 +136,7 @@ def test_categorical_split_predict_matches_node_walk():
         max_depth=4,
         categorical_features=(0,),
     ).fit(df)
-    feats = df[list(est.feature_names_in_)].to_numpy(dtype=np.float64)
+    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
     a_pred = est.predict(df)
     a_node = node_predict_array(est.predictor_.tree, feats)
     np.testing.assert_array_equal(a_pred, a_node)

@@ -1,20 +1,18 @@
 """Autograd-friendly Bregman-Riesz loss in PyTorch.
 
-For each original row ``z_i`` the per-row Riesz loss is
+The per-row Riesz loss of original row ``i`` sums the augmented-row terms
+that ``Estimand.augment`` emits for it (``origin_index == i``):
 
-    L_i = ψ(α(x_i)) − Σ_j coef_j · φ'(α(point_j))
+    L_i = Σ_r [ D_r · h̃(α(z_r)) + C_r · h'(α(z_r)) ]
 
-where ``(coef_j, point_j)`` come from ``rieszreg.trace(estimand, z_i)``. The
-neural network produces ``η``; the loss spec's ``link_to_alpha`` produces
-``α``; ``ψ`` and ``φ'`` are computed directly in torch so autograd matches the
-analytic gradients in the loss spec module-for-module.
+the same formula as ``Loss.aug_loss_alpha``. The network produces ``η``;
+``h̃`` and ``h'`` are computed directly in torch as functions of ``η`` so
+autograd matches the analytic gradients in the loss spec.
 
-The four built-in losses are:
-
-| Loss spec type        | ``ψ(α(η))``               | ``φ'(α(η))``         |
+| Loss spec type        | ``h̃(α(η))``              | ``h'(α(η))``         |
 |-----------------------|---------------------------|----------------------|
 | ``SquaredLoss``       | ``η²``                    | ``2η``               |
-| ``KLLoss``            | ``exp(η)`` (clamped)      | ``η`` (clamped)      |
+| ``KLLoss``            | ``exp(η)`` (clamped)      | ``η + 1`` (clamped)  |
 | ``BernoulliLoss``     | ``softplus(η)`` (clamped) | ``η`` (clamped)      |
 | ``BoundedSquaredLoss``| ``α²``, α=lo+R·σ(η)       | ``2α``               |
 
@@ -24,124 +22,62 @@ numerical stability, matching the analytic backends.
 
 from __future__ import annotations
 
+from typing import Callable
+
 import torch
 import torch.nn.functional as F
 
-from rieszreg.losses import Loss
+from rieszreg.losses import BernoulliLoss, BoundedSquaredLoss, KLLoss, Loss, SquaredLoss
 
 
-def _spec_type(loss_spec: Loss) -> str:
-    return loss_spec.to_spec()["type"]
-
-
-def is_supported(loss_spec: Loss) -> bool:
-    return _spec_type(loss_spec) in {
-        "SquaredLoss",
-        "KLLoss",
-        "BernoulliLoss",
-        "BoundedSquaredLoss",
-    }
-
-
-def validate_supported(loss_spec: Loss) -> None:
-    if not is_supported(loss_spec):
-        raise NotImplementedError(
-            f"riesznet does not support loss type {_spec_type(loss_spec)!r}. "
-            "Supported losses: SquaredLoss, KLLoss, BernoulliLoss, "
-            "BoundedSquaredLoss."
+def _terms(loss_spec: Loss) -> tuple[Callable, Callable]:
+    """``(h̃∘link, h'∘link)`` as torch functions of η, resolved once per loss."""
+    if isinstance(loss_spec, SquaredLoss):
+        return (lambda eta: eta * eta), (lambda eta: 2.0 * eta)
+    if isinstance(loss_spec, KLLoss):
+        b = float(loss_spec.max_eta)
+        return (
+            lambda eta: torch.exp(torch.clamp(eta, -b, b)),
+            lambda eta: torch.clamp(eta, -b, b) + 1.0,
         )
+    if isinstance(loss_spec, BernoulliLoss):
+        b = float(loss_spec.max_abs_eta)
+        return (
+            lambda eta: F.softplus(torch.clamp(eta, -b, b)),
+            lambda eta: torch.clamp(eta, -b, b),
+        )
+    if isinstance(loss_spec, BoundedSquaredLoss):
+        lo, R, b = float(loss_spec.lo), float(loss_spec.hi - loss_spec.lo), float(loss_spec.max_abs_eta)
+
+        def alpha(eta):
+            return lo + R * torch.sigmoid(torch.clamp(eta, -b, b))
+
+        return (lambda eta: alpha(eta) ** 2), (lambda eta: 2.0 * alpha(eta))
+    raise NotImplementedError(
+        f"riesznet does not support {type(loss_spec).__name__}. Supported "
+        "losses: SquaredLoss, KLLoss, BernoulliLoss, BoundedSquaredLoss."
+    )
 
 
-def _clamp_for_loss(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
-    """Apply the loss spec's η clamp (matches numpy backends' numerical safety)."""
-    t = _spec_type(loss_spec)
-    if t == "KLLoss":
-        bound = float(loss_spec.max_eta)
-        return torch.clamp(eta, -bound, bound)
-    if t in ("BernoulliLoss", "BoundedSquaredLoss"):
-        bound = float(loss_spec.max_abs_eta)
-        return torch.clamp(eta, -bound, bound)
-    return eta  # SquaredLoss has no clamp
+class TorchRieszLoss:
+    """Per-row Bregman-Riesz loss for one ``Loss`` spec (type resolved once)."""
 
+    def __init__(self, loss_spec: Loss):
+        self.tilde_potential, self.potential_deriv = _terms(loss_spec)
 
-def psi_alpha(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
-    """ψ(α(η)) — the convex generator evaluated at the link of η."""
-    t = _spec_type(loss_spec)
-    if t == "SquaredLoss":
-        return eta * eta
-    if t == "KLLoss":
-        eta_c = _clamp_for_loss(loss_spec, eta)
-        return torch.exp(eta_c)
-    if t == "BernoulliLoss":
-        eta_c = _clamp_for_loss(loss_spec, eta)
-        return F.softplus(eta_c)
-    if t == "BoundedSquaredLoss":
-        lo = float(loss_spec.lo)
-        hi = float(loss_spec.hi)
-        eta_c = _clamp_for_loss(loss_spec, eta)
-        sigma = torch.sigmoid(eta_c)
-        alpha = lo + (hi - lo) * sigma
-        return alpha * alpha
-    raise NotImplementedError(t)
-
-
-def phi_prime_alpha(loss_spec: Loss, eta: torch.Tensor) -> torch.Tensor:
-    """φ'(α(η)) — the derivative of the convex generator, in η-space."""
-    t = _spec_type(loss_spec)
-    if t == "SquaredLoss":
-        return 2.0 * eta
-    if t == "KLLoss":
-        # φ(t) = t log t, φ'(t) = log t + 1; the augmentation absorbs the
-        # constant 1 (so the linear term in the augmented loss is C·log α not
-        # C·(log α + 1)). Mirror that convention here so the analytic
-        # `loss.aug_grad_eta(D, C, eta)` parity check passes.
-        return _clamp_for_loss(loss_spec, eta)
-    if t == "BernoulliLoss":
-        # φ'(α) = log(α/(1-α)) = η, with the loss spec's clamp.
-        return _clamp_for_loss(loss_spec, eta)
-    if t == "BoundedSquaredLoss":
-        lo = float(loss_spec.lo)
-        hi = float(loss_spec.hi)
-        eta_c = _clamp_for_loss(loss_spec, eta)
-        sigma = torch.sigmoid(eta_c)
-        alpha = lo + (hi - lo) * sigma
-        return 2.0 * alpha
-    raise NotImplementedError(t)
-
-
-def per_row_riesz_loss(
-    loss_spec: Loss,
-    eta_orig: torch.Tensor,
-    eta_pts: torch.Tensor,
-    coefs_pts: torch.Tensor,
-    pt_to_row: torch.Tensor,
-    n_rows: int,
-) -> torch.Tensor:
-    """Per-row Bregman-Riesz loss.
-
-    Returns a ``(n_rows,)`` tensor whose ``i``-th entry is
-
-        L_i = ψ(α(η_orig_i)) − Σ_{j: pt_to_row[j]==i} coefs_pts[j] · φ'(α(η_pts[j]))
-
-    Parameters
-    ----------
-    loss_spec : Loss
-        The Bregman loss to use. Validated by ``validate_supported``.
-    eta_orig : torch.Tensor of shape (n_rows,)
-        Network output η at each original row's feature point.
-    eta_pts : torch.Tensor of shape (N,)
-        Network output η at each trace evaluation point (concatenated across
-        all rows in the batch).
-    coefs_pts : torch.Tensor of shape (N,)
-        Trace coefficients matching ``eta_pts``.
-    pt_to_row : torch.LongTensor of shape (N,)
-        For each trace point, the index in ``[0, n_rows)`` of the original
-        row it belongs to.
-    n_rows : int
-        Number of original rows (length of ``eta_orig``).
-    """
-    psi = psi_alpha(loss_spec, eta_orig)                     # (n_rows,)
-    phip = phi_prime_alpha(loss_spec, eta_pts)               # (N,)
-    moment = torch.zeros(n_rows, device=eta_orig.device, dtype=eta_orig.dtype)
-    moment.scatter_add_(0, pt_to_row, coefs_pts * phip)
-    return psi - moment
+    def per_row(
+        self,
+        eta: torch.Tensor,
+        is_original: torch.Tensor,
+        potential_deriv_coef: torch.Tensor,
+        origin: torch.Tensor,
+        n_rows: int,
+    ) -> torch.Tensor:
+        """``(n_rows,)`` tensor: Σ over each row's augmented terms of
+        ``D · h̃(α(η)) + C · h'(α(η))``, grouped by ``origin`` in ``[0, n_rows)``."""
+        terms = (
+            is_original * self.tilde_potential(eta)
+            + potential_deriv_coef * self.potential_deriv(eta)
+        )
+        out = torch.zeros(n_rows, device=eta.device, dtype=eta.dtype)
+        return out.scatter_add_(0, origin, terms)

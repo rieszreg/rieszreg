@@ -59,6 +59,7 @@ def diagnose(
     *,
     estimator=None,
     Z=None,
+    y=None,
     extreme_threshold: float = 30.0,
     extreme_fraction_warn: float = 0.01,
 ) -> Diagnostics:
@@ -75,6 +76,8 @@ def diagnose(
         Riesz loss when ``alpha_hat`` is not supplied.
     Z : DataFrame or ndarray, optional
         Eval predictor matrix. Required when ``estimator`` is supplied.
+    y : array-like, optional
+        Eval outcome, for estimands whose functional reads it.
     """
     if alpha_hat is None:
         if estimator is None or Z is None:
@@ -88,8 +91,8 @@ def diagnose(
     extreme_fraction = float(n_extreme / len(alpha_hat))
 
     riesz_loss = None
-    if estimator is not None and Z is not None and hasattr(estimator, "riesz_loss"):
-        riesz_loss = estimator.riesz_loss(Z)
+    if estimator is not None and Z is not None:
+        riesz_loss = estimator.riesz_loss(Z, y)
 
     warnings: list[str] = []
     if extreme_fraction > extreme_fraction_warn:

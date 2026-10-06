@@ -29,3 +29,10 @@ class AugmentedDataset:
     potential_deriv_coef: np.ndarray  # (n_aug,) — coefficient on h'(α) (C_r)
     origin_index: np.ndarray          # (n_aug,) — index into original rows
     n_rows: int                       # number of original rows
+
+    def mean_loss(self, loss, alpha: np.ndarray) -> float:
+        """Mean per-original-row Riesz loss of ``alpha`` (α̂ at ``features``)."""
+        return float(
+            np.sum(loss.aug_loss_alpha(self.is_original, self.potential_deriv_coef, alpha))
+            / self.n_rows
+        )

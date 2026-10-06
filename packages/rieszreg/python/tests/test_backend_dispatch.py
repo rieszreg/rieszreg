@@ -1,6 +1,6 @@
 """Dispatch between augmentation-style and moment-style backends.
 
-`RieszEstimator.fit` looks for `fit_rows` first; if absent, builds an
+`RieszEstimator.fit` calls `fit_rows` for moment-only backends; otherwise builds an
 `AugmentedDataset` and calls `fit_augmented`. Backends implementing both
 methods default to `fit_augmented` for back-compat.
 """
@@ -53,12 +53,14 @@ class _AugOnlyBackend:
 @dataclass
 class _MomentOnlyBackend:
     calls: list[str] = field(default_factory=list)
-    last_rows: list[dict[str, Any]] | None = None
+    last_X: np.ndarray | None = None
+    last_aug: AugmentedDataset | None = None
     last_estimand_name: str | None = None
 
-    def fit_rows(self, rows_train, rows_valid, estimand, loss, **kwargs) -> FitResult:
+    def fit_rows(self, X_train, X_valid, estimand, loss, *, aug_train, aug_valid, **kwargs) -> FitResult:
         self.calls.append("fit_rows")
-        self.last_rows = rows_train
+        self.last_X = X_train
+        self.last_aug = aug_train
         self.last_estimand_name = estimand.name
         return FitResult(predictor=_ConstPredictor(0.0))
 
@@ -71,7 +73,7 @@ class _BothBackend:
         self.calls.append("fit_augmented")
         return FitResult(predictor=_ConstPredictor(0.0))
 
-    def fit_rows(self, rows_train, rows_valid, estimand, loss, **kwargs) -> FitResult:
+    def fit_rows(self, X_train, X_valid, estimand, loss, **kwargs) -> FitResult:
         self.calls.append("fit_rows")
         return FitResult(predictor=_ConstPredictor(0.0))
 
@@ -99,11 +101,9 @@ def test_moment_only_backend_routes_to_fit_rows(df):
     est = RieszEstimator(estimand=ATE(), backend=backend, loss=SquaredLoss())
     est.fit(df)
     assert backend.calls == ["fit_rows"]
-    assert backend.last_rows is not None
-    assert len(backend.last_rows) == 50
     assert backend.last_estimand_name == "ATE"
-    # Rows must have estimand-required keys.
-    assert set(backend.last_rows[0].keys()) >= {"a", "x"}
+    # Columns arrive in feature_keys order (treatment first).
+    np.testing.assert_array_equal(backend.last_X, df[["a", "x"]].to_numpy())
 
 
 def test_backend_implementing_both_defaults_to_fit_augmented(df):
@@ -124,4 +124,5 @@ def test_moment_path_passes_validation_rows(df):
     est.fit(df)
     assert backend.calls == ["fit_rows"]
     # With backend.validation_fraction=0.2, train has 40 rows, valid has 10.
-    assert len(backend.last_rows) == 40
+    assert backend.last_X.shape == (40, 2)
+    assert backend.last_aug.n_rows == 40

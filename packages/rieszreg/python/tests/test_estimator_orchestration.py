@@ -41,15 +41,9 @@ class _StubPredictor:
 class _StubBackend:
     """Backend that returns a stub predictor; ignores augmented data entirely."""
 
-    def fit_augmented(self, aug_train, aug_valid, loss, **kw):
-        del aug_valid, kw
+    def fit_augmented(self, aug_train, aug_valid, loss, *, base_score, **kw):
         assert isinstance(aug_train, AugmentedDataset)
-        return FitResult(
-            predictor=_StubPredictor(base_score=kw.get("base_score", 0.0)
-                                     if False else 0.0, loss=loss),
-            best_iteration=None,
-            best_score=None,
-        )
+        return FitResult(predictor=_StubPredictor(base_score=base_score, loss=loss))
 
 
 def test_fit_predict_with_dataframe():
@@ -124,9 +118,22 @@ def test_fit_records_sklearn_feature_attributes():
     df = pd.DataFrame({"x": [0.1, 0.2, 0.3, 0.4], "a": [0.0, 1.0, 0.0, 1.0], "w": [1.0, 2.0, 3.0, 4.0]})
     est = RieszEstimator(estimand=ATE(), backend=_StubBackend()).fit(df)
     assert est.n_features_in_ == 3
-    assert list(est.feature_names_in_) == ["a", "x", "w"]
+    assert list(est.feature_names_in_) == ["x", "a", "w"]  # X's columns, as sklearn
+    assert est.estimand_.feature_keys == ("a", "x", "w")  # what α̂ reads
     # Column order at predict time doesn't matter for DataFrames.
     np.testing.assert_allclose(est.predict(df[["w", "a", "x"]]), est.predict(df))
+    # An ndarray fit has no feature names.
+    est.fit(df[["a", "x", "w"]].to_numpy())
+    assert est.n_features_in_ == 3 and not hasattr(est, "feature_names_in_")
+
+
+def test_array_predict_after_dataframe_fit_warns_about_column_order():
+    """Fit on df[["x", "a"]] then predict on df.to_numpy(): the array's column
+    0 is x, but α̂ reads column 0 as the treatment. Warn instead of staying silent."""
+    df = pd.DataFrame({"x": [0.1, 0.2, 0.3, 0.4], "a": [0.0, 1.0, 0.0, 1.0]})
+    est = RieszEstimator(estimand=ATE(), backend=_StubBackend()).fit(df)
+    with pytest.warns(UserWarning, match=r"read in the order \['a', 'x'\]"):
+        est.predict(df.to_numpy())
 
 
 def test_fit_accepts_y_and_ignores_when_unused():
@@ -194,3 +201,43 @@ def test_outcome_column_left_in_Z_is_caught():
         RieszEstimator(estimand=ATE(), backend=_StubBackend()).fit(df.assign(y=y))
     # Naming the covariates is the fix.
     RieszEstimator(estimand=ATE(covariates=["x"]), backend=_StubBackend()).fit(df.assign(y=y), y)
+
+
+def test_default_init_is_m_bar_with_or_without_y():
+    """Passing y to a treatment estimand must not change the fit: the default
+    init is m̄ = E[m(Z, 1)] either way (TSM → 1)."""
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"a": rng.choice([0.0, 1.0], 100), "x": rng.normal(size=100)})
+    y = rng.normal(size=100)
+    a = RieszEstimator(estimand=TSM(level=1), backend=_StubBackend()).fit(df)
+    b = RieszEstimator(estimand=TSM(level=1), backend=_StubBackend()).fit(df, y)
+    assert a.base_score_ == b.base_score_ == 1.0
+
+
+def test_integer_outcome_fits_y_dependent_estimand():
+    """OutcomeRegNormSq's init is E[Y]; integer y must work like float y."""
+    from rieszreg import OutcomeRegNormSq
+
+    X = np.random.default_rng(0).normal(size=(40, 2))
+    y = np.arange(40)
+    est = RieszEstimator(estimand=OutcomeRegNormSq(), backend=_StubBackend()).fit(X, y)
+    assert est.base_score_ == pytest.approx(y.mean())
+    assert np.isfinite(est.diagnose(X, y=y).riesz_loss)
+
+
+def test_clone_preserves_custom_estimand_subclass_and_loss():
+    from sklearn.base import clone
+
+    from rieszreg import FiniteEvalEstimand
+
+    class Shift(FiniteEvalEstimand):
+        def __init__(self):
+            super().__init__(feature_keys=("a", "x"), m=self._m)
+
+        def _m(self, alpha):
+            return lambda z, y=None: alpha(a=z["a"] + 1.0, x=z["x"]) - alpha(**z)
+
+    est = RieszEstimator(estimand=Shift(), backend=_StubBackend(), loss=KLLoss(max_eta=20.0))
+    twin = clone(est)
+    assert type(twin.estimand) is Shift
+    assert twin.loss == KLLoss(max_eta=20.0) != KLLoss()

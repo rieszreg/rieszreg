@@ -2,7 +2,7 @@
 title: "Backends"
 ---
 
-A backend fits the Riesz representer for a given estimand and loss. Five implementation packages ship today; each slots into `RieszEstimator` through one of two Protocols. `rieszboost` and `krrr` consume the augmented dataset of evaluation points with weights $(D_r, C_r)$ (`Backend.fit_augmented`). `forestriesz` ships *both*: an augmentation-style `AugForestRieszRegressor` that works on every estimand without per-estimand configuration (`Backend.fit_augmented`), and a moment-style `ForestRieszRegressor` that consumes original rows plus a user-supplied list of basis functions (`MomentBackend.fit_rows`) and supports honest-split confidence intervals. `riesznet` consumes original rows plus per-row moments via `MomentBackend.fit_rows`, training a PyTorch model with autograd.
+A backend fits the Riesz representer for a given estimand and loss. Five implementation packages ship today; each slots into `RieszEstimator` through one of two Protocols. `rieszboost` and `krrr` consume the augmented dataset of evaluation points with weights $(D_r, C_r)$ (`Backend.fit_augmented`). `forestriesz` ships *both*: an augmentation-style `AugForestRieszRegressor` that works on every estimand without per-estimand configuration (`Backend.fit_augmented`), and a moment-style `ForestRieszRegressor` that consumes original rows plus a user-supplied list of basis functions (`MomentBackend.fit_rows`) and supports honest-split confidence intervals. `riesznet` consumes the augmented dataset through `Backend.fit_augmented`, grouping it by original row to train a PyTorch model with autograd on minibatches of rows.
 
 ## Pick a backend
 
@@ -75,7 +75,7 @@ est = RieszEstimator(
     backend=ForestRieszBackend(n_estimators=500),
 )
 
-# Neural network (moment-style backend; fit_rows path)
+# Neural network (augmentation-style backend; fit_augmented path)
 est = RieszEstimator(
     estimand=ATE(),
     backend=TorchBackend(
@@ -98,11 +98,11 @@ This is the end-user route: keep the wrapper in your own module, depend on `ries
 
 Two Protocols live in `rieszreg.backends.base`. Each backend implements one.
 
-`Backend.fit_augmented(aug_train, aug_valid, loss, …)` is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an `AugmentedDataset` of pseudo-rows with `is_original` and `potential_deriv_coef` columns. The empirical Bregman-Riesz loss at $\alpha$ is the sum over augmented rows $r$ of $D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))$, where $D_r$ is `is_original` and $C_r$ is `potential_deriv_coef`. Reference learners using this entry point: kernel ridge (`KernelRidgeBackend`), gradient boosting (`XGBoostBackend`, `SklearnBackend`), and random forests (`AugForestRieszBackend`).
+`Backend.fit_augmented(aug_train, aug_valid, loss, …)` is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an `AugmentedDataset` of pseudo-rows with `is_original` and `potential_deriv_coef` columns. The empirical Bregman-Riesz loss at $\alpha$ is the sum over augmented rows $r$ of $D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))$, where $D_r$ is `is_original` and $C_r$ is `potential_deriv_coef`. Reference learners using this entry point: kernel ridge (`KernelRidgeBackend`), gradient boosting (`XGBoostBackend`, `SklearnBackend`), random forests (`AugForestRieszBackend`), and neural nets (`TorchBackend`, which groups the augmented rows by `origin_index` to minibatch over original rows).
 
-`MomentBackend.fit_rows(rows_train, rows_valid, estimand, loss, …)` is for learners whose loss decomposes per original row. You receive raw rows plus the estimand, and you call `rieszreg.trace(estimand, row, y)` per row to read the $(c_j, a_j)$ pairs. Each row contributes a single loss term, so there is no $k+1$-fold augmentation blow-up. Reference learners using this entry point: random forests (`ForestRieszBackend`) and neural nets (`TorchBackend`).
+`MomentBackend.fit_rows(X_train, X_valid, estimand, loss, *, aug_train, aug_valid, …)` is for learners that fit on the original rows and need the estimand itself. You receive the original-row feature arrays (columns in `estimand.feature_keys` order), the estimand, and the same augmented datasets `fit_augmented` would get. The augmented rows give every evaluation point $a_j$ with coefficient $c_j = -C_r$ and the original row it came from (`origin_index`), so each row's moment is one vectorised group-by. Each row is a single training example to the learner. Reference learner using this entry point: the EconML-based random forest (`ForestRieszBackend`), which also reads the estimand to pick its basis functions.
 
-Pick by your learner's natural loss decomposition. Closed-form linear solves and gradient boosting fit `fit_augmented`, because the augmented sum has the same shape as a per-row weighted regression. Random forests and neural nets fit `fit_rows`, because each original row is a single training example to the underlying learner. When both fit, pick `fit_augmented`: the orchestrator dispatches to the moment path only when `fit_rows` is the only method present.
+Pick `fit_augmented` unless your learner needs the original-row matrix or the estimand: the augmented dataset already carries each row's moment through `origin_index`. The orchestrator dispatches to the moment path only when `fit_rows` is the only method present.
 
 ### Minimum viable wrapper
 
@@ -169,26 +169,19 @@ register_predictor_loader("my-learner", MyLearnerPredictor.load)
 Replace `fit_augmented` with `fit_rows`. The predictor stays the same.
 
 ```python
-from rieszreg import trace
-
 class MyMomentBackend:
     def __init__(self, learning_rate=1e-3):
         self.learning_rate = learning_rate
 
-    def fit_rows(self, rows_train, rows_valid, estimand, loss,
-                 *, base_score, random_state, hyperparams,
-                 ys_train=None, ys_valid=None):
-        # For each row i, trace(...) returns the pairs (c_j, a_j) where
-        # m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). Each row's contribution
-        # to the empirical loss is α(Z_i)² − 2 · sum_j c_j · α(a_j) for
-        # squared loss; the general Bregman form lives on `loss`.
-        moments = []
-        for i, row in enumerate(rows_train):
-            y_i = ys_train[i] if ys_train is not None else None
-            moments.append(trace(estimand, row, y_i))
+    def fit_rows(self, X_train, X_valid, estimand, loss,
+                 *, aug_train, aug_valid, base_score, random_state, hyperparams):
+        # m(α)(Z_i, Y_i) = sum_j c_j · α(a_j). The augmented rows carry every
+        # point a_j, its coefficient c_j = -C_r, and the row i it came from.
+        points = aug_train.features
+        coefs, row = -aug_train.potential_deriv_coef, aug_train.origin_index
 
         params = my_moment_fit(
-            rows_train, moments,
+            X_train, points, coefs, row,
             learning_rate=self.learning_rate,
             random_state=random_state,
         )

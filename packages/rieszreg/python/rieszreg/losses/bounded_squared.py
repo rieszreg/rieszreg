@@ -54,19 +54,12 @@ class BoundedSquaredLoss(Loss):
         return self.lo + self._R() * self._sigma(eta)
 
     def alpha_to_eta(self, alpha):
-        if isinstance(alpha, np.ndarray):
-            u = (alpha - self.lo) / self._R()
-            if np.any((u <= 0) | (u >= 1)):
-                raise ValueError(
-                    f"BoundedSquaredLoss requires alpha in ({self.lo}, {self.hi})."
-                )
-            return np.log(u / (1.0 - u))
         u = (alpha - self.lo) / self._R()
-        if not (0 < u < 1):
+        if np.any((np.asarray(u) <= 0) | (np.asarray(u) >= 1)):
             raise ValueError(
                 f"BoundedSquaredLoss requires alpha in ({self.lo}, {self.hi})."
             )
-        return float(np.log(u / (1.0 - u)))
+        return np.log(u / (1.0 - u))
 
     def aug_grad_eta(self, is_original, potential_deriv_coef, eta):
         sigma = self._sigma(eta)

@@ -7,9 +7,9 @@
 
 Neural-network backend for the [RieszReg meta-package](../README.md), in the spirit of [Chernozhukov et al. (2021)](https://arxiv.org/abs/2110.03031). Trains the Riesz representer α(x) only — outcome regression is the user's responsibility.
 
-This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `MomentBackend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `trace`). `riesznet` contributes:
+This package depends on `rieszreg` for the shared abstractions (`Estimand`, `Loss`, `Backend` Protocol, `Diagnostics`, `RieszEstimator` orchestrator, `AugmentedDataset`). `riesznet` contributes:
 
-- `TorchBackend` — `MomentBackend` Protocol implementation. Receives raw rows + the estimand, evaluates per-row moments via `rieszreg.trace`, and minimizes the per-row Bregman-Riesz loss with a PyTorch training loop.
+- `TorchBackend` — `Backend.fit_augmented` Protocol implementation. Receives the augmented dataset, groups each original row's evaluation points by `origin_index`, and minimizes the per-row Bregman-Riesz loss with a PyTorch training loop.
 - `TorchPredictor` — wraps the trained `nn.Module` and registers itself with the rieszreg loader registry.
 - `RieszNet` — convenience subclass of `rieszreg.RieszEstimator` exposing simple-MLP defaults (`hidden_sizes`, `activation`, `dropout`, `learning_rate`, `epochs`, ...). Power users instantiate `TorchBackend(module_factory=..., optimizer_factory=...)` directly for full architecture control.
 - R6 wrapper subclassing `rieszreg::RieszEstimatorR6`.
@@ -31,8 +31,8 @@ Object-oriented factory `RieszNet(estimand=, hidden_sizes=, ...)`, `BaseEstimato
 ## Layout
 
 - `python/riesznet/`
-  - `backend.py` — `TorchBackend` (`MomentBackend.fit_rows`), `TorchPredictor`, predictor-loader registration.
-  - `losses_torch.py` — torch-autograd implementations of `ψ(α)` and `φ'(α)` for each Bregman loss; the per-row Riesz loss helper.
+  - `backend.py` — `TorchBackend` (`Backend.fit_augmented`), `TorchPredictor`, predictor-loader registration.
+  - `losses_torch.py` — `TorchRieszLoss`: torch-autograd `h̃(α(η))` and `h'(α(η))` for each Bregman loss (resolved once per loss) and the per-row Riesz loss.
   - `modules.py` — top-level default factories (`build_mlp`, `build_adam`) for the convenience class.
   - `estimator.py` — `RieszNet` convenience subclass of `RieszEstimator`.
 - `r/riesznet/` — R6 wrapper via reticulate, ~120 lines.
@@ -61,27 +61,27 @@ Rscript -e '
 
 `riesznet` depends on `rieszreg` and reuses, without modification:
 
-- `Estimand`, `Tracer`/`LinearForm`, `trace` — the moment-functional abstraction. The neural backend uses `trace` directly to compute per-row moments.
+- `Estimand`, `Estimand.augment`, `AugmentedDataset` — the moment-functional abstraction. The neural backend groups the augmented rows by `origin_index` to get each original row's loss terms.
 - `Loss`, all four built-in losses — the Bregman-Riesz loss framework.
 - `Diagnostics`, `diagnose` — base diagnostics.
 - `RieszEstimator` — orchestration; `RieszNet` is a thin subclass.
 
-The integration point is `rieszreg`'s `MomentBackend` Protocol (`rieszreg/backends/base.py`). `TorchBackend.fit_rows(...)` consumes raw rows + the estimand and returns a `FitResult`. `TorchPredictor` registers itself for the registry-based save/load path on import via `register_predictor_loader("riesznet", ...)`.
+The integration point is `rieszreg`'s `Backend` Protocol (`rieszreg/backends/base.py`). `TorchBackend.fit_augmented(...)` consumes the augmented datasets the orchestrator builds and returns a `FitResult`. `TorchPredictor` registers itself for the registry-based save/load path on import via `register_predictor_loader("riesznet", ...)`.
 
 ### Per-row Bregman-Riesz loss
 
-For each original row `z_i`, the per-row Riesz loss is
+For each original row `z_i`, the per-row Riesz loss sums the augmented rows `r` with `origin_index == i`:
 
 ```
-L_i = ψ(α(x_i)) − Σ_j coef_j · φ'(α(point_j))
+L_i = Σ_r [ D_r · h̃(α(z_r)) + C_r · h'(α(z_r)) ]
 ```
 
-where `(coef_j, point_j)` come from `trace(estimand, z_i)`. The model produces `η`, the loss spec's `link_to_alpha` produces `α`, and `ψ`/`φ'` are computed in autograd-friendly torch. `losses_torch.py` derives `ψ(α(η))` and `φ'(α(η))` directly per loss (the four built-in losses are elementary compositions of `exp`, `log`, `sigmoid`, `softplus`):
+This is `Loss.aug_loss_alpha` summed per original row, so values (not just gradients) match the numpy losses and `riesz_loss`. `losses_torch.py` writes `h̃(α(η))` and `h'(α(η))` directly per loss:
 
-| Loss | `ψ(α(η))` | `φ'(α(η))` |
+| Loss | `h̃(α(η))` | `h'(α(η))` |
 |---|---|---|
 | `SquaredLoss` | `η²` | `2η` |
-| `KLLoss` | `exp(η)` | `η` |
+| `KLLoss` | `exp(η)` | `η + 1` |
 | `BernoulliLoss` | `softplus(η)` | `η` |
 | `BoundedSquaredLoss` | `(lo + R·σ(η))²` | `2(lo + R·σ(η))` |
 
@@ -89,7 +89,7 @@ where `(coef_j, point_j)` come from `trace(estimand, z_i)`. The model produces `
 
 ### Training loop
 
-For each minibatch of original rows, a single forward pass evaluates η at both the original sample points and all trace points; a `scatter_add` aggregates `coef · φ'` per row to form the moment term; the per-row loss is summed and normalized by batch size. Validation loss is the same per-row formula on the held-out rows, no augmentation step. The convenience class defaults to `batch_size=64` (a common starting point for tabular MLPs); set `batch_size=None` for full-batch GD on small problems, or larger when n is in the tens of thousands.
+`_AugTensors` holds the augmented rows sorted by origin with CSR offsets. A minibatch of original rows gathers only its own augmented rows (O(batch) per step), runs one forward pass, and `scatter_add`s the per-row terms. Validation loss is the same formula on the held-out rows. The convenience class defaults to `batch_size=64`; set `batch_size=None` for full-batch GD on small problems. With `early_stopping_rounds=None` all epochs run and the final weights are kept, even when an `eval_set` is passed.
 
 ### Save / load
 
@@ -101,7 +101,7 @@ Saves the model's `state_dict` plus a JSON metadata blob carrying the `module_fa
 
 ### Device / dtype
 
-Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corresponding torch backend is available. `dtype="float64"` works at a small speed penalty. Bitwise reproducibility on CUDA is not promised; the loop seeds `torch`, `torch.cuda`, and a `torch.Generator` for the DataLoader, but does not enable `torch.use_deterministic_algorithms`.
+Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corresponding torch backend is available; fitting on an unavailable device raises. A saved model whose device isn't available predicts on CPU, so GPU-saved models load anywhere. `device="auto"` skips MPS for `float64`. `dtype="float64"` works at a small speed penalty. Bitwise reproducibility on CUDA is not promised; the loop seeds `torch`, `torch.cuda`, and a `torch.Generator` for the DataLoader, but does not enable `torch.use_deterministic_algorithms`.
 
 ### What's lazy-imported
 
@@ -110,7 +110,7 @@ Default `cpu` and `float32`. `device="cuda"` and `device="mps"` work if the corr
 ## What works today (v0.0.1)
 
 - **`RieszNet(BaseEstimator)`** — sklearn-compatible. Composes with `GridSearchCV`, `cross_val_predict`, `clone`, `Pipeline`. Same `fit / predict / score / diagnose` surface as `RieszBooster`, `KernelRieszRegressor`, `ForestRieszRegressor`.
-- **All six built-in estimands** via the rieszreg re-exports. Custom `Estimand`s also work; the per-row trace mechanism is identical.
+- **All six built-in estimands** via the rieszreg re-exports. Custom `Estimand`s also work through the tracer-based default `augment`.
 - **All four built-in losses**: `SquaredLoss`, `KLLoss`, `BernoulliLoss`, `BoundedSquaredLoss` (autograd-friendly torch implementations matching the analytic gradients).
 - **Architecture flexibility**: pass any `nn.Module` factory via `TorchBackend(module_factory=..., optimizer_factory=...)`. The convenience class `RieszNet` exposes a simple MLP path with `hidden_sizes`, `activation`, `dropout`.
 - **Save / load**: `state_dict` + JSON metadata. Built-in estimands round-trip automatically; the default MLP factory round-trips cleanly via qualname; user-defined factories must be importable by qualname.

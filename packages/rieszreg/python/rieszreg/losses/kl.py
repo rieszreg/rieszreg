@@ -48,13 +48,9 @@ class KLLoss(Loss):
         return np.exp(self._clip(eta))
 
     def alpha_to_eta(self, alpha):
-        if isinstance(alpha, np.ndarray):
-            if np.any(alpha <= 0):
-                raise ValueError("KLLoss requires positive alpha for init.")
-            return np.log(alpha)
-        if alpha <= 0:
+        if np.any(np.asarray(alpha) <= 0):
             raise ValueError("KLLoss requires positive alpha for init.")
-        return float(np.log(alpha))
+        return np.log(alpha)
 
     def aug_grad_eta(self, is_original, potential_deriv_coef, eta):
         alpha = np.exp(self._clip(eta))

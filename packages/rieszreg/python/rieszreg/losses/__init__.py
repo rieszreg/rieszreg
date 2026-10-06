@@ -18,14 +18,7 @@ __all__ = [
 
 def loss_from_spec(spec: dict) -> Loss:
     """Reconstruct a Loss from its `to_spec()` dict."""
-    cls_name = spec["type"]
-    args = spec.get("args", {})
-    if cls_name == "SquaredLoss":
-        return SquaredLoss(**args)
-    if cls_name == "KLLoss":
-        return KLLoss(**args)
-    if cls_name == "BernoulliLoss":
-        return BernoulliLoss(**args)
-    if cls_name == "BoundedSquaredLoss":
-        return BoundedSquaredLoss(**args)
-    raise ValueError(f"Unknown loss spec type: {cls_name!r}")
+    classes = {c.__name__: c for c in (SquaredLoss, KLLoss, BernoulliLoss, BoundedSquaredLoss)}
+    if spec["type"] not in classes:
+        raise ValueError(f"Unknown loss spec type: {spec['type']!r}")
+    return classes[spec["type"]](**spec.get("args", {}))

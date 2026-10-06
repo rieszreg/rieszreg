@@ -161,6 +161,18 @@ class Loss:
         if name is not None:
             self.name = name
 
+    def __eq__(self, other) -> bool:
+        # Equal when same class and same settings, so sklearn.clone round-trips.
+        if not isinstance(other, Loss):
+            return NotImplemented
+        cache = ("_grad_strategy", "_jax_grad_fn")
+        mine = {k: v for k, v in vars(self).items() if k not in cache}
+        theirs = {k: v for k, v in vars(other).items() if k not in cache}
+        return type(self) is type(other) and mine == theirs
+
+    def __hash__(self) -> int:
+        return hash(type(self))
+
     # ---- α-space loss functions ----
 
     def potential(self, alpha: np.ndarray) -> np.ndarray:

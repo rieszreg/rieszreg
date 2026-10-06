@@ -1,95 +1,42 @@
 """ForestRieszBackend — implements `rieszreg.MomentBackend`.
 
-Consumes raw rows + the estimand directly (the moment-style entry point),
-computes per-row moments via `rieszreg.trace`, packs them as a linear-moment
-problem for EconML's `BaseGRF`, and returns a `FitResult` whose predictor is a
-`ForestPredictor`.
+Consumes the original-row feature matrix + the estimand (the moment-style
+entry point), computes per-row moments from the augmented data, packs them
+as a linear-moment problem for EconML's ``BaseGRF``, and returns a
+``FitResult`` whose predictor is a ``ForestPredictor``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from rieszreg import (
-    AugmentedDataset,
-    Estimand,
-    FiniteEvalEstimand,
-    FitResult,
-    Loss,
-    SquaredLoss,
-    trace,
-)
+from rieszreg import AugmentedDataset, Estimand, FitResult, Loss, SquaredLoss
 
 from ._grf import _RieszGRF
-from .feature_fns import default_split_feature_indices
+from .feature_fns import default_riesz_features, default_split_feature_indices
 from .predictor import ForestPredictor
 
 
-def _materialize_features(
-    rows: list[dict[str, Any]], feature_keys: Sequence[str]
-) -> np.ndarray:
-    return np.array([[r[k] for k in feature_keys] for r in rows], dtype=float)
-
-
-def _eval_phi(
-    features: np.ndarray, phi_fns: Sequence[Callable]
-) -> np.ndarray:
+def _eval_phi(features: np.ndarray, phi_fns: Sequence[Callable]) -> np.ndarray:
     """Stack vectorized basis evaluations into an (n, p) matrix."""
     return np.column_stack([np.asarray(fn(features), dtype=float) for fn in phi_fns])
 
 
-def _compute_per_row_moments(
-    rows: list[dict[str, Any]],
-    estimand: Estimand,
-    phi_fns: Sequence[Callable],
-    feature_keys: Sequence[str],
-    ys: list | None = None,
-) -> np.ndarray:
-    """Compute A[i, j] = m(W_i; phi_j) = sum over (coef, point) in trace(W_i, y_i)
-    of coef * phi_j(point), for each original row i and basis j. ``ys`` is the
-    sklearn-style per-row outcome; pass ``None`` when the estimand's m doesn't
-    depend on Y."""
-    n = len(rows)
-    p = len(phi_fns)
-    if n == 0:
-        return np.zeros((0, p))
-    A = np.zeros((n, p))
-    for i, row in enumerate(rows):
-        y_i = ys[i] if ys is not None else None
-        for coef, point in trace(estimand, row, y_i):
-            point_arr = np.array([[point[k] for k in feature_keys]], dtype=float)
-            phi_at_point = np.array([float(fn(point_arr)[0]) for fn in phi_fns])
-            A[i] += coef * phi_at_point
-    return A
+def _per_row_moments(aug: AugmentedDataset, phi_fns: Sequence[Callable]) -> np.ndarray:
+    """``A[i, j] = m(W_i; φ_j) = Σ_k coef_k · φ_j(point_k)``.
 
-
-def _holdout_riesz_loss(
-    rows_valid: list[dict[str, Any]],
-    estimand: Estimand,
-    predictor: ForestPredictor,
-    loss: Loss,
-    ys_valid: list | None = None,
-) -> float:
-    """Mean per-original-row Riesz loss on the validation rows.
-
-    Uses ``Estimand.augment`` + ``Loss.aug_loss_alpha`` to share the formula
-    with the rest of the framework, so val scores are comparable across
-    backends. ``ys_valid`` threads the per-row outcome through to
-    ``m(alpha)(z, y)`` for Y-dependent estimands.
+    Each augmented row carries ``C_r = −Σ coef`` at its point, so the moment
+    is ``−Σ_{r: origin_r = i} C_r · φ_j(z_r)``, one ``bincount`` per basis.
     """
-    if not rows_valid:
-        return float("nan")
-    feats = _materialize_features(rows_valid, estimand.feature_keys)
-    aug = estimand.augment(feats, ys=ys_valid)
-    eta = predictor.predict_eta(aug.features)
-    alpha = loss.link_to_alpha(eta)
-    return float(
-        np.sum(loss.aug_loss_alpha(aug.is_original, aug.potential_deriv_coef, alpha))
-        / aug.n_rows
-    )
+    phi_aug = _eval_phi(aug.features, phi_fns)
+    w = -aug.potential_deriv_coef[:, None] * phi_aug
+    return np.column_stack([
+        np.bincount(aug.origin_index, weights=w[:, j], minlength=aug.n_rows)
+        for j in range(phi_aug.shape[1])
+    ])
 
 
 @dataclass
@@ -97,9 +44,8 @@ class ForestRieszBackend:
     """Random-forest Riesz regression backend.
 
     Wraps EconML's ``BaseGRF`` with the linear-moment criterion. Implements
-    ``MomentBackend.fit_rows`` so it consumes raw rows and uses
-    ``rieszreg.trace`` to evaluate per-row moments directly — no augmented
-    dataset blow-up.
+    ``MomentBackend.fit_rows``: the forest is grown on the n original rows,
+    with per-row moments computed from the augmented data.
 
     Parameters
     ----------
@@ -150,16 +96,16 @@ class ForestRieszBackend:
 
     def fit_rows(
         self,
-        rows_train: list[dict[str, Any]],
-        rows_valid: list[dict[str, Any]] | None,
+        X_train: np.ndarray,
+        X_valid: np.ndarray | None,
         estimand: Estimand,
         loss: Loss,
         *,
+        aug_train: AugmentedDataset,
+        aug_valid: AugmentedDataset | None,
         base_score: float,
         random_state: int,
         hyperparams: dict[str, Any],
-        ys_train: list | None = None,
-        ys_valid: list | None = None,
     ) -> FitResult:
         if not isinstance(loss, SquaredLoss):
             raise NotImplementedError(
@@ -174,50 +120,36 @@ class ForestRieszBackend:
             )
         del hyperparams
 
-        seed = random_state if random_state is not None else self.random_state
-        feature_keys = estimand.feature_keys
-
-        # 1. Materialize feature matrix.
-        features = _materialize_features(rows_train, feature_keys)
-
-        # 2. Resolve sieve. "auto" => default_riesz_features(estimand) when one
-        # exists; otherwise constant. None => force constant.
-        from .feature_fns import default_riesz_features
-
-        if self.riesz_feature_fns == "auto":
-            sieve = default_riesz_features(estimand)
-        else:
-            sieve = self.riesz_feature_fns
+        # Sieve: "auto" => default_riesz_features(estimand) when one exists;
+        # None (or no default) => constant basis.
+        sieve = (
+            default_riesz_features(estimand)
+            if self.riesz_feature_fns == "auto"
+            else self.riesz_feature_fns
+        )
         phi_fns = sieve if sieve else [lambda f: np.ones(len(f))]
         p = len(phi_fns)
+        n_train = X_train.shape[0]
 
-        # 3. Per-row basis values φ(W_i).
-        phi_W = _eval_phi(features, phi_fns)             # (n, p)
-
-        # 4. Per-row moment A[i, j] = m(W_i; φ_j).
-        A = _compute_per_row_moments(rows_train, estimand, phi_fns, feature_keys, ys_train)
-
-        # 5. Fold base_score into A so the predictor returns base_score + leaf θ·φ.
+        # Per-row basis values φ(W_i) and moments A[i, j] = m(W_i; φ_j).
+        phi_W = _eval_phi(X_train, phi_fns)
+        A = _per_row_moments(aug_train, phi_fns)
+        # Fold base_score into A so the predictor returns base_score + θ·φ.
         if base_score != 0.0:
             A = A - base_score * phi_W
 
-        # 6. Pack T = [vec(J) | A] per row, with J = φφ' (symmetric, so flat
+        # Pack T = [vec(J) | A] per row, with J = φφ' (symmetric, so flat
         # order is immaterial). y is a dummy scalar zero column — EconML's
         # LinearMomentGRFCriterion requires scalar y.
-        n_train = len(rows_train)
         JJ = np.einsum("ij,ik->ijk", phi_W, phi_W).reshape(n_train, p * p)
         T_pack = np.ascontiguousarray(np.column_stack([JJ, A]))
         y_pack = np.zeros((n_train, 1), dtype=float)
 
-        # 6b. Detect degeneracy. For all built-in estimands the trace returns
-        # a fixed set of (coef, point) pairs that don't depend on W, so under
-        # a constant basis both A and J = φφ' are identical across rows and
-        # the forest cannot learn anything from splits. The natural fix is the
-        # sieve.
+        # Degeneracy: for built-in estimands the per-row moments under a
+        # constant basis don't depend on W, so both A and J are identical
+        # across rows and splits learn nothing. The natural fix is the sieve.
         if A.size > 0 and base_score == 0.0:
-            j_row_constant = bool(np.allclose(JJ - JJ[0:1], 0.0, atol=1e-12))
-            a_row_constant = bool(np.allclose(A - A[0:1], 0.0, atol=1e-12))
-            if j_row_constant and a_row_constant:
+            if np.allclose(JJ - JJ[0:1], 0.0, atol=1e-12) and np.allclose(A - A[0:1], 0.0, atol=1e-12):
                 if default_riesz_features(estimand) is None:
                     raise ValueError(
                         f"ForestRieszRegressor (the reference ForestRiesz "
@@ -234,14 +166,11 @@ class ForestRieszBackend:
                     "or use AugForestRieszRegressor."
                 )
 
-        # 7. Choose split features.
         split_idx = self.split_feature_indices
         if split_idx is None:
             split_idx = default_split_feature_indices(estimand, self.riesz_feature_fns)
         split_idx = tuple(int(i) for i in split_idx)
-        X_split = features[:, list(split_idx)]
 
-        # 8. Fit forest.
         forest = _RieszGRF(
             n_outputs_riesz=p,
             n_estimators=self.n_estimators,
@@ -260,11 +189,11 @@ class ForestRieszBackend:
             fit_intercept=self.fit_intercept,
             subforest_size=self.subforest_size,
             n_jobs=self.n_jobs,
-            random_state=seed,
+            random_state=random_state,
             verbose=self.verbose,
             warm_start=False,
         )
-        forest.fit(X_split, T_pack, y_pack)
+        forest.fit(X_train[:, list(split_idx)], T_pack, y_pack)
 
         predictor = ForestPredictor(
             forest=forest,
@@ -272,17 +201,12 @@ class ForestRieszBackend:
             base_score=base_score,
             # Always store the resolved sieve, never the "auto" sentinel.
             riesz_feature_fns=sieve if sieve else None,
-            feature_keys=tuple(feature_keys),
+            feature_keys=tuple(estimand.feature_keys),
             split_feature_indices=split_idx,
         )
 
-        val_score = None
-        if rows_valid:
-            val_score = _holdout_riesz_loss(rows_valid, estimand, predictor, loss, ys_valid)
-
-        return FitResult(
-            predictor=predictor,
-            best_iteration=None,
-            best_score=val_score,
-            history=None,
+        val_score = (
+            aug_valid.mean_loss(loss, predictor.predict_alpha(aug_valid.features))
+            if aug_valid is not None else None
         )
+        return FitResult(predictor=predictor, best_score=val_score)

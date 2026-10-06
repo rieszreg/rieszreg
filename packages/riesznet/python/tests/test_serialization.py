@@ -11,6 +11,7 @@ import functools
 
 import numpy as np
 import pytest
+import torch
 import torch.nn as nn
 
 from rieszreg import ATE, RieszEstimator, TSM
@@ -103,3 +104,16 @@ def test_closure_factory_save_raises(tmp_path, logistic_tsm_df):
     est = RieszEstimator(estimand=TSM(level=1), backend=backend, random_state=0)
     with pytest.raises(ValueError, match="top-level"):
         est.fit(logistic_tsm_df)
+
+
+@pytest.mark.skipif(torch.cuda.is_available(), reason="needs a machine without CUDA")
+def test_cuda_saved_model_predicts_on_cpu_but_fit_does_not_fall_back(small_df, tmp_path):
+    """A model saved on a GPU must load and predict on a CPU-only machine,
+    but asking to *train* on a missing GPU is a user error, not a silent CPU run."""
+    est = RieszNet(ATE(), hidden_sizes=(4,), epochs=2, random_state=0).fit(small_df)
+    est.predictor_.device = "cuda"
+    est.save(tmp_path / "m")
+    loaded = RieszNet.load(tmp_path / "m")
+    np.testing.assert_allclose(loaded.predict(small_df), est.predict(small_df))
+    with pytest.raises((RuntimeError, AssertionError)):
+        RieszNet(ATE(), hidden_sizes=(4,), epochs=2, device="cuda").fit(small_df)

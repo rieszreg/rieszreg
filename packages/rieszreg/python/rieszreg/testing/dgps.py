@@ -26,43 +26,37 @@ class DGP:
     estimand_factory: str                    # "ATE", "ATT", ...
 
 
-def linear_gaussian_ate(
-    *,
-    p_treated: float = 0.5,
-    sigma_x: float = 1.0,
-) -> DGP:
-    """Linear-Gaussian ATE DGP.
-
-    A ~ Bernoulli(π(x)) with logit π(x) = β · x; X ~ N(0, σ²).
-    Closed-form Riesz representer for ATE: α₀(a, x) = (2a − 1) / [a · π(x) + (1−a)·(1−π(x))].
-    """
-    feature_keys = ("a", "x")
+def _logistic_sampler(sigma_x: float):
+    """X ~ N(0, σ²), A ~ Bernoulli(π(x)) with logit π(x) = 0.5 x. Returns
+    ``(sample, propensity_of_observed_a)``."""
 
     def sample(n: int, rng: np.random.Generator):
-        try:
-            import pandas as pd
-        except ImportError as e:  # pragma: no cover
-            raise RuntimeError("rieszreg.testing.dgps requires pandas") from e
+        import pandas as pd
+
         x = rng.normal(0.0, sigma_x, size=n)
-        # Use a fixed propensity model logit(π) = 0.5 x for nontrivial overlap.
-        logit = 0.5 * x
-        pi = 1.0 / (1.0 + np.exp(-logit))
-        a = (rng.uniform(0, 1, size=n) < pi).astype(float)
+        a = (rng.uniform(0, 1, size=n) < 1.0 / (1.0 + np.exp(-0.5 * x))).astype(float)
         return pd.DataFrame({"a": a, "x": x})
 
-    def true_alpha(df) -> np.ndarray:
-        x = np.asarray(df["x"])
+    def prob_a(df) -> np.ndarray:
         a = np.asarray(df["a"])
-        pi = 1.0 / (1.0 + np.exp(-0.5 * x))
-        prob_a = a * pi + (1.0 - a) * (1.0 - pi)
-        sign = 2.0 * a - 1.0
-        return sign / prob_a
+        pi = 1.0 / (1.0 + np.exp(-0.5 * np.asarray(df["x"])))
+        return a * pi + (1.0 - a) * (1.0 - pi)
 
+    return sample, prob_a
+
+
+def linear_gaussian_ate(*, sigma_x: float = 1.0) -> DGP:
+    """Linear-Gaussian ATE DGP.
+
+    A ~ Bernoulli(π(x)) with logit π(x) = 0.5 x; X ~ N(0, σ²).
+    Closed-form Riesz representer for ATE: α₀(a, x) = (2a − 1) / [a · π(x) + (1−a)·(1−π(x))].
+    """
+    sample, prob_a = _logistic_sampler(sigma_x)
     return DGP(
         name="linear_gaussian_ate",
-        feature_keys=feature_keys,
+        feature_keys=("a", "x"),
         sample=sample,
-        true_alpha=true_alpha,
+        true_alpha=lambda df: (2.0 * np.asarray(df["a"]) - 1.0) / prob_a(df),
         estimand_factory="ATE",
     )
 
@@ -72,31 +66,12 @@ def logistic_tsm(level: float = 1.0, sigma_x: float = 1.0) -> DGP:
 
     Useful as a density-ratio estimand: α₀ ≥ 0 everywhere, so KLLoss applies.
     """
-    feature_keys = ("a", "x")
-
-    def sample(n: int, rng: np.random.Generator):
-        try:
-            import pandas as pd
-        except ImportError as e:  # pragma: no cover
-            raise RuntimeError("rieszreg.testing.dgps requires pandas") from e
-        x = rng.normal(0.0, sigma_x, size=n)
-        logit = 0.5 * x
-        pi = 1.0 / (1.0 + np.exp(-logit))
-        a = (rng.uniform(0, 1, size=n) < pi).astype(float)
-        return pd.DataFrame({"a": a, "x": x})
-
-    def true_alpha(df) -> np.ndarray:
-        x = np.asarray(df["x"])
-        a = np.asarray(df["a"])
-        pi = 1.0 / (1.0 + np.exp(-0.5 * x))
-        prob_a = a * pi + (1.0 - a) * (1.0 - pi)
-        return (a == level).astype(float) / prob_a
-
+    sample, prob_a = _logistic_sampler(sigma_x)
     return DGP(
         name="logistic_tsm",
-        feature_keys=feature_keys,
+        feature_keys=("a", "x"),
         sample=sample,
-        true_alpha=true_alpha,
+        true_alpha=lambda df: (np.asarray(df["a"]) == level).astype(float) / prob_a(df),
         estimand_factory="TSM",
     )
 

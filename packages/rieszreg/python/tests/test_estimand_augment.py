@@ -142,18 +142,19 @@ def test_subclass_augment_is_meaningfully_faster_than_base():
         (LocalShift(delta=0.3, threshold=1.5), 0.0),
     ],
 )
-def test_m_bar_analytic_matches_empirical(estimand, expected):
-    """The class-level closed-form `m_bar` matches the empirical mean of
-    `sum(coef for coef, _ in trace(estimand, z))` for built-ins."""
+def test_m_bar_from_augmentation_matches_trace(estimand, expected):
+    """m̄ = E[m(Z, 1)] read off the augmented data (−ΣC / n, what the
+    orchestrator's default init uses) matches the per-row trace and the
+    closed form."""
     from rieszreg import trace
 
     rng = np.random.default_rng(0)
     n = 200
-    a = rng.choice([0.0, 1.0, 2.0], size=n).astype(float)
-    x = rng.normal(size=n)
-    rows = [{"a": float(a[i]), "x": float(x[i])} for i in range(n)]
+    features = np.column_stack([rng.choice([0.0, 1.0], size=n), rng.normal(size=n)])
+    rows = [{"a": a, "x": x} for a, x in features]
     empirical = float(np.mean([sum(c for c, _ in trace(estimand, z)) for z in rows]))
-    assert estimand.m_bar == expected
+    aug = estimand.augment(features)
+    np.testing.assert_allclose(-aug.potential_deriv_coef.sum() / aug.n_rows, empirical)
     np.testing.assert_allclose(empirical, expected)
 
 

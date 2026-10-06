@@ -54,13 +54,10 @@ class BernoulliLoss(Loss):
         return 1.0 / (1.0 + np.exp(-eta))
 
     def alpha_to_eta(self, alpha):
-        if isinstance(alpha, np.ndarray):
-            if np.any((alpha <= 0) | (alpha >= 1)):
-                raise ValueError("BernoulliLoss requires alpha in (0, 1) for init.")
-            return np.log(alpha / (1.0 - alpha))
-        if not (0 < alpha < 1):
+        a = np.asarray(alpha)
+        if np.any((a <= 0) | (a >= 1)):
             raise ValueError("BernoulliLoss requires alpha in (0, 1) for init.")
-        return float(np.log(alpha / (1.0 - alpha)))
+        return np.log(alpha / (1.0 - alpha))
 
     def aug_grad_eta(self, is_original, potential_deriv_coef, eta):
         alpha = self.link_to_alpha(eta)

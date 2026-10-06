@@ -1,9 +1,9 @@
-"""TorchBackend — implements ``rieszreg.MomentBackend``.
+"""TorchBackend — implements ``rieszreg.Backend``.
 
-Consumes raw rows + the estimand directly (the moment-style entry point),
-evaluates per-row moments via ``rieszreg.trace``, and minimizes the per-row
-Bregman-Riesz loss with a PyTorch training loop. Returns a ``FitResult`` whose
-predictor is a ``TorchPredictor``.
+Consumes the ``AugmentedDataset``, groups the augmented rows by origin row,
+and minimizes the per-row Bregman-Riesz loss with a PyTorch training loop
+over minibatches of original rows. Returns a ``FitResult`` whose predictor
+is a ``TorchPredictor``.
 """
 
 from __future__ import annotations
@@ -19,17 +19,10 @@ from typing import Any, Callable, ClassVar, Iterable
 import numpy as np
 import torch
 
-from rieszreg import (
-    Estimand,
-    FitResult,
-    Loss,
-    register_predictor_loader,
-    trace,
-)
+from rieszreg import AugmentedDataset, FitResult, Loss, register_predictor_loader
 from rieszreg.losses import loss_from_spec
 
-from . import losses_torch
-from .losses_torch import per_row_riesz_loss, validate_supported
+from .losses_torch import TorchRieszLoss
 
 
 # ----------------------------------------------------------------------
@@ -37,14 +30,16 @@ from .losses_torch import per_row_riesz_loss, validate_supported
 # ----------------------------------------------------------------------
 
 
-def _resolve_device(spec: str) -> torch.device:
-    if spec == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    return torch.device(spec)
+def _resolve_device(spec: str, dtype: str = "float32") -> torch.device:
+    """``"auto"`` picks CUDA, then MPS (float32 only; MPS has no float64),
+    then CPU. An explicit device is used as given."""
+    if spec != "auto":
+        return torch.device(spec)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if dtype != "float64" and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def _resolve_dtype(spec: str) -> torch.dtype:
@@ -62,15 +57,15 @@ def _factory_metadata(factory: Callable) -> dict:
     and ``functools.partial`` over them. Closures, lambdas, and locally-defined
     classes raise — the user must define the factory at module top level.
     """
+    inner, partial_kwargs = factory, None
     if isinstance(factory, functools.partial):
-        inner = factory.func
-        partial_kwargs = dict(factory.keywords or {})
         if factory.args:
             raise ValueError(
                 "TorchBackend save/load requires `module_factory` partials to "
                 "use keyword args only (no positional args), so the factory "
                 "round-trips faithfully through JSON metadata."
             )
+        inner, partial_kwargs = factory.func, dict(factory.keywords or {})
         try:
             json.dumps(partial_kwargs)
         except TypeError as e:
@@ -80,24 +75,15 @@ def _factory_metadata(factory: Callable) -> dict:
                 "lists/tuples, dicts, None). Got non-serializable kwarg in "
                 f"{partial_kwargs!r}: {e}"
             ) from e
-        qualname = getattr(inner, "__qualname__", None)
-        module = getattr(inner, "__module__", None)
-        if qualname is None or module is None or "." in (qualname or ""):
-            raise ValueError(
-                "TorchBackend save/load requires `module_factory` to be a "
-                "top-level callable (e.g. a module-level `def`). Closures, "
-                "lambdas, and class methods cannot be reconstructed by qualname."
-            )
-        return {"qualname": qualname, "module": module, "partial_kwargs": partial_kwargs}
-    qualname = getattr(factory, "__qualname__", None)
-    module = getattr(factory, "__module__", None)
-    if qualname is None or module is None or "." in (qualname or ""):
+    qualname = getattr(inner, "__qualname__", None)
+    module = getattr(inner, "__module__", None)
+    if qualname is None or module is None or "." in qualname:
         raise ValueError(
             "TorchBackend save/load requires `module_factory` to be a "
             "top-level callable (e.g. a module-level `def`). Closures, "
             "lambdas, and class methods cannot be reconstructed by qualname."
         )
-    return {"qualname": qualname, "module": module, "partial_kwargs": None}
+    return {"qualname": qualname, "module": module, "partial_kwargs": partial_kwargs}
 
 
 def _factory_from_metadata(meta: dict) -> Callable:
@@ -109,68 +95,68 @@ def _factory_from_metadata(meta: dict) -> Callable:
     return inner
 
 
-def _prepare_rows(
-    rows: list[dict[str, Any]],
-    estimand: Estimand,
-    ys: list | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Trace each row once; return packed arrays.
+@dataclass
+class _AugTensors:
+    """An ``AugmentedDataset`` on the training device, sorted by origin row
+    with CSR offsets so a minibatch of original rows gathers only its own
+    augmented rows."""
 
-    ``ys`` is the sklearn-style per-row outcome; pass ``None`` when the
-    estimand's m doesn't depend on Y.
+    features: torch.Tensor
+    is_original: torch.Tensor
+    potential_deriv_coef: torch.Tensor
+    origin: torch.Tensor
+    offsets: torch.Tensor  # (n_rows + 1,) start of each row's block
+    n_rows: int
 
-    Returns
-    -------
-    x : (n, d) original-row feature matrix.
-    pts : (N, d) stacked feature matrix for all trace points across all rows.
-    coefs : (N,) trace coefficients matching ``pts``.
-    pt_to_row : (N,) int index — which original row each trace point belongs to.
-    """
-    feature_keys = estimand.feature_keys
-    d = len(feature_keys)
-    if not rows:
-        return (
-            np.zeros((0, d), dtype=float),
-            np.zeros((0, d), dtype=float),
-            np.zeros((0,), dtype=float),
-            np.zeros((0,), dtype=np.int64),
+    @classmethod
+    def build(cls, aug: AugmentedDataset, device, dtype) -> "_AugTensors":
+        # Rows with D = C = 0 contribute nothing; drop them.
+        keep = (aug.is_original != 0) | (aug.potential_deriv_coef != 0)
+        order = np.flatnonzero(keep)[np.argsort(aug.origin_index[keep], kind="stable")]
+        origin = aug.origin_index[order]
+        counts = np.bincount(origin, minlength=aug.n_rows)
+
+        def t(a, dt=dtype):
+            return torch.as_tensor(np.ascontiguousarray(a), dtype=dt, device=device)
+
+        return cls(
+            features=t(aug.features[order]),
+            is_original=t(aug.is_original[order]),
+            potential_deriv_coef=t(aug.potential_deriv_coef[order]),
+            origin=t(origin, torch.long),
+            offsets=t(np.concatenate([[0], np.cumsum(counts)]), torch.long),
+            n_rows=int(aug.n_rows),
         )
 
-    x = np.asarray(
-        [[row[k] for k in feature_keys] for row in rows], dtype=float
-    )
+    def batch(self, rows: torch.Tensor | None):
+        """``(features, D, C, local_origin, n_batch)`` for original rows
+        ``rows`` (``None`` means every row)."""
+        if rows is None:
+            return self.features, self.is_original, self.potential_deriv_coef, self.origin, self.n_rows
+        starts = self.offsets[rows]
+        counts = self.offsets[rows + 1] - starts
+        local = torch.repeat_interleave(torch.arange(rows.shape[0], device=rows.device), counts)
+        block_start = torch.cumsum(counts, 0) - counts
+        idx = starts[local] + torch.arange(local.shape[0], device=rows.device) - block_start[local]
+        return (
+            self.features[idx], self.is_original[idx],
+            self.potential_deriv_coef[idx], local, int(rows.shape[0]),
+        )
 
-    pt_list: list[list[float]] = []
-    coef_list: list[float] = []
-    p2r_list: list[int] = []
-    for i, row in enumerate(rows):
-        y_i = ys[i] if ys is not None else None
-        for coef, point in trace(estimand, row, y_i):
-            missing = [k for k in feature_keys if k not in point]
-            if missing:
-                raise ValueError(
-                    f"m evaluated alpha at a point missing keys {missing}; "
-                    f"all feature_keys {list(feature_keys)} must be specified."
-                )
-            pt_list.append([point[k] for k in feature_keys])
-            coef_list.append(float(coef))
-            p2r_list.append(i)
 
-    if not pt_list:
-        pts = np.zeros((0, d), dtype=float)
-    else:
-        pts = np.asarray(pt_list, dtype=float)
-    coefs = np.asarray(coef_list, dtype=float)
-    pt_to_row = np.asarray(p2r_list, dtype=np.int64)
-    return x, pts, coefs, pt_to_row
+def _batch_loss(model, base, torch_loss: TorchRieszLoss, data: _AugTensors, rows=None):
+    """Mean per-row Riesz loss over original rows ``rows`` (all when None)."""
+    feats, D, C, origin, n = data.batch(rows)
+    eta = model(feats).squeeze(-1) + base
+    return torch_loss.per_row(eta, D, C, origin, n).mean()
 
 
 def _row_batches(
     n_rows: int, batch_size: int | None, generator: torch.Generator
-) -> list[torch.Tensor]:
-    """Return a list of LongTensor row-index batches for one epoch."""
+) -> list[torch.Tensor | None]:
+    """Row-index batches for one epoch; ``[None]`` means one full batch."""
     if batch_size is None or batch_size >= n_rows:
-        return [torch.arange(n_rows, dtype=torch.long)]
+        return [None]
     perm = torch.randperm(n_rows, generator=generator)
     return [perm[i : i + batch_size] for i in range(0, n_rows, batch_size)]
 
@@ -215,7 +201,6 @@ class TorchPredictor:
     dtype: str
     device: str
     factory_metadata: dict
-    feature_keys: tuple[str, ...] = field(default_factory=tuple)
     snapshot_state_dicts: dict[int, dict[str, torch.Tensor]] | None = None
     snapshot_epochs: tuple[int, ...] | None = None
 
@@ -223,35 +208,37 @@ class TorchPredictor:
 
     # ---- prediction ----
 
-    def _torch_dtype(self) -> torch.dtype:
-        return _resolve_dtype(self.dtype)
-
-    def _torch_device(self) -> torch.device:
-        try:
-            return torch.device(self.device)
-        except (RuntimeError, ValueError):
-            return torch.device("cpu")
-
-    def predict_eta(self, features: np.ndarray) -> np.ndarray:
-        X = np.atleast_2d(np.asarray(features, dtype=float))
+    def _input_tensor(self, features: np.ndarray) -> torch.Tensor:
+        """Check the feature width, move the model to its device, and return
+        ``features`` as a tensor there."""
+        X = np.atleast_2d(np.array(features, dtype=float))
         if X.shape[1] != self.input_dim:
             raise ValueError(
                 f"TorchPredictor expects {self.input_dim} input features, "
                 f"got {X.shape[1]}."
             )
-        device = self._torch_device()
-        dtype = self._torch_dtype()
-        X_t = torch.as_tensor(X, dtype=dtype, device=device)
+        device, dtype = _resolve_device(self.device, self.dtype), _resolve_dtype(self.dtype)
+        # A model saved on a GPU still predicts on a machine without one.
+        if (device.type == "cuda" and not torch.cuda.is_available()) or (
+            device.type == "mps" and not torch.backends.mps.is_available()
+        ):
+            device = torch.device("cpu")
         self.model.to(device=device, dtype=dtype)
+        return torch.as_tensor(X, dtype=dtype, device=device)
+
+    def _eta(self, X_t: torch.Tensor) -> np.ndarray:
+        with torch.no_grad():
+            eta_t = self.model(X_t).squeeze(-1) + self.base_score
+        return eta_t.cpu().numpy().astype(float)
+
+    def predict_eta(self, features: np.ndarray) -> np.ndarray:
+        X_t = self._input_tensor(features)
         was_training = self.model.training
         self.model.eval()
         try:
-            with torch.no_grad():
-                eta_t = self.model(X_t).squeeze(-1) + self.base_score
+            return self._eta(X_t)
         finally:
-            if was_training:
-                self.model.train()
-        return eta_t.detach().cpu().numpy().astype(float)
+            self.model.train(was_training)
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return np.asarray(self.loss.link_to_alpha(self.predict_eta(features)))
@@ -284,34 +271,21 @@ class TorchPredictor:
         self, features: np.ndarray, epochs: Iterable[int] | None = None
     ) -> np.ndarray:
         chosen = self._resolve_snapshot_epochs(epochs)
-        X = np.atleast_2d(np.asarray(features, dtype=float))
-        if X.shape[1] != self.input_dim:
-            raise ValueError(
-                f"TorchPredictor expects {self.input_dim} input features, "
-                f"got {X.shape[1]}."
-            )
-        device = self._torch_device()
-        dtype = self._torch_dtype()
-        X_t = torch.as_tensor(X, dtype=dtype, device=device)
-        self.model.to(device=device, dtype=dtype)
-
+        X_t = self._input_tensor(features)
         original_state = {
             k: v.detach().clone() for k, v in self.model.state_dict().items()
         }
         was_training = self.model.training
         self.model.eval()
-        out = np.empty((X.shape[0], len(chosen)), dtype=float)
         try:
-            for j, ep in enumerate(chosen):
+            out = []
+            for ep in chosen:
                 self.model.load_state_dict(self.snapshot_state_dicts[ep])
-                with torch.no_grad():
-                    eta_t = self.model(X_t).squeeze(-1) + self.base_score
-                out[:, j] = eta_t.detach().cpu().numpy().astype(float)
+                out.append(self._eta(X_t))
+            return np.column_stack(out)
         finally:
             self.model.load_state_dict(original_state)
-            if was_training:
-                self.model.train()
-        return out
+            self.model.train(was_training)
 
     def predict_alpha_path(
         self, features: np.ndarray, epochs: Iterable[int] | None = None
@@ -336,7 +310,6 @@ class TorchPredictor:
             "dtype": self.dtype,
             "device": self.device,
             "factory": self.factory_metadata,
-            "feature_keys": list(self.feature_keys),
             "snapshot_epochs": (
                 list(self.snapshot_epochs)
                 if self.snapshot_epochs is not None
@@ -391,7 +364,6 @@ class TorchPredictor:
             dtype=dtype,
             device=device,
             factory_metadata=meta["factory"],
-            feature_keys=tuple(meta.get("feature_keys", ())),
             snapshot_state_dicts=snap_state_dicts,
             snapshot_epochs=(
                 tuple(int(e) for e in snap_epochs) if snap_epochs else None
@@ -425,9 +397,9 @@ def _default_optimizer_factory(params):  # pragma: no cover - placeholder
 class TorchBackend:
     """Neural-network Riesz regression backend (PyTorch).
 
-    Implements ``rieszreg.MomentBackend.fit_rows``: consumes raw rows and the
-    estimand, evaluates per-row moments via ``rieszreg.trace``, and minimizes
-    the per-row Bregman-Riesz loss with a PyTorch training loop.
+    Implements ``rieszreg.Backend.fit_augmented``: groups the augmented rows
+    by origin row and minimizes the per-row Bregman-Riesz loss with a
+    PyTorch training loop over minibatches of original rows.
 
     Parameters
     ----------
@@ -466,33 +438,23 @@ class TorchBackend:
     validation_fraction: float = 0.0
     snapshot_epochs: tuple[int, ...] = ()
 
-    def fit_rows(
+    def fit_augmented(
         self,
-        rows_train: list[dict[str, Any]],
-        rows_valid: list[dict[str, Any]] | None,
-        estimand: Estimand,
+        aug_train: AugmentedDataset,
+        aug_valid: AugmentedDataset | None,
         loss: Loss,
         *,
         base_score: float,
         random_state: int,
         hyperparams: dict[str, Any],
-        ys_train: list | None = None,
-        ys_valid: list | None = None,
     ) -> FitResult:
         del hyperparams  # torch backend has no string-keyed passthrough
-
-        validate_supported(loss)
-
-        # ---- precompute traces ----
-        train_x, train_pts, train_coefs, train_p2r = _prepare_rows(
-            rows_train, estimand, ys_train
-        )
-        if rows_valid:
-            valid_x, valid_pts, valid_coefs, valid_p2r = _prepare_rows(
-                rows_valid, estimand, ys_valid
+        torch_loss = TorchRieszLoss(loss)
+        if aug_valid is None and self.early_stopping_rounds is not None:
+            raise ValueError(
+                "early_stopping_rounds requires a validation set. Set "
+                "validation_fraction>0 (or pass eval_set=) when fitting."
             )
-        else:
-            valid_x = valid_pts = valid_coefs = valid_p2r = None
 
         # ---- seeding ----
         seed = int(random_state)
@@ -501,9 +463,13 @@ class TorchBackend:
             torch.cuda.manual_seed_all(seed)
         gen = torch.Generator().manual_seed(seed)
 
-        device = _resolve_device(self.device)
+        device = _resolve_device(self.device, self.dtype)
         dtype = _resolve_dtype(self.dtype)
-        input_dim = int(train_x.shape[1])
+        input_dim = int(aug_train.features.shape[1])
+
+        # ---- data: each row's evaluation points, grouped by row ----
+        train = _AugTensors.build(aug_train, device, dtype)
+        valid = _AugTensors.build(aug_valid, device, dtype) if aug_valid is not None else None
 
         # ---- build model + optimizer ----
         model = self.module_factory(input_dim).to(device=device, dtype=dtype)
@@ -513,67 +479,23 @@ class TorchBackend:
             if self.scheduler_factory is not None
             else None
         )
-
-        train_x_t = torch.as_tensor(train_x, dtype=dtype, device=device)
-        train_pts_t = torch.as_tensor(train_pts, dtype=dtype, device=device)
-        train_coefs_t = torch.as_tensor(train_coefs, dtype=dtype, device=device)
-        train_p2r_t = torch.as_tensor(train_p2r, dtype=torch.long, device=device)
-        if valid_x is not None:
-            valid_x_t = torch.as_tensor(valid_x, dtype=dtype, device=device)
-            valid_pts_t = torch.as_tensor(valid_pts, dtype=dtype, device=device)
-            valid_coefs_t = torch.as_tensor(valid_coefs, dtype=dtype, device=device)
-            valid_p2r_t = torch.as_tensor(valid_p2r, dtype=torch.long, device=device)
         base = torch.tensor(float(base_score), device=device, dtype=dtype)
-        n_train = train_x_t.shape[0]
 
         best_score = math.inf
         best_iter = None
+        early_stopping = self.early_stopping_rounds is not None
         best_state = None
         no_improve = 0
         history: list[float] = []
-
         snap_set = {int(e) for e in self.snapshot_epochs}
         snapshots: dict[int, dict[str, torch.Tensor]] = {}
 
-        if rows_valid is None and self.early_stopping_rounds:
-            raise ValueError(
-                "early_stopping_rounds requires a validation set. Set "
-                "validation_fraction>0 (or pass eval_set=) when fitting."
-            )
-
         for epoch in range(int(self.epochs)):
             model.train()
-            for batch_row_idx in _row_batches(n_train, self.batch_size, gen):
-                batch_row_idx = batch_row_idx.to(device=device)
+            for rows in _row_batches(train.n_rows, self.batch_size, gen):
                 optimizer.zero_grad()
-
-                # Pick out trace rows whose origin is in this batch and remap
-                # global row indices to local-batch indices.
-                B = batch_row_idx.shape[0]
-                row_to_local = torch.full(
-                    (n_train,), -1, dtype=torch.long, device=device
-                )
-                row_to_local[batch_row_idx] = torch.arange(B, device=device)
-                local_p2r_full = row_to_local[train_p2r_t]
-                mask = local_p2r_full >= 0
-                pts_b = train_pts_t[mask]
-                coefs_b = train_coefs_t[mask]
-                local_p2r = local_p2r_full[mask]
-                x_b = train_x_t[batch_row_idx]
-
-                # One forward pass on (orig + trace points) for efficiency.
-                if pts_b.shape[0] > 0:
-                    all_feat = torch.cat([x_b, pts_b], dim=0)
-                else:
-                    all_feat = x_b
-                eta_all = model(all_feat).squeeze(-1) + base
-                eta_orig = eta_all[:B]
-                eta_pts = eta_all[B:]
-
-                per_row = per_row_riesz_loss(
-                    loss, eta_orig, eta_pts, coefs_b, local_p2r, B
-                )
-                loss_val = per_row.mean()
+                batch = None if rows is None else rows.to(device=device)
+                loss_val = _batch_loss(model, base, torch_loss, train, batch)
                 loss_val.backward()
                 if self.grad_clip_norm:
                     torch.nn.utils.clip_grad_norm_(
@@ -590,24 +512,26 @@ class TorchBackend:
                     for k, v in model.state_dict().items()
                 }
 
-            if valid_x is not None:
-                val = self._validation_loss(
-                    model, base, loss,
-                    valid_x_t, valid_pts_t, valid_coefs_t, valid_p2r_t,
-                )
+            if valid is not None:
+                model.eval()
+                with torch.no_grad():
+                    val = float(_batch_loss(model, base, torch_loss, valid).item())
                 history.append(val)
                 if val < best_score - 1e-12:
                     best_score = val
                     best_iter = epoch
-                    best_state = {
-                        k: v.detach().clone() for k, v in model.state_dict().items()
-                    }
+                    if early_stopping:
+                        best_state = {
+                            k: v.detach().clone() for k, v in model.state_dict().items()
+                        }
                     no_improve = 0
                 else:
                     no_improve += 1
-                if self.early_stopping_rounds and no_improve >= int(self.early_stopping_rounds):
+                if early_stopping and no_improve >= int(self.early_stopping_rounds):
                     break
 
+        # Early stopping restores the best-validation weights; without it the
+        # final weights are kept (as in the boosting backends).
         if best_state is not None:
             model.load_state_dict(best_state)
 
@@ -626,47 +550,16 @@ class TorchBackend:
             dtype=self.dtype,
             device=str(device),
             factory_metadata=factory_meta,
-            feature_keys=tuple(estimand.feature_keys),
             snapshot_state_dicts=snapshots if retained_epochs else None,
             snapshot_epochs=retained_epochs if retained_epochs else None,
         )
 
         return FitResult(
             predictor=predictor,
-            best_iteration=best_iter,
-            best_score=best_score if best_iter is not None else None,
+            best_iteration=best_iter if early_stopping else None,
+            best_score=best_score if early_stopping and best_iter is not None else None,
             history=history if history else None,
         )
-
-    @staticmethod
-    def _validation_loss(
-        model: torch.nn.Module,
-        base: torch.Tensor,
-        loss: Loss,
-        x_t: torch.Tensor,
-        pts_t: torch.Tensor,
-        coefs_t: torch.Tensor,
-        p2r_t: torch.Tensor,
-    ) -> float:
-        n_valid = x_t.shape[0]
-        was_training = model.training
-        model.eval()
-        try:
-            with torch.no_grad():
-                if pts_t.shape[0] > 0:
-                    all_feat = torch.cat([x_t, pts_t], dim=0)
-                else:
-                    all_feat = x_t
-                eta_all = model(all_feat).squeeze(-1) + base
-                eta_orig = eta_all[:n_valid]
-                eta_pts = eta_all[n_valid:]
-                per_row = per_row_riesz_loss(
-                    loss, eta_orig, eta_pts, coefs_t, p2r_t, n_valid
-                )
-                return float(per_row.mean().item())
-        finally:
-            if was_training:
-                model.train()
 
 
 __all__ = ["TorchBackend", "TorchPredictor"]

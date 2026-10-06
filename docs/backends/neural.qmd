@@ -6,17 +6,17 @@ title: "Neural-network backend (riesznet)"
 
 `riesznet` trains the Riesz representer α(x) with a PyTorch model, in the spirit of [Chernozhukov et al. (2021), *RieszNet and ForestRiesz*](https://arxiv.org/abs/2110.03031). It fits the Riesz representer only — outcome regression is handled separately.
 
-`rieszreg` exposes the entry point as `MomentBackend.fit_rows`. The neural backend uses the per-row moment formulation: for each original row `z_i`,
+The backend implements `Backend.fit_augmented` and groups the augmented rows by original row: for each original row `z_i`,
 
 $$
-L_i = \psi(\alpha(x_i)) - \sum_{j} c_j \cdot \varphi'(\alpha(p_j))
+L_i = \tilde h(\alpha(z_i)) - \sum_{j} c_j \cdot h'(\alpha(p_j))
 $$
 
-where the `(c_j, p_j)` pairs come from `rieszreg.trace(estimand, z_i)` and the model produces α via a Bregman link. The training loop minimizes the mean of `L_i` with autograd; no augmented dataset is built.
+where the `(c_j, p_j)` pairs are the evaluation points of `m` at `z_i` and the model produces α via a Bregman link. These points come from the augmented dataset the orchestrator builds with `estimand.augment`, so the built-in estimands need no per-row Python work. Each minibatch evaluates the network only at its own rows' points. The training loop minimizes the mean of `L_i` with autograd.
 
 ## Two surfaces
 
-- **`RieszNet`** — convenience class with a default MLP. Surfaces `hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `device`, `dtype`. Trains full-batch.
+- **`RieszNet`** — convenience class with a default MLP. Surfaces `hidden_sizes`, `activation`, `dropout`, `learning_rate`, `weight_decay`, `epochs`, `batch_size`, `device`, `dtype`.
 - **`TorchBackend`** — power-user surface. Pass any `nn.Module` factory and any optimizer factory. Compose with `rieszreg.RieszEstimator` for full control.
 
 ## Quickstart — ATE
@@ -169,13 +169,13 @@ print(f"α̂ range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 | `weight_decay` | `0.0` | Adam weight decay. |
 | `epochs` | `200` | Max epochs. Combine with `early_stopping_rounds` for adaptive stopping. |
 | `batch_size` | `64` | Original rows per minibatch. `None` is full-batch GD. |
-| `device` | `"cpu"` | Also `"cuda"`, `"mps"`, `"auto"`. |
+| `device` | `"cpu"` | Also `"cuda"`, `"mps"`, `"auto"`. `"auto"` skips MPS when `dtype="float64"`. |
 | `dtype` | `"float32"` | Also `"float64"` (slower, more precise). |
 | `grad_clip_norm` | `None` | Global L2 clip on the gradient. |
 | `loss` | `SquaredLoss()` | Any of the four built-in Bregman losses. |
 | `init` | `None` | α-space initialization. Default is `m̄ = E[m(Z, 1)]` projected into the loss's domain (the loss-minimizing constant); pass a float to override. |
-| `validation_fraction` | `0.0` | Hold out for early stopping. |
-| `early_stopping_rounds` | `None` | Patience (in epochs) for validation Riesz loss. |
+| `validation_fraction` | `0.1` | Held-out fraction for early stopping. Used only when `early_stopping_rounds` is set and no `eval_set` is passed. |
+| `early_stopping_rounds` | `None` | Patience (in epochs) for validation Riesz loss. The best-validation weights are restored at the end. With `None`, all `epochs` run and the final weights are kept. |
 | `random_state` | `0` | Seeds `torch`, `torch.cuda`, and the DataLoader generator. |
 
 `TorchBackend` constructor (power-user surface):
@@ -204,7 +204,7 @@ with tempfile.TemporaryDirectory() as tmp:
     print(f"max abs diff after round-trip: {np.max(np.abs(pred_loaded - alpha_hat)):.2e}")
 ```
 
-Save writes `state_dict.pt` (PyTorch weights, on CPU) plus `predictor.json` (carries the factory's module + qualname, the input dim, and the Bregman-loss spec). Load re-imports the factory by qualname, rebuilds the module, and calls `load_state_dict`.
+Save writes `state_dict.pt` (PyTorch weights, on CPU) plus `predictor.json` (carries the factory's module + qualname, the input dim, and the Bregman-loss spec). Load re-imports the factory by qualname, rebuilds the module, and calls `load_state_dict`. A model saved on a GPU loads and predicts on a machine without one; it runs on the CPU.
 
 For built-in estimands the metadata round-trips automatically. For a custom `Estimand`, pass `estimand=` to `load`.
 

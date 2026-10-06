@@ -16,7 +16,7 @@ from typing import Sequence
 
 import numpy as np
 
-from rieszreg import Estimand, Loss, RieszEstimator, SquaredLoss
+from rieszreg import Estimand, Loss, RieszEstimator
 
 from .backend import TorchBackend, auto_snapshot_epochs
 from .modules import build_adam, build_mlp
@@ -62,7 +62,8 @@ class RieszNet(RieszEstimator):
         to ``fit``.
     early_stopping_rounds : int or None
         Stop fitting after this many epochs without validation-loss
-        improvement; restore best-validation weights at end of fit.
+        improvement; restore best-validation weights at end of fit. ``None``
+        trains all ``epochs`` and keeps the final weights.
     snapshot_epochs : sequence of int or None, default None
         Epoch ticks at which to snapshot ``state_dict`` during training so
         ``predict_path(Z, epochs=...)`` can return α̂ at each tick. ``None``
@@ -114,9 +115,6 @@ class RieszNet(RieszEstimator):
         self.snapshot_epochs = snapshot_epochs
 
     # ---- defaults / backend construction ----
-
-    def _resolved_loss(self) -> Loss:
-        return self.loss if self.loss is not None else SquaredLoss()
 
     def _resolved_snapshot_epochs(self) -> tuple[int, ...]:
         if self.snapshot_epochs is None:
@@ -172,53 +170,3 @@ class RieszNet(RieszEstimator):
         """
         feats = self._features(Z)
         return self.predictor_.predict_alpha_path(feats, epochs)
-
-    # ---- save/load ----
-
-    def _save_hyperparameters(self) -> dict:
-        base = super()._save_hyperparameters()
-        base.update(
-            hidden_sizes=list(self.hidden_sizes),
-            activation=self.activation,
-            dropout=float(self.dropout),
-            learning_rate=float(self.learning_rate),
-            weight_decay=float(self.weight_decay),
-            epochs=int(self.epochs),
-            batch_size=self.batch_size,
-            device=self.device,
-            dtype=self.dtype,
-            grad_clip_norm=self.grad_clip_norm,
-            early_stopping_rounds=self.early_stopping_rounds,
-            validation_fraction=float(self.validation_fraction),
-            snapshot_epochs=(
-                list(int(e) for e in self.snapshot_epochs)
-                if self.snapshot_epochs is not None
-                else None
-            ),
-        )
-        return base
-
-    @classmethod
-    def _construct_for_load(
-        cls, *, estimand, loss, hyperparameters: dict
-    ) -> "RieszNet":
-        hs = hyperparameters.get("hidden_sizes", [64, 64])
-        return cls(
-            estimand=estimand,
-            hidden_sizes=tuple(int(h) for h in hs),
-            activation=hyperparameters.get("activation", "relu"),
-            dropout=float(hyperparameters.get("dropout", 0.0)),
-            learning_rate=float(hyperparameters.get("learning_rate", 1e-3)),
-            weight_decay=float(hyperparameters.get("weight_decay", 0.0)),
-            epochs=int(hyperparameters.get("epochs", 200)),
-            batch_size=hyperparameters.get("batch_size", 64),
-            device=hyperparameters.get("device", "cpu"),
-            dtype=hyperparameters.get("dtype", "float32"),
-            grad_clip_norm=hyperparameters.get("grad_clip_norm"),
-            loss=loss,
-            init=hyperparameters.get("init"),
-            validation_fraction=hyperparameters.get("validation_fraction", 0.1),
-            early_stopping_rounds=hyperparameters.get("early_stopping_rounds"),
-            snapshot_epochs=hyperparameters.get("snapshot_epochs"),
-            random_state=hyperparameters.get("random_state", 0),
-        )

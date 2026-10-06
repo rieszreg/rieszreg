@@ -46,9 +46,7 @@ def diagnose_tree(estimator, Z, **kwargs) -> TreeDiagnostics:
         _walk(tree)
         if sizes:
             mls = float(np.mean(sizes))
-        n_features = len(getattr(estimator, "feature_names_in_", ()))
-        if n_features > 0:
-            fi = feature_importance(tree, n_features)
+        fi = feature_importance(tree, len(estimator.estimand_.feature_keys))
 
     return TreeDiagnostics(
         **vars(base),

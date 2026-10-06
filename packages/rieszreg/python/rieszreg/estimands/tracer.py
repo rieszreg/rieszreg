@@ -18,6 +18,7 @@ raises with a clear error pointing at the offending operation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Real
 from typing import Any
 
 from .base import FiniteEvalEstimand
@@ -77,7 +78,7 @@ class LinearForm:
         return (-1.0) * self
 
     def __mul__(self, scalar):
-        if not isinstance(scalar, (int, float)):
+        if not isinstance(scalar, Real):
             raise TypeError(
                 f"LinearForm * {type(scalar).__name__} is not allowed — m must be "
                 "linear in alpha (only scalar multiplication)."
@@ -88,7 +89,7 @@ class LinearForm:
         return self.__mul__(scalar)
 
     def __truediv__(self, scalar):
-        if not isinstance(scalar, (int, float)):
+        if not isinstance(scalar, Real):
             raise TypeError(
                 "LinearForm can only be divided by scalars — m must be linear in alpha."
             )

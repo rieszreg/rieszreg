@@ -15,5 +15,5 @@ A few existing tools cover overlapping ground.
 What's distinctive here:
 
 - The `Backend` / `MomentBackend` split, exposed as a stable Protocol, lets a third-party learner package depend on `rieszreg` and ship as its own PyPI / CRAN release. New learners do not require a PR upstream.
-- The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting via `fit_augmented`) vs moment-style (forests, neural nets via `fit_rows`).
+- The split itself reflects two structurally different fitting strategies: augmentation-style (kernel ridge, gradient boosting, trees, neural nets via `fit_augmented`) vs moment-style (the EconML-based forest via `fit_rows`).
 - Cross-language Python + R coverage at the family level via R6 wrappers per package, not just bindings to a Python core.

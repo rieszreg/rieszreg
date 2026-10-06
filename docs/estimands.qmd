@@ -162,7 +162,7 @@ For the Lalonde quickstart above, the wiring looks like this:
 | Covariates $X$ | `age`, `educ`, `black`, `hisp`, `marr`, `nodegree`, `re74`, `re75` | `ATE(covariates=(...))` — also `feature_keys`. |
 | Outcome $Y$ | `re78` | `.fit(Z, y=df["re78"])`. |
 
-Leave `covariates` out to use every column of `Z` other than the treatment: `ATE(treatment="treat")` fits $\alpha$ on `treat` plus all eight covariates here. Keep the outcome out of `Z` when you do this. After fitting, `est.feature_names_in_` lists the columns $\alpha$ uses.
+Leave `covariates` out to use every column of `Z` other than the treatment: `ATE(treatment="treat")` fits $\alpha$ on `treat` plus all eight covariates here. Keep the outcome out of `Z` when you do this. After fitting, `est.estimand_.feature_keys` lists the columns $\alpha$ uses, in the order an ndarray passed to `predict` is read.
 
 When `covariates` is given, `Z` must contain every name in `feature_keys`, and other columns are ignored. With an `ndarray`, the treatment is column 0 and the rest are the covariates, in order.
 

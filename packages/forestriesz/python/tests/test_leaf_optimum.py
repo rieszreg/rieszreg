@@ -108,3 +108,38 @@ def test_sieve_leaf_matches_closed_form_ate():
     pred = est.predict(df)
     expected_pred = (phi * theta_expected[None, :]).sum(axis=1)
     np.testing.assert_allclose(pred, expected_pred, rtol=5e-2, atol=5e-2)
+
+
+def test_vectorized_moments_match_trace():
+    """The backend reads m(W_i; φ_j) off ``estimand.augment``; it must equal
+    the per-row trace Σ coef · φ_j(point) for every built-in and a custom
+    estimand."""
+    from rieszreg import (
+        ATT, AdditiveShift, FiniteEvalEstimand, LocalShift, OutcomeRegNormSq,
+    )
+    from forestriesz.backend import _per_row_moments
+
+    rng = np.random.default_rng(3)
+    n = 60
+    df = pd.DataFrame({"a": rng.choice([0.0, 1.0], n), "x": rng.normal(size=n)})
+    y = rng.normal(size=n)
+    phi_fns = [lambda f: np.ones(len(f)), lambda f: f[:, 0], lambda f: f[:, 0] * f[:, 1] ** 2]
+    custom = FiniteEvalEstimand(
+        feature_keys=("a", "x"),
+        m=lambda alpha: lambda z, y=None: 2.0 * alpha(a=1, x=z["x"]) - alpha(a=z["a"], x=0.5 * z["x"]),
+    )
+    for estimand, ys in [
+        (ATE(covariates=["x"]), None), (ATT(covariates=["x"]), None),
+        (TSM(level=0, covariates=["x"]), None), (AdditiveShift(delta=0.7, covariates=["x"]), None),
+        (LocalShift(delta=0.3, threshold=0.5, covariates=["x"]), None), (custom, None),
+        (OutcomeRegNormSq(covariates=["a", "x"]), y),
+    ]:
+        rows = df.to_dict("records")
+        X = df[list(estimand.feature_keys)].to_numpy(float)
+        reference = np.zeros((n, len(phi_fns)))
+        for i, row in enumerate(rows):
+            for coef, point in trace(estimand, row, None if ys is None else ys[i]):
+                pt = np.array([[point[k] for k in estimand.feature_keys]], float)
+                reference[i] += coef * np.array([fn(pt)[0] for fn in phi_fns])
+        got = _per_row_moments(estimand.augment(X, ys=ys), phi_fns)
+        np.testing.assert_allclose(got, reference, atol=1e-12, err_msg=estimand.name)
