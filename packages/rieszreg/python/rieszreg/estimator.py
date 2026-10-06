@@ -297,15 +297,16 @@ class RieszEstimator(BaseEstimator):
             feats_valid = ys_valid = None
         if getattr(self.estimand, "covariates", ()) is None:
             _check_outcome_not_covariate(estimand, feats_train, ys_train)
+        estimand.check_support(feats_train)
         aug_train = estimand.augment(feats_train, ys=ys_train)
+        loss.check_estimand(aug_train, estimand)
         aug_valid = estimand.augment(feats_valid, ys=ys_valid) if has_valid else None
 
         # init=None: the constant minimizing the empirical Riesz loss. For any
         # Bregman loss with strictly convex h that is m̄ = E[m(Z, 1)], and
         # Σ_r C_r = −Σ_i m(Z_i, 1), so m̄ falls out of the augmentation.
         if self.init is None:
-            m_bar = -float(aug_train.potential_deriv_coef.sum()) / aug_train.n_rows
-            init_alpha = loss.best_constant_init(m_bar)
+            init_alpha = loss.best_constant_init(aug_train.m_bar)
         elif isinstance(self.init, Real):
             init_alpha = float(self.init)
         else:

@@ -68,6 +68,10 @@ class FiniteEvalEstimand(Estimand):
             self.name = name
         self.factory_spec = factory_spec
 
+    def check_support(self, features: np.ndarray) -> None:
+        """Raise if α is not identified from these training rows (e.g. ATE
+        with no control rows). Built-ins override; custom estimands pass."""
+
     def bind(self, columns) -> "FiniteEvalEstimand":
         """Return the estimand with its input columns resolved against the
         data: ``columns`` is a DataFrame's column names, or an ndarray's
@@ -239,6 +243,14 @@ class _BuiltinEstimand(FiniteEvalEstimand):
             )
         return a == 1.0
 
+    def _check_both_arms(self, features: np.ndarray) -> None:
+        treated = self._binary_treatment(features[:, 0])
+        if treated.all() or not treated.any():
+            raise ValueError(
+                f"{self.name} compares treated and control rows, but every row "
+                f"has {self.treatment} = {int(treated[0])}."
+            )
+
     def bind(self, columns) -> "_BuiltinEstimand":
         if self.covariates is not None:
             return self
@@ -281,6 +293,8 @@ class ATE(_BuiltinEstimand):
             return alpha(**{self.treatment: 1, **x}) - alpha(**{self.treatment: 0, **x})
         return inner
 
+    check_support = _BuiltinEstimand._check_both_arms
+
     def augment(self, features, ys=None):
         features, n = self._normalise_features(features, ys)
         is_treated = self._binary_treatment(features[:, 0])  # treatment is column 0
@@ -314,6 +328,8 @@ class ATT(_BuiltinEstimand):
                 alpha(**{self.treatment: 1, **x}) - alpha(**{self.treatment: 0, **x})
             )
         return inner
+
+    check_support = _BuiltinEstimand._check_both_arms
 
     def augment(self, features, ys=None):
         features, n = self._normalise_features(features, ys)
@@ -360,6 +376,13 @@ class TSM(_BuiltinEstimand):
         def inner(z, y=None):
             return alpha(**{self.treatment: self.level, **self._covariate_values(z)})
         return inner
+
+    def check_support(self, features):
+        if not (features[:, 0] == self.level).any():
+            raise ValueError(
+                f"No row has {self.treatment} = {self.level}, so the mean outcome "
+                "at that treatment level can't be estimated from this data."
+            )
 
     def augment(self, features, ys=None):
         features, n = self._normalise_features(features, ys)

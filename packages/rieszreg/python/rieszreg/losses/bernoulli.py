@@ -16,13 +16,14 @@ class BernoulliLoss(Loss):
         l(η) = D · softplus(η) + C · η      (since softplus(η) = -log(1 - σ(η)))
     Gradient (η) = D · α + C,  Hessian (η) = D · α (1 − α).
 
-    Use when α₀ is known to lie in (0, 1) by problem structure (e.g. trimmed
-    propensity-score-style representers). If true α₀ exceeds 1, the sigmoid
-    saturates and the fit plateaus near 1 — there is no warning, just a poor
-    fit. Validate that your representer is bounded before reaching for this.
+    Use when α₀ is known to lie in (0, 1) by problem structure (e.g.
+    OutcomeRegNormSq with a binary outcome, or a scaled TSM). Fit raises when
+    α₀ takes negative values or its mean E[m(Z, 1)] is outside (0, 1). Where
+    only part of α₀ exceeds 1, the sigmoid saturates there with no warning.
     """
 
     name = "bernoulli"
+    alpha_domain = (0.0, 1.0)
 
     def __init__(self, max_abs_eta: float = 30.0):
         super().__init__()

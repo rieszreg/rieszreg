@@ -28,6 +28,7 @@ from riesztree import (
     TSM,
 )
 from riesztree.fast._binner import fit_bin_mapper, transform
+from rieszreg.testing.dgps import scaled_tsm
 
 
 def _make_df(n=600, p=4, seed=0):
@@ -91,7 +92,7 @@ def test_bin_mapper_max_bins_cap():
                 treatment="a", covariates=tuple(f"x{j}" for j in range(p)), level=1.0
             ),
         ),
-        (lambda: BernoulliLoss(), lambda p: _ate(p)),
+        (lambda: BernoulliLoss(), lambda p: scaled_tsm(covariates=tuple(f"x{j}" for j in range(p)))),
         (lambda: BoundedSquaredLoss(lo=-3.0, hi=3.0), lambda p: _ate(p)),
     ],
 )

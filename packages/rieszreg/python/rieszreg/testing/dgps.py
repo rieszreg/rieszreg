@@ -124,3 +124,17 @@ def assert_consistency(
             f"above tolerance {tol_at_max_n}"
         )
     return rmses
+
+
+def scaled_tsm(covariates=("x",), scale: float = 0.1, level: float = 1.0, treatment: str = "a"):
+    """Custom estimand ``m(α)(z) = scale · α(level, x)``, whose α₀ =
+    scale · 1[a=level] / π(level | x) lies in (0, 1) wherever π > scale, so
+    this is the target for ``BernoulliLoss`` tests on a treatment estimand."""
+    from ..estimands.base import FiniteEvalEstimand
+
+    def m(alpha):
+        def inner(z, y=None):
+            return scale * alpha(**{**z, treatment: level})
+        return inner
+
+    return FiniteEvalEstimand(feature_keys=(treatment, *covariates), m=m, name="ScaledTSM")

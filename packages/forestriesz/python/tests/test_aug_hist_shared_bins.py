@@ -34,6 +34,7 @@ from rieszreg import (
     TSM,
 )
 from forestriesz import AugForestRieszRegressor
+from rieszreg.testing.dgps import scaled_tsm
 
 
 def _make_df(n: int = 200, p: int = 4, seed: int = 0) -> pd.DataFrame:
@@ -55,7 +56,7 @@ def _make_df(n: int = 200, p: int = 4, seed: int = 0) -> pd.DataFrame:
         (lambda: KLLoss(),
          lambda p: TSM(treatment="a", covariates=tuple(f"x{j}" for j in range(p)), level=1.0)),
         (lambda: BernoulliLoss(),
-         lambda p: ATE(treatment="a", covariates=tuple(f"x{j}" for j in range(p)))),
+         lambda p: scaled_tsm(covariates=tuple(f"x{j}" for j in range(p)))),
         (lambda: BoundedSquaredLoss(lo=-3.0, hi=3.0),
          lambda p: ATE(treatment="a", covariates=tuple(f"x{j}" for j in range(p)))),
     ],

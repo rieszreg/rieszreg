@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from rieszreg import BernoulliLoss, BoundedSquaredLoss, KLLoss
+from rieszreg import BoundedSquaredLoss, KLLoss
 
 from forestriesz import ForestRieszRegressor, TSM
 
 
 @pytest.mark.parametrize(
     "loss",
-    [KLLoss(), BernoulliLoss(), BoundedSquaredLoss(lo=0.0, hi=10.0)],
+    [KLLoss(), BoundedSquaredLoss(lo=-1.0, hi=10.0)],
 )
 def test_non_squared_loss_raises(loss, logistic_tsm_df):
     est = ForestRieszRegressor(

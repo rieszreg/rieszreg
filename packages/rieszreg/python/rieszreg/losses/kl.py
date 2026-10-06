@@ -15,11 +15,12 @@ class KLLoss(Loss):
     With η = log(α), gradient (η) = D · exp(η) + C = D · α + C.
     Hessian (η) = D · exp(η) = D · α (floored).
 
-    Pair with density-ratio estimands (TSM, IPSI) — for ATE-style estimands
-    where m has negative coefficients, the empirical KL loss is unbounded below.
+    Pair with density-ratio estimands (TSM, IPSI). For ATE-style estimands,
+    whose α takes negative values, fit raises.
     """
 
     name = "kl"
+    alpha_domain = (0.0, np.inf)
 
     def __init__(self, max_eta: float = 50.0):
         super().__init__()

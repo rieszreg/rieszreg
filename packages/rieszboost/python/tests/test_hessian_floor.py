@@ -1,13 +1,17 @@
-"""``XGBoostBackend(hessian_floor="auto")`` floors each row at the curvature an
-observed row has at the current prediction (``Loss.curvature_eta``)."""
+"""``XGBoostBackend(hessian_floor="auto")`` and SklearnBackend's line search
+floor each row at the curvature an observed row has at the current prediction
+(``Loss.curvature_eta``)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
+from sklearn.tree import DecisionTreeRegressor
 
-from rieszboost import RieszBooster, XGBoostBackend
+from rieszboost import RieszBooster, SklearnBackend, XGBoostBackend
 from rieszreg import ATE, TSM, KLLoss
+from rieszreg.testing import dgps
 
 
 def _treatment_data(n, seed):
@@ -44,3 +48,20 @@ def test_auto_floor_recovers_kl_tsm_representer_better_than_fixed_floor():
     auto, fixed = rmse("auto"), rmse(2.0)
     assert auto < 0.6
     assert auto < 0.8 * fixed
+
+
+@pytest.mark.parametrize("dgp, estimand", [
+    (dgps.linear_gaussian_ate(), ATE()),
+    (dgps.logistic_tsm(level=1.0), TSM(level=1)),
+])
+def test_sklearn_backend_recovers_alpha(dgp, estimand):
+    """SklearnBackend's line search floors counterfactual rows at the same
+    curvature. With a near-zero floor the step blew up wherever a tree leaf
+    held only counterfactual rows (relative error 0.36–0.68 here vs ~0.12)."""
+    train = dgp.sample(2000, np.random.default_rng(0))
+    test = dgp.sample(5000, np.random.default_rng(10))
+    alpha0 = dgp.true_alpha(test)
+    alpha = RieszBooster(
+        estimand, backend=SklearnBackend(lambda: DecisionTreeRegressor(max_depth=3))
+    ).fit(train).predict(test)
+    assert np.sqrt(np.mean((alpha - alpha0) ** 2)) < 0.25 * np.sqrt(np.mean(alpha0**2))

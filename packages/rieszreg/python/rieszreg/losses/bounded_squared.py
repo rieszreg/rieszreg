@@ -34,6 +34,10 @@ class BoundedSquaredLoss(Loss):
         self.hi = float(hi)
         self.max_abs_eta = float(max_abs_eta)
 
+    @property
+    def alpha_domain(self) -> tuple[float, float]:
+        return (self.lo, self.hi)
+
     def _R(self):
         return self.hi - self.lo
 

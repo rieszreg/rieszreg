@@ -7,7 +7,6 @@ import pytest
 
 from rieszreg import (
     ATE,
-    BernoulliLoss,
     BoundedSquaredLoss,
     KLLoss,
     SquaredLoss,
@@ -19,13 +18,13 @@ from krrr import KernelRieszRegressor
 
 @pytest.mark.parametrize(
     "unsupported_loss",
-    [KLLoss(), BernoulliLoss(), BoundedSquaredLoss(lo=0.0, hi=1.0)],
+    [KLLoss(), BoundedSquaredLoss(lo=-1.0, hi=10.0)],
 )
 def test_unsupported_losses_raise_at_fit(binary_ate_data, unsupported_loss):
-    """Fitting with KL / Bernoulli / BoundedSquared raises NotImplementedError."""
+    """Fitting with a non-squared loss raises NotImplementedError."""
     df, _, _ = binary_ate_data
     krr = KernelRieszRegressor(
-        estimand=TSM(level=1) if unsupported_loss.name in ("kl", "bernoulli") else ATE(),
+        estimand=TSM(level=1),
         loss=unsupported_loss,
         lambda_grid=np.logspace(-3, 0, 4),
         validation_fraction=0.25,

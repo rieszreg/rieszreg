@@ -31,6 +31,17 @@ The "Potential $h$" column is $h$ in α-space — the function the user passes a
 | `BernoulliLoss` | $\alpha \log \alpha + (1-\alpha)\log(1-\alpha)$ | $\eta\,\sigma(\eta) - \log(1+e^\eta)$ | $(0, 1)$ | $\alpha_0$ known to lie in $(0, 1)$. |
 | `BoundedSquaredLoss(lo, hi)` | $\alpha^2$ | $\big(\mathrm{lo}+(\mathrm{hi}-\mathrm{lo})\sigma(\eta)\big)^2$ | $(\mathrm{lo}, \mathrm{hi})$ | Squared-loss fit with prior bounds (e.g. trimmed-propensity ratios). |
 
+The loss must be able to represent the true α. The mean of α is known from the data, $E[\alpha_0] = E[m(Z, 1)]$, and `fit` raises when that mean lies outside the loss's range, since α can't then stay inside it:
+
+- **`ATE`, `ATT`, `AdditiveShift` and `LocalShift`** have mean 0, because their functional subtracts, e.g. $\alpha(0, x)$ in `ATE`. So their α takes negative values, and `KLLoss`, `BernoulliLoss` and `BoundedSquaredLoss` with `lo ≥ 0` can't fit them.
+- **`TSM`** has mean 1, so `BernoulliLoss` can't fit it.
+
+The mean can lie inside the range while α leaves it somewhere. `fit` warns when some rows enter the functional with a negative coefficient, such as rows with $y < 0$ under `OutcomeRegNormSq`, because α may then be negative where the loss keeps it above 0.
+
+Among the built-in estimands, only `OutcomeRegNormSq` with a binary outcome has α in $(0, 1)$: there α is $P(Y = 1 \mid X)$. Otherwise `BernoulliLoss` is for custom estimands.
+
+`KLLoss` needs good overlap. Where some covariate values have almost no treated rows, the empirical KL loss has no lower bound there. A flexible learner (`SklearnBackend`, `RieszNet`) can then push α̂ toward infinity at those points. Use `SquaredLoss`, or `RieszBooster`'s default XGBoost backend, when propensities get close to 0 or 1.
+
 Pass the loss instance to any learner via `loss=`:
 
 ::: {.panel-tabset group="lang"}

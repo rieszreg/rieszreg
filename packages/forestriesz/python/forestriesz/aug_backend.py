@@ -128,8 +128,12 @@ class AugForestRieszBackend:
     min_samples_split : int, default=2
         Minimum count of original (D > 0) augmented rows in a node before
         considering a split.
-    min_samples_leaf : int, default=1
+    min_samples_leaf : int, default=50
         Minimum count of original rows in each child of a candidate split.
+        Each leaf stores a ratio of counts, so small leaves give very noisy
+        α̂: at 1 (sklearn's default) the error does not shrink with n. In
+        simulations the best value grew with n, roughly 2√n (50–100 at
+        n = 1000, about 200 at n = 10000); raise it for large samples.
     min_weight_fraction_leaf : float, default=0.0
         sklearn-parity: leaves must contain at least
         ``ceil(min_weight_fraction_leaf * n_original_total)`` original rows
@@ -179,7 +183,7 @@ class AugForestRieszBackend:
     n_estimators: int = 100
     max_depth: int | None = None
     min_samples_split: int = 2
-    min_samples_leaf: int = 1
+    min_samples_leaf: int = 50
     min_weight_fraction_leaf: float = 0.0
     max_features: int | float | str | None = 1.0
     max_leaf_nodes: int | None = None

@@ -1,7 +1,7 @@
 """Predictor wrapping the fitted GRF + sieve evaluation.
 
 Stores the forest plus the metadata needed to map a query feature vector back
-through the basis: ``α(z) = θ(z_split) · φ(z) + base_score``. Registers itself
+through the basis: ``α(z) = θ(z_split) · φ(z)``. Registers itself
 with the rieszreg loader registry on import.
 
 User-supplied basis callables are not pickled. Save persists the forest and
@@ -30,7 +30,6 @@ def _const_phi(features: np.ndarray) -> np.ndarray:
 class ForestPredictor:
     forest: object  # _RieszGRF; declared opaquely to avoid an import cycle
     loss: Loss
-    base_score: float
     riesz_feature_fns: list[Callable] | None
     feature_keys: tuple[str, ...]
     split_feature_indices: tuple[int, ...]
@@ -55,7 +54,7 @@ class ForestPredictor:
         if theta.ndim == 1:
             theta = theta.reshape(-1, 1)
         phi = self._phi(features)
-        return (theta * phi).sum(axis=1) + self.base_score
+        return (theta * phi).sum(axis=1)
 
     def predict_alpha(self, features: np.ndarray) -> np.ndarray:
         return self.loss.link_to_alpha(self.predict_eta(features))
@@ -88,9 +87,7 @@ class ForestPredictor:
         # swap. Build per-row min/max so we never assume a sign.
         a = lb_theta * phi
         b = ub_theta * phi
-        lb = np.minimum(a, b) + self.base_score
-        ub = np.maximum(a, b) + self.base_score
-        return lb, ub
+        return np.minimum(a, b), np.maximum(a, b)
 
     # ---- serialization ----
 
@@ -103,7 +100,6 @@ class ForestPredictor:
         extras = {
             "kind": self.kind,
             "loss": self.loss.to_spec(),
-            "base_score": float(self.base_score),
             "feature_keys": list(self.feature_keys),
             "split_feature_indices": list(self.split_feature_indices),
             "has_sieve": self.riesz_feature_fns is not None,
@@ -113,6 +109,7 @@ class ForestPredictor:
 
     @classmethod
     def load(cls, dir_path, *, base_score, loss, best_iteration):
+        del base_score, best_iteration  # leaves solve for α directly
         import joblib
 
         path = Path(dir_path)
@@ -122,7 +119,6 @@ class ForestPredictor:
         return cls(
             forest=forest,
             loss=loss if loss is not None else loss_from_spec(extras["loss"]),
-            base_score=float(extras["base_score"]) if base_score is None else base_score,
             riesz_feature_fns=None,  # caller patches in via ForestRieszRegressor.load
             feature_keys=tuple(extras["feature_keys"]),
             split_feature_indices=tuple(int(i) for i in extras["split_feature_indices"]),

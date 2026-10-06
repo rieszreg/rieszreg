@@ -329,7 +329,7 @@ The splitter uses the analytic per-leaf-loss-at-optimum for each Bregman loss:
 | `BernoulliLoss` | $-D_\ell < C_\ell < 0$ | $D_\ell \log D_\ell - (D_\ell + C_\ell) \log(D_\ell + C_\ell) + C_\ell \log(-C_\ell)$ |
 | `BoundedSquaredLoss(lo, hi)` | always (project $\alpha_\ell^*$ to $[lo, hi]$) | $D_\ell (\alpha_\ell^*)^2 + 2 C_\ell \alpha_\ell^*$ |
 
-Out-of-domain children are disqualified (`+∞` leaf loss). Pair `KLLoss` / `BernoulliLoss` with density-ratio-style estimands (`TSM`); difference-of-evaluations estimands (`ATE`, `ATT`) frequently produce out-of-domain leaves under those losses.
+Out-of-domain children are disqualified (`+∞` leaf loss). `fit` rejects `KLLoss` / `BernoulliLoss` with estimands whose α takes negative values (`ATE`, `ATT`, shifts); see [Losses](../losses.qmd).
 
 ```{python}
 from riesztree import RieszTreeRegressor, TSM
@@ -689,4 +689,4 @@ The held-out depth that minimises RMSE for `riesztree` typically sits in the 4�
 - **High variance.** A single tree's RMSE is materially higher than a tuned forest or booster on the same DGP. Use this learner for interpretability or when the dependency footprint matters; otherwise pick `forestriesz` or `rieszboost`.
 - **No confidence intervals in v1.** Honest splits are not implemented.
 - **Constant per-leaf $\alpha$ only.** Linear-in-$X$ and treatment-sieve leaves are documented as future work.
-- **Loss-domain disqualifications.** KL / Bernoulli with `ATE`-style estimands will see many split candidates ruled out; the resulting tree may be shallower than `max_depth`. This is the splitter respecting the link's $\alpha$-domain, not a bug.
+- **Loss-domain disqualifications.** Under KL / Bernoulli some split candidates put a child outside the link's $\alpha$-domain and are ruled out, so the tree may be shallower than `max_depth`. This is the splitter respecting the domain, not a bug.

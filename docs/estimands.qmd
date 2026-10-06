@@ -372,7 +372,7 @@ booster = RieszBooster(estimand=TSM(level=1), init=2.5) # informed prior
 ```
 
 ::: {.callout-note title="Boundary cases"}
-For `BernoulliLoss` + `TSM` (or any density-ratio estimand with $\bar m = 1$) the loss-minimizing constant sits on the upper boundary, and the projection clips to $1 - \varepsilon$. The sigmoid is saturated at that init and gradients are tiny, so iterative training may stall. Pass `init=0.5` (or another interior value) when this matters. The `KLLoss` / `BoundedSquaredLoss` boundaries can hit the same issue when $\bar m$ lands exactly on a bound.
+$\bar m$ is the mean of the true α. When it lies outside the loss's α-range (for example $\bar m = 1$ for `TSM` under `BernoulliLoss`), no α̂ in that range can be right, and `fit` raises. See [Losses](losses.qmd).
 :::
 
 ## Estimand subclass taxonomy and future work

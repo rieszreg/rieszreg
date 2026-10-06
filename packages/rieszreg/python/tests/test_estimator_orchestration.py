@@ -14,12 +14,15 @@ from sklearn.exceptions import NotFittedError
 from rieszreg import (
     ATE,
     AugmentedDataset,
+    BernoulliLoss,
+    BoundedSquaredLoss,
     FitResult,
     KLLoss,
     RieszEstimator,
     SquaredLoss,
     TSM,
 )
+from rieszreg.testing.dgps import scaled_tsm
 
 
 class _StubPredictor:
@@ -241,3 +244,36 @@ def test_clone_preserves_custom_estimand_subclass_and_loss():
     twin = clone(est)
     assert type(twin.estimand) is Shift
     assert twin.loss == KLLoss(max_eta=20.0) != KLLoss()
+
+
+@pytest.mark.parametrize(
+    "estimand, loss, ok",
+    [
+        (TSM(level=1), KLLoss(), True),                         # α₀ = 1[a=1]/π ≥ 0
+        (ATE(), KLLoss(), False),                               # α₀ < 0 on controls
+        (ATE(), BoundedSquaredLoss(lo=0.0, hi=10.0), False),
+        (ATE(), BoundedSquaredLoss(lo=-10.0, hi=10.0), True),
+        (TSM(level=1), BernoulliLoss(), False),                 # E[α₀] = 1 ∉ (0, 1)
+        (scaled_tsm(), BernoulliLoss(), True),                  # α₀ = 0.1·1[a=1]/π
+    ],
+)
+def test_fit_rejects_losses_that_cannot_represent_alpha(estimand, loss, ok):
+    """A loss whose α-range excludes the true α would otherwise fit a
+    constant stuck at the edge of the range."""
+    df, _ = _binary_df()
+    est = RieszEstimator(estimand=estimand, backend=_StubBackend(), loss=loss)
+    if ok:
+        est.fit(df)
+    else:
+        with pytest.raises(ValueError, match="Use SquaredLoss"):
+            est.fit(df)
+
+
+def test_fit_rejects_unidentified_designs():
+    """ATE with one treatment arm, or TSM at a level no row has, has no
+    identified α."""
+    df, _ = _binary_df()
+    with pytest.raises(ValueError, match="treated and control"):
+        RieszEstimator(estimand=ATE(), backend=_StubBackend()).fit(df.assign(a=1.0))
+    with pytest.raises(ValueError, match="No row has"):
+        RieszEstimator(estimand=TSM(level=2), backend=_StubBackend()).fit(df)

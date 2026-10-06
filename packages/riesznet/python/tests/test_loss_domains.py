@@ -13,6 +13,7 @@ from rieszreg import (
 )
 
 from riesznet import RieszNet
+from rieszreg.testing.dgps import scaled_tsm
 
 
 def test_kl_loss_runs_on_tsm(logistic_tsm_df):
@@ -30,9 +31,9 @@ def test_kl_loss_runs_on_tsm(logistic_tsm_df):
     assert np.all(pred > 0)
 
 
-def test_bernoulli_loss_runs_on_tsm(logistic_tsm_df):
+def test_bernoulli_loss_runs_on_scaled_tsm(logistic_tsm_df):
     est = RieszNet(
-        estimand=TSM(level=1),
+        estimand=scaled_tsm(),
         hidden_sizes=(8,),
         epochs=10,
         loss=BernoulliLoss(max_abs_eta=10.0),

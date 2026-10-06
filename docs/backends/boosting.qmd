@@ -48,7 +48,7 @@ See the [diagnostics page](../diagnostics.qmd) for the warnings each knob addres
 
 To use a non-tree base learner, pass a `base_learner_factory`: a zero-arg callable returning a fresh sklearn-compatible regressor each round.
 
-The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction.
+The backend implements first-order gradient boosting with closed-form line search. Each round: fit the weak learner to the negative gradient of the Riesz loss, solve for the optimal step size under a quadratic surrogate, update the running prediction. As in `XGBoostBackend`'s `hessian_floor="auto"`, counterfactual rows count with an observed row's curvature at the current prediction in that surrogate. Without this, the step size blew up wherever the base learner isolated rows that exist only as counterfactuals.
 
 Base learners with an unset `random_state` are seeded from the estimator's `random_state`, so fits are reproducible. As with `XGBoostBackend`, the model is cut back to the best round only when `early_stopping_rounds` is set. Otherwise all `n_estimators` rounds are kept, even when you pass `eval_set=`. `max_depth`, `reg_lambda` and `subsample` on `RieszBooster` apply to `XGBoostBackend` only. Set tree settings on the base learner instead.
 

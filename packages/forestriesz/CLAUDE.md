@@ -97,7 +97,7 @@ A[i, j] = Σ_(coef, point) ∈ trace(W_i)  coef · φ_j(point)         (per-row 
 J[i]    = φ(W_i) φ(W_i)'                                           (per-row Jacobian)
 ```
 
-`_get_alpha_and_pointJ` unpacks T and returns `(A, J)` to the criterion. `_get_n_outputs_decomposition` declares all p outputs are relevant. `_get_alpha_and_pointJ` also adds `l2 · vec(I)` to each row's J. Per-leaf solve is closed-form `θ_ℓ = (Σ J_i + n_ℓ · l2 · I)^{-1} Σ A_i`; predictions are `α(z) = θ(z_split) · φ(z) + base_score`.
+`_get_alpha_and_pointJ` unpacks T and returns `(A, J)` to the criterion. `_get_n_outputs_decomposition` declares all p outputs are relevant. `_get_alpha_and_pointJ` also adds `l2 · vec(I)` to each row's J. Per-leaf solve is closed-form `θ_ℓ = (Σ J_i + n_ℓ · l2 · I)^{-1} Σ A_i`; predictions are `α(z) = θ(z_split) · φ(z)`. There is no `base_score` offset: it would sit outside the basis, and bases without an intercept (TSM's `1[a=level]`) could not cancel it.
 
 For TSM with `default_riesz_features([1{T=level}])`, A_i = 1 (constant), J_i = T_i (varies). Per-leaf θ = 1 / (P̂(T=level | X-region) + l2) — the IPW representer, ridged by `l2`. The forest splits on covariates only (the sieve resolves treatment).
 

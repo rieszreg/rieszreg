@@ -85,7 +85,6 @@ df_cont = pd.DataFrame({"a": a_cont, "x": x})
 fr = AugForestRieszRegressor(
     estimand=AdditiveShift(delta=0.5),
     n_estimators=500,
-    min_samples_leaf=10,
     random_state=0,
 )
 fr.fit(df_cont)

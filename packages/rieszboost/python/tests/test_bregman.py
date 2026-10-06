@@ -73,14 +73,11 @@ def test_kl_riesz_loss_finite():
 
 def test_bernoulli_predicts_in_zero_one():
     from rieszreg.losses import BernoulliLoss
+    from rieszreg.testing.dgps import scaled_tsm
     df, _ = _simulate_df(500, seed=0)
-    # For TSM, m̄ = 1, which under Bernoulli sits on the upper boundary; the
-    # loss-minimizing constant init clips to (1-ε) and saturates the sigmoid.
-    # Pass `init=0.5` explicitly so the iterative fit has room to descend.
     booster = RieszBooster(
-        estimand=rieszboost.TSM(level=1),
+        estimand=scaled_tsm(),
         loss=BernoulliLoss(),
-        init=0.5,
         n_estimators=30, learning_rate=0.1, max_depth=3,
     ).fit(df)
     alpha_hat = booster.predict(df)
@@ -131,15 +128,16 @@ def test_bounded_squared_init_validation():
 
 def test_bernoulli_serialization_round_trip(tmp_path):
     from rieszreg.losses import BernoulliLoss
+    from rieszreg.testing.dgps import scaled_tsm
     df, _ = _simulate_df(300, seed=4)
     b = RieszBooster(
-        estimand=rieszboost.TSM(level=1),
+        estimand=scaled_tsm(),
         loss=BernoulliLoss(max_abs_eta=20.0),
         n_estimators=20, learning_rate=0.1, max_depth=3,
     ).fit(df)
     pre = b.predict(df)
     b.save(tmp_path / "bern")
-    loaded = RieszBooster.load(tmp_path / "bern")
+    loaded = RieszBooster.load(tmp_path / "bern", estimand=scaled_tsm())
     assert loaded.loss_.max_abs_eta == 20.0
     np.testing.assert_array_equal(pre, loaded.predict(df))
 

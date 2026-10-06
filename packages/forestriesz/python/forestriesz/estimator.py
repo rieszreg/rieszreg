@@ -66,8 +66,8 @@ class ForestRieszRegressor(RieszEstimator):
     loss : rieszreg.Loss, default=SquaredLoss()
         Currently only ``SquaredLoss`` is supported.
     init : float or None
-        α-space starting value. ``None`` (default) starts from the constant
-        that minimizes the Riesz loss.
+        Accepted for API parity with the other learners. Each leaf solves
+        for α directly, so it has no effect on the forest.
     random_state : int, default=0
     """
 

@@ -41,7 +41,8 @@ class AugForestRieszRegressor(RieszEstimator):
     verbose, splitter, max_bins, categorical_features
         See :class:`AugForestRieszBackend`. Defaults match
         :class:`sklearn.ensemble.RandomForestRegressor` where the augmented
-        Bregman-Riesz setting allows.
+        Bregman-Riesz setting allows, except ``min_samples_leaf=50``: leaves
+        of a few rows give very noisy α̂.
     init : float or None
         Accepted for API parity with the other learners. Leaves store the
         loss-optimal α directly, so it has no effect on the forest.
@@ -57,7 +58,7 @@ class AugForestRieszRegressor(RieszEstimator):
         n_estimators: int = 100,
         max_depth: int | None = None,
         min_samples_split: int = 2,
-        min_samples_leaf: int = 1,
+        min_samples_leaf: int = 50,
         min_weight_fraction_leaf: float = 0.0,
         max_features: int | float | str | None = 1.0,
         max_leaf_nodes: int | None = None,

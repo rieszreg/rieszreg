@@ -27,6 +27,7 @@ from riesztree.fast import (
 )
 from riesztree.fast._tree import _predict_alpha_python
 from riesztree.tree import predict_array as node_predict_array
+from rieszreg.testing.dgps import scaled_tsm
 
 
 def _make_df(n=600, p=6, seed=0):
@@ -100,7 +101,7 @@ def test_python_fallback_matches_cython():
     [
         (SquaredLoss, lambda p: ATE(treatment="a", covariates=tuple(f"x{j}" for j in range(p)))),
         (KLLoss, lambda p: TSM(treatment="a", covariates=tuple(f"x{j}" for j in range(p)), level=1.0)),
-        (BernoulliLoss, lambda p: ATE(treatment="a", covariates=tuple(f"x{j}" for j in range(p)))),
+        (BernoulliLoss, lambda p: scaled_tsm(covariates=tuple(f"x{j}" for j in range(p)))),
         (BoundedSquaredLoss, lambda p: ATE(treatment="a", covariates=tuple(f"x{j}" for j in range(p)))),
     ],
 )

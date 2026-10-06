@@ -27,7 +27,6 @@ def main() -> None:
     est = AugForestRieszRegressor(
         estimand=AdditiveShift(delta=0.5, treatment="a", covariates=("x",)),
         n_estimators=200,
-        min_samples_leaf=10,
         random_state=0,
     )
     est.fit(df)

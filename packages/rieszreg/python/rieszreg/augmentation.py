@@ -30,6 +30,11 @@ class AugmentedDataset:
     origin_index: np.ndarray          # (n_aug,) — index into original rows
     n_rows: int                       # number of original rows
 
+    @property
+    def m_bar(self) -> float:
+        """m̄ = E[m(Z, 1)], the mean of the true α. Σ_r C_r = −Σ_i m(Z_i, 1)."""
+        return -float(self.potential_deriv_coef.sum()) / self.n_rows
+
     def mean_loss(self, loss, alpha: np.ndarray) -> float:
         """Mean per-original-row Riesz loss of ``alpha`` (α̂ at ``features``)."""
         return float(

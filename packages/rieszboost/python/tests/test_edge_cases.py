@@ -36,34 +36,15 @@ def test_extra_columns_in_dataframe_are_ignored():
     assert booster.predict(df).shape == (len(df),)
 
 
-def test_single_row_dataframe():
-    """Fitting on a single row should not crash; predictions are degenerate."""
-    df = pd.DataFrame({"a": [1.0], "x": [0.5]})
+def test_single_row_predict():
+    """Predicting on a single row returns a length-1 array."""
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"a": rng.binomial(1, 0.5, 200).astype(float), "x": rng.uniform(0, 1, 200)})
     booster = RieszBooster(
         estimand=ATE(), n_estimators=5, learning_rate=0.1, max_depth=3,
     ).fit(df)
-    pred = booster.predict(df)
+    pred = booster.predict(df.iloc[:1])
     assert pred.shape == (1,) and np.isfinite(pred).all()
-
-
-def test_all_treated_input():
-    """ATE on data with no controls. The augmentation still emits both
-    counterfactual rows; the booster fits but α̂ at A=0 is extrapolation."""
-    df = pd.DataFrame({"a": np.ones(200), "x": np.linspace(0, 1, 200)})
-    booster = RieszBooster(
-        estimand=ATE(), n_estimators=20, learning_rate=0.1, max_depth=3,
-    ).fit(df)
-    pred = booster.predict(df)
-    assert pred.shape == (200,) and np.isfinite(pred).all()
-
-
-def test_all_control_input():
-    df = pd.DataFrame({"a": np.zeros(200), "x": np.linspace(0, 1, 200)})
-    booster = RieszBooster(
-        estimand=ATE(), n_estimators=20, learning_rate=0.1, max_depth=3,
-    ).fit(df)
-    pred = booster.predict(df)
-    assert pred.shape == (200,) and np.isfinite(pred).all()
 
 
 def test_local_shift_all_above_threshold_returns_no_counterfactuals():

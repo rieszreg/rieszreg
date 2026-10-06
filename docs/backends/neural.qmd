@@ -109,7 +109,7 @@ print(f"min α̂        = {alpha_hat.min():.4f}  (positive by construction)")
 print(f"corr(α̂, α₀) = {np.corrcoef(alpha_hat, true_alpha)[0, 1]:.3f}")
 ```
 
-`KLLoss` and `BernoulliLoss` reject ATE / ATT / shift-style data at fit time (they require non-negative m-coefficients, which difference-of-evaluations estimands violate). `BoundedSquaredLoss(lo, hi)` accepts any signed coefficients and clips α̂ into the interval.
+`KLLoss` and `BernoulliLoss` reject ATE / ATT / shift-style estimands at fit time, because their α takes negative values. `BoundedSquaredLoss(lo, hi)` with `lo < 0` accepts them and clips α̂ into the interval.
 
 ## Custom architectures
 

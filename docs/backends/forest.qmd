@@ -81,13 +81,12 @@ pi = 1 / (1 + np.exp(-(0.5 * x - 0.3)))
 a = rng.binomial(1, pi).astype(float)
 df_tsm = pd.DataFrame({"a": a, "x": x})
 
-# KLLoss is matched to density-ratio estimands like TSM and IPSI;
-# it requires non-negative C-coefficients in the augmented dataset.
+# KLLoss is matched to density-ratio estimands like TSM and IPSI,
+# whose α is non-negative.
 est = AugForestRieszRegressor(
     estimand=TSM(level=1, treatment="a", covariates=("x",)),
     loss=KLLoss(),
     n_estimators=200,
-    min_samples_leaf=10,
     random_state=0,
 )
 est.fit(df_tsm)
@@ -95,7 +94,7 @@ alpha_hat = est.predict(df_tsm)
 print(f"alpha_hat range: [{alpha_hat.min():.3f}, {alpha_hat.max():.3f}]")
 ```
 
-`KLLoss` and `BernoulliLoss` reject `ATE` / `ATT` / shift-style data at fit time — they require non-negative $C$-coefficients, which difference-style estimands violate. `BoundedSquaredLoss(lo, hi)` accepts any signed coefficients and clips $\hat\alpha$ into the interval.
+`KLLoss` and `BernoulliLoss` reject `ATE` / `ATT` / shift-style estimands at fit time, because their α takes negative values. `BoundedSquaredLoss(lo, hi)` with `lo < 0` accepts them and clips $\hat\alpha$ into the interval.
 
 ## Quickstart — ATE
 
@@ -172,7 +171,6 @@ df_cont = pd.DataFrame({"a": a_cont, "x": x})
 afr = AugForestRieszRegressor(
     estimand=AdditiveShift(delta=0.5, treatment="a", covariates=("x",)),
     n_estimators=500,
-    min_samples_leaf=10,
     random_state=0,
 )
 afr.fit(df_cont)
@@ -239,7 +237,7 @@ Mirrors [`sklearn.ensemble.RandomForestRegressor`](https://scikit-learn.org/stab
 | `n_estimators` | 100 | Number of trees. |
 | `max_depth` | None | Grow until leaves saturate `min_samples_leaf`. |
 | `min_samples_split` | 2 | Minimum count of original ($D > 0$) augmented rows in a node before considering a split. |
-| `min_samples_leaf` | 1 | Minimum count of original rows in each child of a candidate split. |
+| `min_samples_leaf` | 50 | Minimum count of original rows in each child of a candidate split. Leaves store a ratio of counts, so small leaves give noisy α̂; the best value grew with n in simulations (roughly $2\sqrt{n}$), so raise it for large samples. |
 | `max_features` | 1.0 | Per-split feature-subsampling rule. |
 | `max_leaf_nodes` | None | Cap on per-tree leaf count. When set, trees grow best-first, as in sklearn. |
 | `min_impurity_decrease` | 0.0 | Reject splits below this gain. |

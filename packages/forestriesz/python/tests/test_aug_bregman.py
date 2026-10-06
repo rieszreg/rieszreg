@@ -19,6 +19,7 @@ from rieszreg import (
 from rieszreg.testing import dgps
 
 from forestriesz import AugForestRieszRegressor, ATE, TSM
+from rieszreg.testing.dgps import scaled_tsm
 
 
 # ---- end-to-end: predictions stay in the loss's natural domain ------------
@@ -55,11 +56,11 @@ def test_kl_loss_predictions_in_natural_domain(df_binary):
 
 
 def test_bernoulli_loss_predictions_in_natural_domain(df_binary):
-    """Bernoulli's natural α-domain is [0, 1]. TSM's truth attains α₀ = 0 at
-    A=0 inputs, so values at the lower boundary are expected."""
+    """Bernoulli's natural α-domain is [0, 1]. The scaled TSM's truth attains
+    α₀ = 0 at A=0 inputs, so values at the lower boundary are expected."""
     df, _, _, _ = df_binary
     est = AugForestRieszRegressor(
-        estimand=TSM(level=1),
+        estimand=scaled_tsm(),
         loss=BernoulliLoss(),
         n_estimators=50,
         min_samples_leaf=10,

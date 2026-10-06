@@ -86,8 +86,12 @@ def _line_search(
     """Closed-form γ minimizing the augmented loss along the direction `h` under
     the second-order quadratic surrogate (correct for SquaredLoss; approximate
     but well-behaved for general convex losses). `grad_F` is the η-gradient
-    at `F`."""
-    hess_F = loss.aug_hess_eta(is_original, potential_deriv_coef, F, hessian_floor=1e-6)
+    at `F`. Counterfactual rows have no curvature of their own; as in
+    XGBoostBackend's ``hessian_floor="auto"`` they get an observed row's
+    curvature at the current prediction, which keeps γ from blowing up where
+    the base learner isolates counterfactual-only regions."""
+    floor = np.maximum(loss.curvature_eta(F), 1e-6)
+    hess_F = loss.aug_hess_eta(is_original, potential_deriv_coef, F, hessian_floor=floor)
     # numerator = -∇·h, denom = h·H·h (diagonal-Hessian surrogate)
     num = -float(np.sum(h * grad_F))
     denom = float(np.sum(h * h * hess_F))

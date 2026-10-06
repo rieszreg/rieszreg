@@ -119,7 +119,7 @@ class ForestRieszBackend:
                 "different per-leaf gradients than the loss API exposes; "
                 "planned for v3."
             )
-        del hyperparams
+        del hyperparams, base_score  # each leaf solves for α directly
 
         # Sieve: "auto" => default_riesz_features(estimand) when one exists;
         # None (or no default) => constant basis.
@@ -135,9 +135,6 @@ class ForestRieszBackend:
         # Per-row basis values φ(W_i) and moments A[i, j] = m(W_i; φ_j).
         phi_W = _eval_phi(X_train, phi_fns)
         A = _per_row_moments(aug_train, phi_fns)
-        # Fold base_score into A so the predictor returns base_score + θ·φ.
-        if base_score != 0.0:
-            A = A - base_score * phi_W
 
         # Pack T = [vec(J) | A] per row, with J = φφ' (symmetric, so flat
         # order is immaterial). y is a dummy scalar zero column — EconML's
@@ -149,7 +146,7 @@ class ForestRieszBackend:
         # Degeneracy: for built-in estimands the per-row moments under a
         # constant basis don't depend on W, so both A and J are identical
         # across rows and splits learn nothing. The natural fix is the sieve.
-        if A.size > 0 and base_score == 0.0:
+        if A.size > 0:
             if np.allclose(JJ - JJ[0:1], 0.0, atol=1e-12) and np.allclose(A - A[0:1], 0.0, atol=1e-12):
                 if default_riesz_features(estimand) is None:
                     raise ValueError(
@@ -200,7 +197,6 @@ class ForestRieszBackend:
         predictor = ForestPredictor(
             forest=forest,
             loss=loss,
-            base_score=base_score,
             # Always store the resolved sieve, never the "auto" sentinel.
             riesz_feature_fns=sieve if sieve else None,
             feature_keys=tuple(estimand.feature_keys),
