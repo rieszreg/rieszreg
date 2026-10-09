@@ -60,6 +60,11 @@ class KernelPredictor:
             )
         if lambdas is None:
             return list(range(len(self.lambda_grid)))
+        if len(lambdas) == 0:
+            raise ValueError(
+                "predict_path got an empty `lambdas`; pass None for every λ in "
+                f"the stored lambda_grid {tuple(self.lambda_grid)}."
+            )
         out_idx: list[int] = []
         for lam in lambdas:
             lam_f = float(lam)
