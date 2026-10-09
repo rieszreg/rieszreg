@@ -246,7 +246,7 @@ Mirrors [`sklearn.ensemble.RandomForestRegressor`](https://scikit-learn.org/stab
 | `n_jobs` | None | Parallelism across trees via `joblib.Parallel`. |
 | `splitter` | `"exact"` | `"exact"`, `"hist"`, or `"random"` — riesztree splitter dispatch. |
 | `max_bins` | 255 | Histogram-splitter bin count. |
-| `categorical_features` | None | Column indices treated as integer category labels. |
+| `categorical_features` | None | Column names, or positions in `feature_keys`, treated as integer category labels. |
 
 With `splitter="hist"`, the bin mapper is fitted once on the full augmented training data and every tree slices the shared binned matrix (the sklearn `HistGradientBoostingRegressor` convention). The win is largest at shallow depths, where per-tree binning dominates tree-build time.
 

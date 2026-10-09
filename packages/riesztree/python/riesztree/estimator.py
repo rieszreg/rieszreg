@@ -68,10 +68,12 @@ class RieszTreeRegressor(RieszEstimator):
     validation_fraction : float, default=0.1
         Held-out fraction the orchestrator splits off before augmentation
         when early stopping is enabled. Ignored when no holdout is needed.
-    categorical_features : sequence of int, optional
-        Column indices (into ``estimand.feature_keys``) treated as integer
-        category labels; the splitter sorts levels by within-level α* and
-        sweeps contiguous splits, per the standard CART convention.
+    categorical_features : sequence of str or int, optional
+        Columns treated as integer category labels; the splitter sorts levels
+        by within-level α* and sweeps contiguous splits, per the standard CART
+        convention. Give column names (``["region"]``), or 0-based positions
+        in the bound ``estimand_.feature_keys``, where the treatment comes
+        first; positions don't follow the column order of ``Z``.
     init : float or None
         Accepted for API parity with the other learners. Leaves store the
         loss-optimal α directly, so it has no effect on a tree.
@@ -101,7 +103,7 @@ class RieszTreeRegressor(RieszEstimator):
         ccp_alpha: float = 0.0,
         early_stopping_rounds: int | None = None,
         validation_fraction: float = 0.1,
-        categorical_features: Sequence[int] | None = None,
+        categorical_features: Sequence[str | int] | None = None,
         init: float | None = None,
         random_state: int = 0,
         splitter: str = "exact",
@@ -132,11 +134,7 @@ class RieszTreeRegressor(RieszEstimator):
     # ---- backend construction ----
 
     def _resolved_backend(self) -> RieszTreeBackend:
-        cat = (
-            tuple(int(i) for i in self.categorical_features)
-            if self.categorical_features is not None
-            else ()
-        )
+        cat = tuple(self.categorical_features) if self.categorical_features is not None else ()
         return RieszTreeBackend(
             max_depth=self.max_depth,
             min_samples_split=self.min_samples_split,

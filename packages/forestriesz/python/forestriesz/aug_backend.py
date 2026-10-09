@@ -17,13 +17,14 @@ where the augmented Bregman-Riesz setting allows.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Sequence
 
 import numpy as np
 from joblib import Parallel, delayed
 
 from rieszreg import AugmentedDataset, FitResult, Loss
+from rieszreg.backends import resolve_column_positions
 from riesztree import RieszTreeBackend
 from riesztree.tree import check_categorical
 
@@ -168,9 +169,11 @@ class AugForestRieszBackend:
         per feature per leaf (sklearn ExtraTrees-style).
     max_bins : int, default=255
         Bin count for the histogram splitter.
-    categorical_features : sequence of int or None, default=None
-        Column indices (into ``estimand.feature_keys``) treated as integer
-        category labels rather than ordered numerics.
+    categorical_features : sequence of str or int, or None, default=None
+        Columns treated as integer category labels rather than ordered
+        numerics, as column names or as 0-based positions in the estimand's
+        ``feature_keys`` (treatment first). Names are resolved when fitting
+        through ``RieszEstimator``.
 
     Notes
     -----
@@ -195,7 +198,12 @@ class AugForestRieszBackend:
     verbose: int = 0
     splitter: str = "exact"
     max_bins: int = 255
-    categorical_features: Sequence[int] | None = None
+    categorical_features: Sequence[int | str] | None = None
+
+    def bind_columns(self, feature_keys: tuple[str, ...]) -> "AugForestRieszBackend":
+        """Resolve column names in ``categorical_features`` (``ColumnBackend``)."""
+        return replace(self, categorical_features=resolve_column_positions(
+            self.categorical_features, feature_keys, "categorical_features"))
 
     def fit_augmented(
         self,
@@ -207,7 +215,8 @@ class AugForestRieszBackend:
         random_state: int | None,
     ) -> FitResult:
         del base_score  # forest leaves store loss-aware α directly.
-        check_categorical(aug_train.features, self.categorical_features or ())
+        cat_feats = resolve_column_positions(self.categorical_features, None, "categorical_features")
+        check_categorical(aug_train.features, cat_feats)
 
         if not self.bootstrap and self.max_samples is not None:
             raise ValueError(
@@ -229,7 +238,7 @@ class AugForestRieszBackend:
             growth_policy="depthwise" if self.max_leaf_nodes is None else "leafwise",
             min_impurity_decrease=self.min_impurity_decrease,
             ccp_alpha=self.ccp_alpha,
-            categorical_features=tuple(int(i) for i in self.categorical_features or ()),
+            categorical_features=cat_feats,
             splitter=self.splitter,
             max_bins=self.max_bins,
         )

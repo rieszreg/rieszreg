@@ -154,3 +154,38 @@ def test_builtin_subclass_survives_copy_pickle_and_clone():
     # A user subclass isn't a registered built-in, so save() treats it as custom.
     assert est.factory_spec is None
     assert _MyShift(delta=0.5) != AdditiveShift(delta=0.5)
+
+
+class _DoseShift(AdditiveShift):
+    """A subclass with its own constructor: it fixes delta and renames the
+    treatment, so it doesn't accept the parent's arguments."""
+
+    def __init__(self, treatment="dose", covariates=None):
+        super().__init__(delta=1.0, treatment=treatment, covariates=covariates)
+
+
+def test_builtin_subclass_with_own_init_survives_copy_pickle_clone_and_bind():
+    import copy
+
+    import numpy as np
+    from sklearn.base import clone
+
+    from rieszreg import RieszEstimator
+
+    est = _DoseShift()
+    for twin in (copy.copy(est), copy.deepcopy(est), pickle.loads(pickle.dumps(est))):
+        assert type(twin) is _DoseShift and twin == est
+        assert twin.delta == 1.0 and twin.treatment == "dose"
+    cloned = clone(RieszEstimator(estimand=est)).estimand
+    assert type(cloned) is _DoseShift and cloned == est
+
+    bound = est.bind(["dose", "age", "income"])
+    assert type(bound) is _DoseShift
+    assert bound.feature_keys == ("dose", "age", "income")
+    assert bound.covariates == ("age", "income") and est.covariates is None
+    assert bound == _DoseShift(covariates=["age", "income"])
+    # The bound copy's m and augment belong to the copy, not the original.
+    assert bound.m.__self__ is bound
+    rows = np.array([[0.0, 1.0, 2.0]])
+    expected = _DoseShift(covariates=["age", "income"]).augment(rows)
+    assert np.array_equal(bound.augment(rows).features, expected.features)

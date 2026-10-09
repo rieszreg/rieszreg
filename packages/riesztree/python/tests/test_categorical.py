@@ -114,3 +114,48 @@ def test_non_integer_or_missing_category_codes_are_rejected():
             RieszTreeRegressor(ATE(), categorical_features=(1,)).fit(df_bad)
         with pytest.raises(ValueError, match="integer level codes"):
             est.predict(df_bad)
+
+
+def test_categorical_features_accepts_column_names():
+    """Names resolve against the bound estimand's columns, so they don't
+    depend on where the treatment sits in Z. Positions index feature_keys,
+    where the treatment comes first."""
+    df = _make_categorical_dgp(2000, seed=0)[["x", "cat", "a"]]
+    by_name = RieszTreeRegressor(
+        estimand=ATE(treatment="a"), max_depth=4, categorical_features=["cat"],
+    ).fit(df)
+    assert by_name.estimand_.feature_keys == ("a", "x", "cat")
+    by_position = RieszTreeRegressor(
+        estimand=ATE(treatment="a"), max_depth=4, categorical_features=(2,),
+    ).fit(df)
+    assert np.array_equal(by_name.predict(df), by_position.predict(df))
+    assert _count_split_kinds(by_name.predictor_.tree)["categorical"] >= 1
+    assert by_name.predictor_.categorical_features == (2,)
+    # The user's setting is left as given.
+    assert by_name.categorical_features == ["cat"]
+
+
+def test_categorical_features_bad_name_or_position_raises():
+    df = _make_categorical_dgp(500, seed=0)[["a", "cat", "x"]]
+    with pytest.raises(ValueError, match="names column 'region'"):
+        RieszTreeRegressor(estimand=ATE(), categorical_features=["region"]).fit(df)
+    with pytest.raises(ValueError, match="position 3 is out of range"):
+        RieszTreeRegressor(estimand=ATE(), categorical_features=[3]).fit(df)
+
+
+def test_backend_resolves_names_through_the_orchestrator_only():
+    from rieszreg import RieszEstimator
+    from riesztree import RieszTreeBackend
+
+    df = _make_categorical_dgp(1000, seed=0)[["a", "cat", "x"]]
+    backend = RieszTreeBackend(max_depth=4, categorical_features=("cat",))
+    est = RieszEstimator(estimand=ATE(), backend=backend).fit(df)
+    assert est.predictor_.categorical_features == (1,)
+    assert backend.categorical_features == ("cat",)
+
+    # Called directly there is no estimand to resolve names against.
+    from rieszreg import SquaredLoss
+
+    aug = ATE().bind(list(df.columns)).augment(df.to_numpy(dtype=float))
+    with pytest.raises(ValueError, match="names are resolved only"):
+        backend.fit_augmented(aug, None, SquaredLoss(), base_score=0.0, random_state=0)

@@ -67,7 +67,7 @@ alpha_hat = est.predict(df)
 - **Two growth policies**: `growth_policy="depthwise"` (default; recursive depth-first) and `"leafwise"` (best-first growth, capped by `max_leaf_nodes`).
 - **Cost-complexity pruning** via `ccp_alpha > 0`. Default off.
 - **Early stopping** via `early_stopping_rounds` + `validation_fraction`. Default off. The fitted tree is the partial tree with the best held-out loss.
-- **Categorical predictors** via `categorical_features=(col_idx, ...)`. Splits use the standard CART trick: order levels by within-level α* and sweep contiguous splits.
+- **Categorical predictors** via `categorical_features=["region", ...]` (names, or positions in `feature_keys`). Splits use the standard CART trick: order levels by within-level α* and sweep contiguous splits.
 - **Save / load**: directory format with JSON predictor + JSON metadata. Built-in estimands round-trip automatically.
 - **Diagnostics**: `TreeDiagnostics` extends `rieszreg.Diagnostics` with `n_leaves`, `max_depth_actual`, `mean_leaf_size`, `feature_importances` (per-feature normalised split-gain).
 - **R wrapper**: R6 mirror via reticulate.
@@ -91,7 +91,7 @@ alpha_hat = est.predict(df)
 | `ccp_alpha` | 0.0 | Cost-complexity pruning penalty. Sklearn name. |
 | `early_stopping_rounds` | None | Stop when held-out augmented loss has not improved for that many splits, then roll back to the partial tree with the best held-out loss. |
 | `validation_fraction` | 0.1 | Held-out fraction for early stopping. Ignored when not needed. |
-| `categorical_features` | None | Sequence of column indices treated as integer category labels. |
+| `categorical_features` | None | Column names, or positions in `feature_keys`, treated as integer category labels. |
 | `loss` | `SquaredLoss()` | Bregman-Riesz loss. |
 | `init` | None | No effect on a tree: each leaf stores its loss-optimal α directly. |
 | `random_state` | 0 | Seeds the per-split feature subsample under `max_features`, the random splitter, and the histogram bin subsample. |

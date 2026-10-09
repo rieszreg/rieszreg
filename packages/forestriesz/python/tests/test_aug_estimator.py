@@ -135,3 +135,22 @@ def test_aug_categorical_rejects_non_integer_codes_at_predict():
     assert np.isfinite(est.predict(df)).all()
     with pytest.raises(ValueError, match="integer level codes"):
         est.predict(df.assign(cat=df["cat"] + 0.5))
+
+
+def test_aug_categorical_features_accepts_column_names():
+    rng = np.random.default_rng(0)
+    n = 400
+    cat = rng.integers(0, 4, n).astype(float)
+    a = (rng.uniform(size=n) < 0.2 + 0.15 * cat).astype(float)
+    df = pd.DataFrame({"cat": cat, "x": rng.normal(size=n), "a": a})
+    fits = [
+        AugForestRieszRegressor(
+            estimand=ATE(treatment="a"), n_estimators=3,
+            categorical_features=cats, random_state=0,
+        ).fit(df)
+        for cats in (["cat"], [1])  # feature_keys = ("a", "cat", "x")
+    ]
+    assert fits[0].estimand_.feature_keys == ("a", "cat", "x")
+    assert np.array_equal(fits[0].predict(df), fits[1].predict(df))
+    with pytest.raises(ValueError, match="integer level codes"):
+        fits[0].predict(df.assign(cat=df["cat"] + 0.5))
