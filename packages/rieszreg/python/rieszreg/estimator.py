@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import shutil
 import warnings
 from importlib import import_module
 from numbers import Real
@@ -126,13 +127,19 @@ def _jsonable(value) -> bool:
 
 
 def _backend_spec(backend) -> dict | None:
-    """``{"module", "qualname", "params"}`` for a dataclass backend whose
-    fields are all JSON-serializable, else None (the backend isn't saved)."""
-    if not dataclasses.is_dataclass(backend):
+    """``{"module", "qualname", "params", "tuples"}`` for a dataclass backend
+    whose fields are all JSON-serializable, else None (the backend isn't
+    saved). A class defined inside a function can't be imported by ``load``,
+    so it isn't saved either. ``tuples`` names the tuple-valued fields, which
+    JSON writes as lists."""
+    cls = type(backend)
+    if not dataclasses.is_dataclass(backend) or "<locals>" in cls.__qualname__:
         return None
     params = {f.name: getattr(backend, f.name) for f in dataclasses.fields(backend) if f.init}
-    cls = type(backend)
-    return {"module": cls.__module__, "qualname": cls.__qualname__, "params": params} if _jsonable(params) else None
+    if not _jsonable(params):
+        return None
+    tuples = [k for k, v in params.items() if isinstance(v, tuple)]
+    return {"module": cls.__module__, "qualname": cls.__qualname__, "params": params, "tuples": tuples}
 
 
 @dataclasses.dataclass
@@ -155,7 +162,10 @@ def _backend_from_spec(spec: dict):
     obj = import_module(spec["module"])
     for part in spec["qualname"].split("."):
         obj = getattr(obj, part)
-    return obj(**spec["params"])
+    params = dict(spec["params"])
+    for k in spec.get("tuples", []):
+        params[k] = tuple(params[k])
+    return obj(**params)
 
 
 def _json_default(obj):
@@ -357,14 +367,21 @@ class RieszEstimator(BaseEstimator):
         """Check the estimator is fitted and pull α̂'s input columns from Z."""
         check_is_fitted(self, "predictor_")
         if hasattr(self, "feature_names_in_") and not _is_dataframe(Z):
+            keys = [str(k) for k in self.estimand_.feature_keys]
+            # As in sklearn, an array as wide as the training DataFrame is
+            # read in that DataFrame's column order, unused columns included.
+            full_width = _n_columns(Z) == self.n_features_in_ != len(keys)
+            order = list(self.feature_names_in_) if full_width else keys
             warnings.warn(
                 f"{type(self).__name__} was fit on a DataFrame but got an array "
                 f"without column names. Array columns are read in the order "
-                f"{list(self.estimand_.feature_keys)}; pass a DataFrame to match "
-                "columns by name.",
+                f"{order}; pass a DataFrame to match columns by name.",
                 UserWarning,
                 stacklevel=3,
             )
+            if full_width:
+                arr = np.asarray(Z, dtype=float).reshape(len(Z), -1)
+                return arr[:, [order.index(k) for k in keys]]
         return _features_from_Z(Z, self.estimand_)
 
     def predict(self, Z) -> np.ndarray:
@@ -429,9 +446,15 @@ class RieszEstimator(BaseEstimator):
         check_is_fitted(self, "predictor_")
 
         path = Path(path)
+        created = not path.exists()
         path.mkdir(parents=True, exist_ok=True)
-
-        self.predictor_.save(path)
+        try:
+            self.predictor_.save(path)
+        except Exception:
+            # Don't leave an empty or half-written directory behind.
+            if created:
+                shutil.rmtree(path, ignore_errors=True)
+            raise
 
         metadata = {
             "rieszreg_format_version": 1,

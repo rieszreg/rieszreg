@@ -189,3 +189,28 @@ def test_builtin_subclass_with_own_init_survives_copy_pickle_clone_and_bind():
     rows = np.array([[0.0, 1.0, 2.0]])
     expected = _DoseShift(covariates=["age", "income"]).augment(rows)
     assert np.array_equal(bound.augment(rows).features, expected.features)
+
+
+class _ScaledShift(AdditiveShift):
+    """A subclass that adds a constructor argument the parent doesn't have."""
+
+    def __init__(self, delta=1.0, scale=1.0, **kwargs):
+        super().__init__(delta=delta, **kwargs)
+        self.scale = scale
+
+
+def test_builtin_subclass_keeps_an_added_init_argument():
+    import copy
+
+    from sklearn.base import clone
+
+    from rieszreg import RieszEstimator
+
+    est = _ScaledShift(scale=9.0)
+    twins = [
+        copy.deepcopy(est),
+        pickle.loads(pickle.dumps(est)),
+        est.bind(["a", "x"]),
+        clone(RieszEstimator(estimand=est)).estimand,
+    ]
+    assert [t.scale for t in twins] == [9.0] * 4

@@ -166,7 +166,7 @@ For the Lalonde quickstart above, the wiring looks like this:
 
 Leave `covariates` out to use every column of `Z` other than the treatment: `ATE(treatment="treat")` fits $\alpha$ on `treat` plus all eight covariates here. Keep the outcome out of `Z` when you do this. After fitting, `est.estimand_.feature_keys` lists the columns $\alpha$ uses, in the order an ndarray passed to `predict` is read.
 
-When `covariates` is given, `Z` must contain every name in `feature_keys`, and other columns are ignored. With an `ndarray`, the treatment is column 0 and the rest are the covariates, in order.
+When `covariates` is given, `Z` must contain every name in `feature_keys`, and other columns are ignored. With an `ndarray`, the treatment is column 0 and the rest are the covariates, in order. A model fit on a DataFrame also predicts on an array holding all of that DataFrame's columns, read in the DataFrame's column order.
 
 ## Theory: how the augmented dataset is derived
 
