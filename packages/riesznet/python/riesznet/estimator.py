@@ -77,7 +77,8 @@ class RieszNet(RieszEstimator):
     n_jobs : int or None, default None
         torch intra-op threads during fit and predict. ``None`` keeps torch's
         current setting (all cores unless changed); -1 uses all cores. Set 1
-        when running many fits in parallel.
+        when running many fits in parallel. ``set_params(n_jobs=...)`` after
+        fit or ``load`` changes the threads used by predict.
     random_state : int, default 0
     """
 
@@ -167,6 +168,15 @@ class RieszNet(RieszEstimator):
             standardize=bool(self.standardize),
             n_jobs=self.n_jobs,
         )
+
+    def set_params(self, **params):
+        super().set_params(**params)
+        # The fitted predictor keeps its own n_jobs; pass a new value on, so
+        # that, as in sklearn, a model loaded on another machine can predict
+        # with that machine's cores.
+        if "n_jobs" in params and hasattr(self, "predictor_"):
+            self.predictor_.n_jobs = self.n_jobs
+        return self
 
     def predict_path(
         self, Z, epochs: Sequence[int] | None = None

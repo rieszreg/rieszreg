@@ -171,7 +171,7 @@ Without the flush, `future` reuses workers across plans of the same shape and th
 
 ## Known sharp edges
 
-- `module_factory` must be importable by qualname for save/load to work. Closures, lambdas, and notebook-cell-defined modules fit and predict but raise on `save()`. Define them at module top level.
+- `module_factory` must be importable by qualname for save/load to work. Closures and lambdas fit and predict but raise on `save()`. A factory defined in a notebook cell or a script's `__main__` saves, but `load` fails in a new process that doesn't define it. Define factories at the top level of an importable module.
 - Single-device training only; no multi-GPU or distributed support.
 - No mixed precision; `dtype` is `float32` or `float64` end-to-end.
 - Bitwise reproducibility on CUDA is not promised; seeding is best-effort.
