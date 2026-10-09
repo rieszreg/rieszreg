@@ -105,7 +105,8 @@ ForestRieszRegressor <- R6::R6Class(
 
     #' Confidence interval for alpha(X) at confidence 1 - alpha.
     #' Requires `honest = TRUE` and `inference = TRUE` at fit. Locally
-    #' constant only in v1.
+    #' constant only in v1. TSM only: ATE and ATT fits use two basis
+    #' functions and raise.
     predict_interval = function(df, alpha = 0.05) {
       result <- reticulate::py_to_r(
         self$py$predict_interval(rieszreg::df_to_py(df), alpha = alpha)

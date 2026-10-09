@@ -76,7 +76,7 @@ use_python_riesznet("/path/to/RieszReg/.venv/bin/python")
 | `ForestRieszRegressor$new(estimand, n_estimators, max_depth, min_samples_leaf, honest, inference, ...)` | `forestriesz.ForestRieszRegressor(...)` |
 | &nbsp;&nbsp;`$fit(df)` | `.fit(Z)` |
 | &nbsp;&nbsp;`$predict(df)` | `.predict(Z)` |
-| &nbsp;&nbsp;`$predict_interval(df, alpha)` | `.predict_interval(Z, alpha=)` (single-basis fits with `honest=TRUE, inference=TRUE`) |
+| &nbsp;&nbsp;`$predict_interval(df, alpha)` | `.predict_interval(Z, alpha=)` (single-basis fits, i.e. TSM, with `honest=TRUE, inference=TRUE`) |
 | &nbsp;&nbsp;`$diagnose(df)` | `.diagnose(Z)` |
 | `load_forest_riesz_regressor(path)` | `ForestRieszRegressor.load(path)` |
 

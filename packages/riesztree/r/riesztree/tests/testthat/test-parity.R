@@ -1,13 +1,5 @@
 test_that("R wrapper produces identical predictions to Python", {
-  skip_on_cran()
-  skip_if_not_installed("reticulate")
-
-  venv <- normalizePath(file.path(getwd(), "../../../../../.venv"), mustWork = FALSE)
-  if (!dir.exists(venv)) {
-    skip("Shared rieszreg .venv not present at ../../../.venv")
-  }
-  reticulate::use_virtualenv(venv, required = TRUE)
-  use_python_riesztree()
+  skip_if_not(reticulate::py_module_available("riesztree"))
 
   set.seed(0)
   n  <- 600
