@@ -139,6 +139,17 @@ def test_array_predict_after_dataframe_fit_warns_about_column_order():
         est.predict(df.to_numpy())
 
 
+def test_array_as_wide_as_training_dataframe_is_read_by_position():
+    """With an unused column in the training DataFrame, an array of all
+    n_features_in_ columns is read in the DataFrame's column order, as sklearn
+    would, rather than raising."""
+    df = pd.DataFrame({"x": [0.1, 0.2, 0.3, 0.4], "w": [9.0] * 4, "a": [0.0, 1.0, 0.0, 1.0]})
+    est = RieszEstimator(estimand=ATE(covariates=["x"]), backend=_StubBackend()).fit(df)
+    with pytest.warns(UserWarning, match=r"read in the order \['x', 'w', 'a'\]"):
+        feats = est._features(df.to_numpy())
+    np.testing.assert_array_equal(feats, df[["a", "x"]].to_numpy())
+
+
 def test_fit_accepts_y_and_ignores_when_unused():
     """Built-in estimands ignore y; passing it is a no-op."""
     df = pd.DataFrame({"a": [0.0, 1.0, 0.0, 1.0], "x": [0.1, 0.2, 0.3, 0.4]})

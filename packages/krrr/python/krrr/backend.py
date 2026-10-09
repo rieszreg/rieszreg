@@ -76,6 +76,12 @@ class KernelRidgeBackend:
                 f"(got {type(loss).__name__}). KLLoss requires Newton iteration "
                 "on the kernel system; planned for a future release."
             )
+        # The solvers split the training rows into D = 1 and D = 0 blocks.
+        if not np.isin(aug_train.is_original, (0, 1)).all():
+            raise ValueError(
+                "KernelRidgeBackend needs is_original (D) in {0, 1} on every "
+                "augmented training row."
+            )
 
         # Fold base_score (initial α = b) into the targets: with α = b + f,
         # D(b+f)² + 2C(b+f) = D f² + 2(C + D b) f + (D b² + 2 C b), so the

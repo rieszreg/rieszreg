@@ -122,6 +122,8 @@ class RieszTreeBackend:
         # offset: base_score (and hence `init`) has no effect on a tree.
         del base_score
         check_categorical(aug_train.features, self._categorical_positions())
+        if aug_valid is not None:
+            check_categorical(aug_valid.features, self._categorical_positions())
         X_binned, mapper = self._bin(aug_train.features, random_state)
         return self._fit_binned(
             aug_train, aug_valid, loss,
