@@ -264,9 +264,13 @@ class _Grower:
         """``(feature, split)`` of the best above-threshold split, or None.
         ``split`` is ``(gain, threshold_or_levels, left_idx, right_idx)``.
 
-        Under ``max_features``, a random subset is searched first; as in
-        sklearn, the search continues through the remaining features when
-        that subset holds no valid split."""
+        Under ``max_features``, a random subset is searched first, and the
+        search continues through the remaining features when that subset
+        holds no valid split. sklearn instead stops after the subset (it
+        only skips features constant in the node), but it also accepts
+        zero-gain splits. riesztree does not, and for ATE-type estimands
+        every split on a covariate alone has zero gain until the tree has
+        split on the treatment, so stopping would often leave α̂ ≡ 0."""
         if self.n_consider >= self.n_features:
             return self._best_among(range(self.n_features), idx)
         perm = self.rng.permutation(self.n_features)

@@ -228,49 +228,12 @@ def node_from_flat_tree(tree: FlatTree) -> "Node":
 # ---------------------------------------------------------------------------
 # Predict facade.
 
-def _predict_alpha_python(tree: FlatTree, X: np.ndarray) -> np.ndarray:
-    """Pure-Python fallback used when the Cython extension hasn't been
-    compiled. Slow; same correctness contract as the compiled path."""
-    feature = tree.feature
-    threshold = tree.threshold
-    left = tree.left
-    right = tree.right
-    is_categorical = tree.is_categorical
-    cat_left_sets = tree.cat_left_sets
-    value = tree.value
-    n_rows = X.shape[0]
-    out = np.empty(n_rows, dtype=np.float64)
-    for i in range(n_rows):
-        node = 0
-        while feature[node] >= 0:
-            feat = feature[node]
-            x_val = X[i, feat]
-            if is_categorical[node]:
-                if int(x_val) in cat_left_sets[node]:
-                    node = left[node]
-                else:
-                    node = right[node]
-            else:
-                if x_val <= threshold[node]:
-                    node = left[node]
-                else:
-                    node = right[node]
-        out[i] = value[node]
-    return out
-
-
 def predict_alpha(tree: FlatTree, X: np.ndarray) -> np.ndarray:
-    """Predict α* for each row in ``X``.
+    """Predict α* for each row in ``X`` with the Cython loop
+    ``_tree_c.predict_alpha_c``."""
+    from . import _tree_c  # type: ignore[attr-defined]
 
-    Uses the Cython tight loop ``_tree_c.predict_alpha_c`` when
-    available; falls back to ``_predict_alpha_python`` if the extension
-    has not been compiled.
-    """
     X = np.ascontiguousarray(X, dtype=np.float64)
-    try:
-        from . import _tree_c  # type: ignore[attr-defined]
-    except ImportError:
-        return _predict_alpha_python(tree, X)
     return _tree_c.predict_alpha_c(
         X,
         tree.feature,

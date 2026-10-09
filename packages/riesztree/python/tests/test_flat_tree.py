@@ -25,7 +25,6 @@ from riesztree.fast import (
     node_from_flat_tree,
     predict_alpha,
 )
-from riesztree.fast._tree import _predict_alpha_python
 from riesztree.tree import predict_array as node_predict_array
 from rieszreg.testing.dgps import scaled_tsm
 
@@ -64,7 +63,7 @@ def test_flat_tree_round_trip_predicts_identically():
 
 
 # ---------------------------------------------------------------------------
-# Cython == Python fallback == Node tree-walk
+# Cython == Node tree-walk
 
 @pytest.mark.parametrize("max_depth", [2, 4, 8])
 def test_cython_predict_matches_node_walk(max_depth):
@@ -78,19 +77,6 @@ def test_cython_predict_matches_node_walk(max_depth):
     a_cython = predict_alpha(flat, feats)            # Cython tight loop
     a_node = node_predict_array(est.predictor_.tree, feats)
     np.testing.assert_array_equal(a_cython, a_node)
-
-
-def test_python_fallback_matches_cython():
-    """The pure-Python fallback (used when the .so is missing) must
-    match the compiled path. Guards against algorithmic drift between
-    the two implementations."""
-    df = _make_df(p=8, n=500)
-    est = RieszTreeRegressor(estimand=_ate_estimand(8), max_depth=6).fit(df)
-    feats = df[list(est.estimand_.feature_keys)].to_numpy(dtype=np.float64)
-    flat = flat_tree_from_node(est.predictor_.tree)
-    np.testing.assert_array_equal(
-        _predict_alpha_python(flat, feats), predict_alpha(flat, feats)
-    )
 
 
 # ---------------------------------------------------------------------------
