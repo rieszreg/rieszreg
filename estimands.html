@@ -745,15 +745,15 @@ window.Quarto = {
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ATE</span>(<span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x144826510&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x15b3f6a10&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>, <span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x144825520&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x15b3f5790&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">LocalShift</span>(<span class="at">delta =</span> <span class="fl">0.3</span>, <span class="at">threshold =</span> <span class="fl">0.7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x1449ce8d0&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x15b3f6b50&gt;</code></pre>
 </div>
 </div>
 </div>
@@ -798,7 +798,7 @@ window.Quarto = {
 </tbody>
 </table>
 <p>Leave <code>covariates</code> out to use every column of <code>Z</code> other than the treatment: <code>ATE(treatment="treat")</code> fits <span class="math inline">\(\alpha\)</span> on <code>treat</code> plus all eight covariates here. Keep the outcome out of <code>Z</code> when you do this. After fitting, <code>est.estimand_.feature_keys</code> lists the columns <span class="math inline">\(\alpha\)</span> uses, in the order an ndarray passed to <code>predict</code> is read.</p>
-<p>When <code>covariates</code> is given, <code>Z</code> must contain every name in <code>feature_keys</code>, and other columns are ignored. With an <code>ndarray</code>, the treatment is column 0 and the rest are the covariates, in order.</p>
+<p>When <code>covariates</code> is given, <code>Z</code> must contain every name in <code>feature_keys</code>, and other columns are ignored. With an <code>ndarray</code>, the treatment is column 0 and the rest are the covariates, in order. A model fit on a DataFrame also predicts on an array holding all of that DataFrame’s columns, read in the DataFrame’s column order.</p>
 </section>
 <section id="theory-how-the-augmented-dataset-is-derived" class="level2">
 <h2 class="anchored" data-anchor-id="theory-how-the-augmented-dataset-is-derived">Theory: how the augmented dataset is derived</h2>
@@ -1187,7 +1187,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(est)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x1449cf9e0&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x15b3f56d0&gt;</code></pre>
 </div>
 </div>
 <p>The inner function takes <code>(z, y)</code> even when <code>y</code> is unused — that signature is the contract every custom <code>m</code> follows. Pass the estimand to any backend’s estimator class:</p>
