@@ -528,7 +528,10 @@ window.Quarto = {
    
   <ul>
   <li><a href="#bregman-riesz-losses" id="toc-bregman-riesz-losses" class="nav-link active" data-scroll-target="#bregman-riesz-losses">Bregman-Riesz Losses</a></li>
-  <li><a href="#loss-table" id="toc-loss-table" class="nav-link" data-scroll-target="#loss-table">Loss table</a></li>
+  <li><a href="#loss-table" id="toc-loss-table" class="nav-link" data-scroll-target="#loss-table">Loss table</a>
+  <ul class="collapse">
+  <li><a href="#choosing-a-loss-for-your-estimand" id="toc-choosing-a-loss-for-your-estimand" class="nav-link" data-scroll-target="#choosing-a-loss-for-your-estimand">Choosing a loss for your estimand</a></li>
+  </ul></li>
   <li><a href="#custom-losses" id="toc-custom-losses" class="nav-link" data-scroll-target="#custom-losses">Custom losses</a></li>
   <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
   <li><a href="#backend-support" id="toc-backend-support" class="nav-link" data-scroll-target="#backend-support">Backend support</a></li>
@@ -622,12 +625,15 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>The loss must be able to represent the true α. The mean of α is known from the data, <span class="math inline">\(E[\alpha_0] = E[m(Z, 1)]\)</span>, and <code>fit</code> raises when that mean lies outside the loss’s range, since α can’t then stay inside it:</p>
+<section id="choosing-a-loss-for-your-estimand" class="level3">
+<h3 class="anchored" data-anchor-id="choosing-a-loss-for-your-estimand">Choosing a loss for your estimand</h3>
+<p>Pick a loss whose α-range contains the true α of your estimand. Where α leaves the range, the fit is pinned at the edge of it, and α̂ is wrong there. <code>SquaredLoss</code> has no range limit, so it fits every estimand; use one of the others only when you know α stays inside its range, for example α &gt; 0 for a density ratio under <code>KLLoss</code>.</p>
+<p><code>fit</code> can check one thing from the data: the mean of α, <span class="math inline">\(E[\alpha_0] = E[m(Z, 1)]\)</span>. When that mean lies outside the loss’s range, α can’t stay inside it, and <code>fit</code> warns before fitting. It still fits, so you can go ahead with that loss if you mean to:</p>
 <ul>
-<li><strong><code>ATE</code>, <code>ATT</code>, <code>AdditiveShift</code> and <code>LocalShift</code></strong> have mean 0, because their functional subtracts, e.g.&nbsp;<span class="math inline">\(\alpha(0, x)\)</span> in <code>ATE</code>. So their α takes negative values, and <code>KLLoss</code>, <code>BernoulliLoss</code> and <code>BoundedSquaredLoss</code> with <code>lo ≥ 0</code> can’t fit them.</li>
-<li><strong><code>TSM</code></strong> has mean 1, so <code>BernoulliLoss</code> can’t fit it.</li>
+<li><strong><code>ATE</code>, <code>ATT</code>, <code>AdditiveShift</code> and <code>LocalShift</code></strong> have mean 0, because their functional subtracts, e.g.&nbsp;<span class="math inline">\(\alpha(0, x)\)</span> in <code>ATE</code>. So their α takes negative values, and under <code>KLLoss</code>, <code>BernoulliLoss</code> or <code>BoundedSquaredLoss</code> with <code>lo ≥ 0</code>, α̂ is pinned at the lower edge wherever α is negative. Some learners return α̂ ≡ 0 everywhere, for example <code>RieszBooster</code> for <code>ATE</code> under <code>KLLoss</code>.</li>
+<li><strong><code>TSM</code></strong> has mean 1, so under <code>BernoulliLoss</code> the fit is pinned at 1.</li>
 </ul>
-<p>The mean can lie inside the range while α leaves it somewhere. <code>fit</code> warns when some rows enter the functional with a negative coefficient, such as rows with <span class="math inline">\(y &lt; 0\)</span> under <code>OutcomeRegNormSq</code>, because α may then be negative where the loss keeps it above 0.</p>
+<p>The mean can lie inside the range while α leaves it somewhere, for example <code>TSM</code> under <code>BoundedSquaredLoss(0, 3)</code> when some propensities are below 1/3. <code>fit</code> can’t detect that, because it depends on α itself, so check that the range you pick holds the values you expect α to take.</p>
 <p>Among the built-in estimands, only <code>OutcomeRegNormSq</code> with a binary outcome has α in <span class="math inline">\((0, 1)\)</span>: there α is <span class="math inline">\(P(Y = 1 \mid X)\)</span>. Otherwise <code>BernoulliLoss</code> is for custom estimands.</p>
 <p><code>KLLoss</code> needs good overlap. Where some covariate values have almost no treated rows, the empirical KL loss has no lower bound there. A flexible learner (<code>SklearnBackend</code>, <code>RieszNet</code>) can then push α̂ toward infinity at those points. Use <code>SquaredLoss</code>, or <code>RieszBooster</code>’s default XGBoost backend, when propensities get close to 0 or 1.</p>
 <p>Pass the loss instance to any learner via <code>loss=</code>:</p>
@@ -697,6 +703,7 @@ window.Quarto = {
 </div>
 </div>
 </div>
+</section>
 </section>
 <section id="custom-losses" class="level2">
 <h2 class="anchored" data-anchor-id="custom-losses">Custom losses</h2>
