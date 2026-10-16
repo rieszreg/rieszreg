@@ -720,6 +720,7 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
+<p><code>ATE</code> and <code>ATT</code> need the treatment coded 0/1, with 1 for treated. <code>fit</code> raises on any other values, so recode the treatment before fitting.</p>
 <p>The R and Python factories take the same arguments.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">R</a></li></ul>
@@ -745,15 +746,15 @@ window.Quarto = {
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ATE</span>(<span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x15533a3d0&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.ATE object at 0x1542ce150&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">TSM</span>(<span class="at">level =</span> <span class="dv">1</span>, <span class="at">treatment =</span> <span class="st">"a"</span>, <span class="at">covariates =</span> <span class="st">"x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x15745b050&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.TSM object at 0x1556ce3d0&gt;</code></pre>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">LocalShift</span>(<span class="at">delta =</span> <span class="fl">0.3</span>, <span class="at">threshold =</span> <span class="fl">0.7</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x1570392d0&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.LocalShift object at 0x15422e310&gt;</code></pre>
 </div>
 </div>
 </div>
@@ -1187,7 +1188,7 @@ C_r = -\sum_{j \,:\, Z_{i_r, j} = Z_r} C_{i_r, j}.
 <span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(est)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x15741eed0&gt;</code></pre>
+<pre><code>&lt;rieszreg.estimands.base.FiniteEvalEstimand object at 0x15291d8d0&gt;</code></pre>
 </div>
 </div>
 <p>The inner function takes <code>(z, y)</code> even when <code>y</code> is unused — that signature is the contract every custom <code>m</code> follows. Pass the estimand to any backend’s estimator class:</p>
