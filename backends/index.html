@@ -535,10 +535,12 @@ window.Quarto = {
   <li><a href="#compose-explicitly" id="toc-compose-explicitly" class="nav-link" data-scroll-target="#compose-explicitly">Compose explicitly</a></li>
   <li><a href="#adding-a-backend" id="toc-adding-a-backend" class="nav-link" data-scroll-target="#adding-a-backend">Adding a backend</a>
   <ul class="collapse">
+  <li><a href="#checklist" id="toc-checklist" class="nav-link" data-scroll-target="#checklist">Checklist</a></li>
   <li><a href="#pick-an-entry-point" id="toc-pick-an-entry-point" class="nav-link" data-scroll-target="#pick-an-entry-point">Pick an entry point</a></li>
   <li><a href="#minimum-viable-wrapper" id="toc-minimum-viable-wrapper" class="nav-link" data-scroll-target="#minimum-viable-wrapper">Minimum viable wrapper</a></li>
   <li><a href="#worked-example" id="toc-worked-example" class="nav-link" data-scroll-target="#worked-example">Worked example</a></li>
   <li><a href="#sklearn-composition" id="toc-sklearn-composition" class="nav-link" data-scroll-target="#sklearn-composition">Sklearn composition</a></li>
+  <li><a href="#column-names-in-settings" id="toc-column-names-in-settings" class="nav-link" data-scroll-target="#column-names-in-settings">Column names in settings</a></li>
   <li><a href="#save-load-conformance" id="toc-save-load-conformance" class="nav-link" data-scroll-target="#save-load-conformance">Save, load, conformance</a></li>
   </ul></li>
   </ul>
@@ -780,10 +782,69 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="adding-a-backend">Adding a backend</h2>
 <p>The <code>RieszEstimator</code> orchestrator is learner-agnostic. To run it with an algorithm we don’t ship, wrap that algorithm as a small class that satisfies one Protocol and register a predictor loader. This section walks through the minimum viable wrapper, a worked example, and how to plug it into <code>cross_val_predict</code>, <code>GridSearchCV</code>, and <code>Pipeline</code>.</p>
 <p>This is the end-user route: keep the wrapper in your own module, depend on <code>rieszreg</code>, ship nothing back. Contributing a learner package to the family adds a few requirements (R parity, the full conformance suite, in-tree tier placement) covered in <a href="https://github.com/rieszreg/rieszreg/blob/main/DESIGN.md"><code>DESIGN.md</code> Part B</a>.</p>
+<section id="checklist" class="level3">
+<h3 class="anchored" data-anchor-id="checklist">Checklist</h3>
+<p>A backend needs one fit method and a predictor with a registered loader. Everything else is optional: the orchestrator looks each optional method up by name and uses a default when it’s missing, so add only what your learner needs.</p>
+<!-- The same checklist is in DESIGN.md §B.2.1, which also records why it's kept in both places; change both together. -->
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Piece</th>
+<th>Needed?</th>
+<th>Without it</th>
+<th>Section</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>fit_augmented</code> or <code>fit_rows</code></td>
+<td>Required, one of the two</td>
+<td>—</td>
+<td><a href="#pick-an-entry-point">Pick an entry point</a></td>
+</tr>
+<tr class="even">
+<td>A predictor with <code>kind</code>, <code>predict_eta</code>, <code>predict_alpha</code> and <code>save</code></td>
+<td>Required</td>
+<td>—</td>
+<td><a href="#minimum-viable-wrapper">Minimum viable wrapper</a></td>
+</tr>
+<tr class="odd">
+<td><code>register_predictor_loader(kind, loader)</code> at import</td>
+<td>For <code>load</code></td>
+<td><code>RieszEstimator.load</code> raises</td>
+<td><a href="#save-load-conformance">Save, load, conformance</a></td>
+</tr>
+<tr class="even">
+<td>Subclass <code>BaseEstimator</code> and store constructor arguments unchanged</td>
+<td>Recommended</td>
+<td><code>GridSearchCV</code> can’t reach <code>backend__&lt;field&gt;</code></td>
+<td><a href="#sklearn-composition">Sklearn composition</a></td>
+</tr>
+<tr class="odd">
+<td>Write the backend as a dataclass with JSON-serializable fields</td>
+<td>Recommended</td>
+<td>After <code>load</code>, the backend must be set again before refitting</td>
+<td><a href="#save-load-conformance">Save, load, conformance</a></td>
+</tr>
+<tr class="even">
+<td><code>holdout_fraction()</code></td>
+<td>For early stopping or λ selection</td>
+<td>No rows are held out; only an <code>eval_set</code> gives validation data</td>
+<td><a href="#sklearn-composition">Sklearn composition</a></td>
+</tr>
+<tr class="odd">
+<td><code>bind_columns(feature_keys)</code></td>
+<td>For settings that name columns</td>
+<td>Those settings take positions only</td>
+<td><a href="#column-names-in-settings">Column names in settings</a></td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="pick-an-entry-point" class="level3">
 <h3 class="anchored" data-anchor-id="pick-an-entry-point">Pick an entry point</h3>
 <p>Two Protocols live in <code>rieszreg.backends.base</code>. Each backend implements one.</p>
-<p><code>Backend.fit_augmented(aug_train, aug_valid, loss, …)</code> is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an <code>AugmentedDataset</code> of pseudo-rows with <code>is_original</code> and <code>potential_deriv_coef</code> columns. The empirical Bregman-Riesz loss at <span class="math inline">\(\alpha\)</span> is the sum over augmented rows <span class="math inline">\(r\)</span> of <span class="math inline">\(D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))\)</span>, where <span class="math inline">\(D_r\)</span> is <code>is_original</code> and <span class="math inline">\(C_r\)</span> is <code>potential_deriv_coef</code>. Reference learners using this entry point: kernel ridge (<code>KernelRidgeBackend</code>), gradient boosting (<code>XGBoostBackend</code>, <code>SklearnBackend</code>), random forests (<code>AugForestRieszBackend</code>), and neural nets (<code>TorchBackend</code>, which groups the augmented rows by <code>origin_index</code> to minibatch over original rows).</p>
+<p><code>Backend.fit_augmented(aug_train, aug_valid, loss, …)</code> is for learners whose loss decomposes naturally over augmented evaluation points. The orchestrator hands you an <code>AugmentedDataset</code> of pseudo-rows with <code>is_original</code> and <code>potential_deriv_coef</code> columns. The empirical Bregman-Riesz loss at <span class="math inline">\(\alpha\)</span> is the sum over augmented rows <span class="math inline">\(r\)</span> of <span class="math inline">\(D_r\,\tilde h(\alpha(Z_r)) + C_r\,h'(\alpha(Z_r))\)</span>, where <span class="math inline">\(D_r\)</span> is <code>is_original</code> and <span class="math inline">\(C_r\)</span> is <code>potential_deriv_coef</code>. Reference learners using this entry point: kernel ridge (<code>KernelRidgeBackend</code>), gradient boosting (<code>XGBoostBackend</code>, <code>SklearnBackend</code>), random forests (<code>AugForestRieszBackend</code>), single trees (<code>RieszTreeBackend</code>), and neural nets (<code>TorchBackend</code>, which groups the augmented rows by <code>origin_index</code> to minibatch over original rows).</p>
 <p><code>MomentBackend.fit_rows(X_train, X_valid, estimand, loss, *, aug_train, aug_valid, …)</code> is for learners that fit on the original rows and need the estimand itself. You receive the original-row feature arrays (columns in <code>estimand.feature_keys</code> order), the estimand, and the same augmented datasets <code>fit_augmented</code> would get. The augmented rows give every evaluation point <span class="math inline">\(a_j\)</span> with coefficient <span class="math inline">\(c_j = -C_r\)</span> and the original row it came from (<code>origin_index</code>), so each row’s moment is one vectorised group-by. Each row is a single training example to the learner. Reference learner using this entry point: the EconML-based random forest (<code>ForestRieszBackend</code>), which also reads the estimand to pick its basis functions.</p>
 <p>Pick <code>fit_augmented</code> unless your learner needs the original-row matrix or the estimand: the augmented dataset already carries each row’s moment through <code>origin_index</code>. The orchestrator dispatches to the moment path only when <code>fit_rows</code> is the only method present.</p>
 </section>
@@ -792,64 +853,66 @@ window.Quarto = {
 <p>Three pieces: a backend class implementing one Protocol method, a predictor class with <code>predict_eta</code> and <code>predict_alpha</code>, and a one-line registration of the predictor’s loader. All three live in your own module.</p>
 <section id="augmentation-style" class="level4">
 <h4 class="anchored" data-anchor-id="augmentation-style">Augmentation-style</h4>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.base <span class="im">import</span> BaseEstimator</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg.backends <span class="im">import</span> (</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    FitResult, register_predictor_loader,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyLearnerPredictor:</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    kind <span class="op">=</span> <span class="st">"my-learner"</span>          <span class="co"># registry key, must be unique</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, base_score, loss):</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.params <span class="op">=</span> params      <span class="co"># whatever your learner returns</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.base_score <span class="op">=</span> base_score</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.loss <span class="op">=</span> loss</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_eta(<span class="va">self</span>, features):</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.base_score <span class="op">+</span> my_learner_predict(<span class="va">self</span>.params, features)</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_alpha(<span class="va">self</span>, features):</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.loss.link_to_alpha(<span class="va">self</span>.predict_eta(features))</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> save(<span class="va">self</span>, dir_path):</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        np.save(dir_path <span class="op">/</span> <span class="st">"params.npy"</span>, <span class="va">self</span>.params)</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">@classmethod</span></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> load(cls, dir_path, <span class="op">*</span>, base_score, loss, best_iteration):</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> np.load(dir_path <span class="op">/</span> <span class="st">"params.npy"</span>)</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cls(params<span class="op">=</span>params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyLearnerBackend(BaseEstimator):</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Augmentation-style wrapper around `my_learner_fit`."""</span></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, regularization<span class="op">=</span><span class="fl">1.0</span>):</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.regularization <span class="op">=</span> regularization</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.base <span class="im">import</span> BaseEstimator</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg.backends <span class="im">import</span> (</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    FitResult, register_predictor_loader,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyLearnerPredictor:</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    kind <span class="op">=</span> <span class="st">"my-learner"</span>          <span class="co"># registry key, must be unique</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, base_score, loss):</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.params <span class="op">=</span> params      <span class="co"># whatever your learner returns</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.base_score <span class="op">=</span> base_score</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.loss <span class="op">=</span> loss</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_eta(<span class="va">self</span>, features):</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.base_score <span class="op">+</span> my_learner_predict(<span class="va">self</span>.params, features)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> predict_alpha(<span class="va">self</span>, features):</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.loss.link_to_alpha(<span class="va">self</span>.predict_eta(features))</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> save(<span class="va">self</span>, dir_path):</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        np.save(dir_path <span class="op">/</span> <span class="st">"params.npy"</span>, <span class="va">self</span>.params)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">@classmethod</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> load(cls, dir_path, <span class="op">*</span>, base_score, loss, best_iteration):</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> np.load(dir_path <span class="op">/</span> <span class="st">"params.npy"</span>)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cls(params<span class="op">=</span>params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(<span class="bu">repr</span><span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyLearnerBackend(BaseEstimator):</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Augmentation-style wrapper around `my_learner_fit`."""</span></span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_augmented(<span class="va">self</span>, aug_train, aug_valid, loss,</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>                      <span class="op">*</span>, base_score, random_state):</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Each augmented row contributes D · h_tilde(α) + C · h'(α) to the loss.</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Translate (features, D, C) into whatever your learner consumes.</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> my_learner_fit(</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>            features<span class="op">=</span>aug_train.features,</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>            is_original<span class="op">=</span>aug_train.is_original,</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>            potential_deriv_coef<span class="op">=</span>aug_train.potential_deriv_coef,</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            regularization<span class="op">=</span><span class="va">self</span>.regularization,</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            random_state<span class="op">=</span>random_state,</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        predictor <span class="op">=</span> MyLearnerPredictor(params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> FitResult(predictor<span class="op">=</span>predictor)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>register_predictor_loader(<span class="st">"my-learner"</span>, MyLearnerPredictor.load)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    regularization: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1.0</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_augmented(<span class="va">self</span>, aug_train, aug_valid, loss,</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>                      <span class="op">*</span>, base_score, random_state):</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Each augmented row contributes D · h_tilde(α) + C · h'(α) to the loss.</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Translate (features, D, C) into whatever your learner consumes.</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        params <span class="op">=</span> my_learner_fit(</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>            features<span class="op">=</span>aug_train.features,</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            is_original<span class="op">=</span>aug_train.is_original,</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            potential_deriv_coef<span class="op">=</span>aug_train.potential_deriv_coef,</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            regularization<span class="op">=</span><span class="va">self</span>.regularization,</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>            random_state<span class="op">=</span>random_state,</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        predictor <span class="op">=</span> MyLearnerPredictor(params, base_score<span class="op">=</span>base_score, loss<span class="op">=</span>loss)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> FitResult(predictor<span class="op">=</span>predictor)</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>register_predictor_loader(<span class="st">"my-learner"</span>, MyLearnerPredictor.load)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="moment-style" class="level4">
 <h4 class="anchored" data-anchor-id="moment-style">Moment-style</h4>
 <p>Replace <code>fit_augmented</code> with <code>fit_rows</code>. The predictor stays the same.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyMomentBackend:</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, learning_rate<span class="op">=</span><span class="fl">1e-3</span>):</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.learning_rate <span class="op">=</span> learning_rate</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(<span class="bu">repr</span><span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyMomentBackend(BaseEstimator):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    learning_rate: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1e-3</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> fit_rows(<span class="va">self</span>, X_train, X_valid, estimand, loss,</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                 <span class="op">*</span>, aug_train, aug_valid, base_score, random_state):</span>
@@ -878,7 +941,7 @@ window.Quarto = {
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>dgp <span class="op">=</span> linear_gaussian_ate()</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> dgp.sample(n<span class="op">=</span><span class="dv">2000</span>, rng<span class="op">=</span>np.random.default_rng(<span class="dv">0</span>))</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>Z <span class="op">=</span> df[[<span class="st">"a"</span>, <span class="st">"x"</span>]]</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> df[<span class="st">"y"</span>]</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> df[<span class="st">"x"</span>] <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> df[<span class="st">"a"</span>] <span class="op">+</span> np.random.default_rng(<span class="dv">1</span>).normal(size<span class="op">=</span><span class="bu">len</span>(df))  <span class="co"># an outcome</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>est <span class="op">=</span> RieszEstimator(</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
@@ -893,8 +956,8 @@ window.Quarto = {
 </section>
 <section id="sklearn-composition" class="level3">
 <h3 class="anchored" data-anchor-id="sklearn-composition">Sklearn composition</h3>
-<p><code>RieszEstimator</code> already inherits from <code>sklearn.base.BaseEstimator</code>. Subclass <code>BaseEstimator</code> in your backend too. It gives the backend <code>get_params</code> and <code>set_params</code>, which <code>GridSearchCV</code> needs to reach backend settings. Composition with <code>cross_val_predict</code>, <code>GridSearchCV</code>, <code>clone</code>, and <code>Pipeline</code> works as long as the wrapper plays by sklearn’s two structural rules.</p>
-<p><strong>The constructor stores its arguments by name without modification.</strong> <code>MyLearnerBackend.__init__</code> writes <code>self.regularization = regularization</code> and stops. No coercion, no validation, no derived attributes. <code>clone(MyLearnerBackend(regularization=0.1))</code> then returns a fresh equivalent object, which sklearn relies on between folds.</p>
+<p><code>RieszEstimator</code> already inherits from <code>sklearn.base.BaseEstimator</code>. Subclass <code>BaseEstimator</code> in your backend too. It gives the backend <code>get_params</code> and <code>set_params</code>, which <code>GridSearchCV</code> needs to reach backend settings. The examples on this page are dataclasses, so <code>save</code> keeps their settings; <code>repr=False</code> keeps sklearn’s printed form rather than the dataclass one. Composition with <code>cross_val_predict</code>, <code>GridSearchCV</code>, <code>clone</code>, and <code>Pipeline</code> works as long as the wrapper plays by sklearn’s two structural rules.</p>
+<p><strong>The constructor stores its arguments by name without modification.</strong> The <code>__init__</code> that <code>@dataclass</code> writes for <code>MyLearnerBackend</code> sets <code>self.regularization = regularization</code> and stops. If you write <code>__init__</code> yourself, do the same: no coercion, no validation, no derived attributes. <code>clone(MyLearnerBackend(regularization=0.1))</code> then returns a fresh equivalent object, which sklearn relies on between folds.</p>
 <p><strong>Fit-time state lives on the predictor, not on the backend.</strong> The backend stays clone-clean across folds; fitted parameters live on the <code>Predictor</code> returned in <code>FitResult</code>, attached to <code>est.predictor_</code> after <code>fit</code>.</p>
 <p>With those two in place, the standard sklearn idioms compose:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> cross_val_predict, GridSearchCV, KFold</span>
@@ -913,30 +976,47 @@ window.Quarto = {
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(grid.best_params_)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>backend__regularization</code> is sklearn’s nested-parameter syntax. It forwards to <code>est.backend.regularization</code> so any backend hyperparameter exposed as a constructor attribute is reachable.</p>
 <p>If your backend uses held-out rows for fit-time logic such as early stopping or regularization-path selection, add a <code>holdout_fraction()</code> method. It returns the fraction of rows to hold out for this fit, or 0 when the fit won’t use them. The orchestrator calls it, splits the rows before augmentation, and passes the held-out part as <code>aug_valid</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyEarlyStoppingBackend(BaseEstimator):</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, early_stopping_rounds<span class="op">=</span><span class="va">None</span>, validation_fraction<span class="op">=</span><span class="fl">0.1</span>):</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.early_stopping_rounds <span class="op">=</span> early_stopping_rounds</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.validation_fraction <span class="op">=</span> validation_fraction</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(<span class="bu">repr</span><span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyEarlyStoppingBackend(BaseEstimator):</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    early_stopping_rounds: <span class="bu">int</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    validation_fraction: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.1</span></span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> holdout_fraction(<span class="va">self</span>):</span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Hold rows out only when early stopping will use them.</span></span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.validation_fraction <span class="cf">if</span> <span class="va">self</span>.early_stopping_rounds <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="fl">0.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>An <code>eval_set</code> passed to <code>fit</code> replaces the split. A backend without the method gets no holdout, whatever attributes it has. Backends that compute their own internal CV or that don’t need a holdout define neither.</p>
 </section>
+<section id="column-names-in-settings" class="level3">
+<h3 class="anchored" data-anchor-id="column-names-in-settings">Column names in settings</h3>
+<p>If a backend setting names input columns, such as a list of categorical columns, add a <code>bind_columns(feature_keys)</code> method. It returns a copy of the backend with the names resolved to positions in <code>feature_keys</code>, the column order α̂ reads (treatment first). The orchestrator calls it once per fit and fits the copy, so the user’s backend keeps the names. <code>rieszreg.backends.resolve_column_positions</code> does the lookup and also accepts 0-based positions:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, replace</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg.backends <span class="im">import</span> resolve_column_positions</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(<span class="bu">repr</span><span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MyCategoricalBackend(BaseEstimator):</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    categorical_features: <span class="bu">tuple</span> <span class="op">=</span> ()</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> bind_columns(<span class="va">self</span>, feature_keys):</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> replace(<span class="va">self</span>, categorical_features<span class="op">=</span>resolve_column_positions(</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.categorical_features, feature_keys, <span class="st">"categorical_features"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A backend without the method gets its settings unchanged, so they must be positions.</p>
+</section>
 <section id="save-load-conformance" class="level3">
 <h3 class="anchored" data-anchor-id="save-load-conformance">Save, load, conformance</h3>
 <p><code>RieszEstimator.save(path)</code> writes <code>metadata.json</code> (loss spec, estimand factory_spec, base_score, your <code>predictor.kind</code>) and calls <code>predictor.save(dir_path)</code> for the binary payload. <code>RieszEstimator.load(path)</code> reads the metadata and looks up your registered predictor loader by <code>kind</code>. Built-in estimands round-trip automatically; custom estimands require <code>RieszEstimator.load(path, estimand=...)</code> so the user’s <span class="math inline">\(m\)</span> is back in scope.</p>
 <p>Run <code>register_predictor_loader("my-learner", MyLearnerPredictor.load)</code> at the top level of your wrapper module so <code>import my_wrapper</code> registers the loader.</p>
+<p><code>save</code> also stores the backend’s settings when the backend is a dataclass whose fields are all JSON-serializable. Otherwise the loaded estimator predicts as usual, but refitting it raises until you pass the backend again with <code>set_params(backend=...)</code>.</p>
 <p><code>rieszreg.testing.conformance</code> ships small helpers (<code>assert_clone_roundtrip</code>, <code>assert_get_params_round_trip</code>) that verify the load-bearing sklearn properties on your wrapper:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg.testing.conformance <span class="im">import</span> assert_clone_roundtrip</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_clone():</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    assert_clone_roundtrip(</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        <span class="kw">lambda</span>: RieszEstimator(</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>            estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>            backend<span class="op">=</span>MyLearnerBackend(regularization<span class="op">=</span><span class="fl">0.1</span>),</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rieszreg.testing.conformance <span class="im">import</span> assert_clone_roundtrip</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_clone():</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    assert_clone_roundtrip(</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        <span class="kw">lambda</span>: RieszEstimator(</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>            estimand<span class="op">=</span>ATE(treatment<span class="op">=</span><span class="st">"a"</span>, covariates<span class="op">=</span>(<span class="st">"x"</span>,)),</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>            backend<span class="op">=</span>MyLearnerBackend(regularization<span class="op">=</span><span class="fl">0.1</span>),</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>For a private wrapper, those two helpers plus a fit/predict/score smoke test on <code>linear_gaussian_ate</code> cover the regression surface. The full suite (<code>GridSearchCV</code>, <code>cross_val_predict</code>, save/load on every built-in estimand, the <a href="https://github.com/rieszreg/rieszreg/blob/main/packages/rieszreg/python/rieszreg/testing/dgps.py">estimator-consistency suite</a> over the canonical DGPs) is the bar an in-tree contributed learner has to clear.</p>
 
 
