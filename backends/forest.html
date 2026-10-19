@@ -85,9 +85,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-890df4807d457dbc410f87df85df408d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-23b7fb441f0177cac005c00e32637b51.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../site_libs/bootstrap/bootstrap-890df4807d457dbc410f87df85df408d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-4d06fa947daf8225b3e533bfbee2a99c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-da3a7532b3ca09b6b23251ab9e357cd6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-4d06fa947daf8225b3e533bfbee2a99c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -544,7 +544,7 @@ window.Quarto = {
   </ul></li>
   <li><a href="#save-load" id="toc-save-load" class="nav-link" data-scroll-target="#save-load">Save / load</a></li>
   <li><a href="#sklearn-integration" id="toc-sklearn-integration" class="nav-link" data-scroll-target="#sklearn-integration">Sklearn integration</a></li>
-  <li><a href="#when-the-constant-basis-raises-moment-style-only" id="toc-when-the-constant-basis-raises-moment-style-only" class="nav-link" data-scroll-target="#when-the-constant-basis-raises-moment-style-only">When the constant basis raises (moment-style only)</a></li>
+  <li><a href="#basis-requirements-moment-style-only" id="toc-basis-requirements-moment-style-only" class="nav-link" data-scroll-target="#basis-requirements-moment-style-only">Basis requirements (moment-style only)</a></li>
   </ul>
 </nav>
     </div>
@@ -573,34 +573,50 @@ window.Quarto = {
 
 <p><code>forestriesz</code> ships two random-forest backends. They differ in whether the user has to make per-estimand modeling choices to fit the model.</p>
 <ul>
-<li><strong><code>AugForestRieszRegressor</code></strong> — augmentation-style. An ensemble of single-tree Riesz regressors fit on the augmented dataset of evaluation points <span class="math inline">\(z_r\)</span> with weights <span class="math inline">\((D_r, C_r)\)</span> that <code>Estimand.augment</code> produces. Each tree uses sklearn-standard hyperparameters and a loss-aware splitter that handles every built-in Bregman loss directly. <strong>Works on every estimand without per-estimand configuration</strong> — built-in estimands (<code>ATE</code>, <code>ATT</code>, <code>TSM</code>, <code>AdditiveShift</code>, <code>LocalShift</code>) and any user-defined <code>Estimand</code> use the same call.</li>
+<li><strong><code>AugForestRieszRegressor</code></strong> — augmentation-style. An ensemble of single-tree Riesz regressors fit on the augmented dataset that <code>Estimand.augment</code> produces (<a href="#augmentation-style-augforestrieszregressor">below</a>). Each tree uses sklearn-standard hyperparameters and a loss-aware splitter that handles every built-in Bregman loss directly. <strong>Works on every estimand without per-estimand configuration</strong> — built-in estimands (<code>ATE</code>, <code>ATT</code>, <code>TSM</code>, <code>AdditiveShift</code>, <code>LocalShift</code>) and any user-defined <code>Estimand</code> use the same call.</li>
 <li><strong><code>ForestRieszRegressor</code></strong> — moment-style. Implements <a href="https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf">Chernozhukov, Newey, Quintas-Martínez, Syrgkanis (ICML 2022)</a>. To fit the model the user must supply a list of basis functions of the data — the <code>riesz_feature_fns</code> parameter — that the forest combines linearly inside each leaf. The required list is per-estimand: <code>ATE</code>, <code>ATT</code>, and <code>TSM</code> get reasonable defaults from <code>riesz_feature_fns="auto"</code>, but other estimands need a user-constructed list. Supports honest-split confidence intervals via <code>predict_interval</code> for single-basis fits.</li>
 </ul>
 <p><code>rieszreg</code> exposes the two entry points as <code>Backend.fit_augmented</code> and <code>MomentBackend.fit_rows</code> respectively.</p>
 <section id="how-they-work" class="level2">
 <h2 class="anchored" data-anchor-id="how-they-work">How they work</h2>
+<p>An estimand has the form <span class="math inline">\(\mathbb E[m(\mu)(Z, Y)]\)</span>. For the built-in estimands, a row’s features are <span class="math inline">\(Z = (A, X)\)</span>, the treatment <span class="math inline">\(A\)</span> and covariates <span class="math inline">\(X\)</span>; <span class="math inline">\(Y\)</span> is its outcome, <span class="math inline">\(\mu(z) = \mathbb E[Y \mid Z = z]\)</span> is the outcome regression, and <span class="math inline">\(m\)</span> is the estimand’s linear operator, which maps a function such as <span class="math inline">\(\mu\)</span> to a linear combination of its values at a few points. Both backends estimate the Riesz representer <span class="math inline">\(\alpha_0\)</span>: the function of <span class="math inline">\(Z\)</span> with <span class="math inline">\(\mathbb E[m(f)(Z, Y)] = \mathbb E[\alpha_0(Z)\, f(Z)]\)</span> for every square-integrable <span class="math inline">\(f\)</span>. <a href="../estimands.html">Estimands</a> defines these.</p>
 <section id="augmentation-style-augforestrieszregressor" class="level3">
 <h3 class="anchored" data-anchor-id="augmentation-style-augforestrieszregressor">Augmentation-style (<code>AugForestRieszRegressor</code>)</h3>
-<p>For each original row <span class="math inline">\(i\)</span>, <code>Estimand.augment</code> emits the original observation <span class="math inline">\(Z_i\)</span> and one evaluation point per linear-form term in <span class="math inline">\(m(\mu)(Z_i, Y_i)\)</span>. Each augmented row <span class="math inline">\(r\)</span> carries an evaluation point <span class="math inline">\(z_r\)</span>, a weight <span class="math inline">\(D_r \in \{0, 1\}\)</span> indicating whether <span class="math inline">\(z_r\)</span> is the original observation, and a coefficient <span class="math inline">\(C_r\)</span> collecting the trace coefficients at <span class="math inline">\(z_r\)</span>. The empirical Bregman-Riesz loss is</p>
+<p>For each original row <span class="math inline">\(i = 1, \dots, n\)</span>, <code>Estimand.augment</code> emits the original observation <span class="math inline">\(Z_i\)</span> and one evaluation point for each point at which the operator <span class="math inline">\(m\)</span> evaluates the outcome regression <span class="math inline">\(\mu\)</span> in <span class="math inline">\(m(\mu)(Z_i, Y_i)\)</span>, merging points that coincide. This gives <span class="math inline">\(M\)</span> augmented rows in total. Each augmented row <span class="math inline">\(r\)</span> carries an evaluation point <span class="math inline">\(z_r\)</span>, a weight <span class="math inline">\(D_r \in \{0, 1\}\)</span> that is <span class="math inline">\(1\)</span> exactly when <span class="math inline">\(z_r\)</span> is the original observation, and a coefficient <span class="math inline">\(C_r\)</span> equal to minus the sum of <span class="math inline">\(m\)</span>’s coefficients on <span class="math inline">\(\mu(z_r)\)</span> (<span class="math inline">\(C_r = 0\)</span> when <span class="math inline">\(m\)</span> does not evaluate <span class="math inline">\(\mu\)</span> at <span class="math inline">\(z_r\)</span>). For <code>ATE</code>, and for <code>TSM</code> on a row already at the target level, the original observation coincides with an evaluation point, so it carries <span class="math inline">\(D_r = 1\)</span> and <span class="math inline">\(C_r = \pm 1\)</span>; the other evaluation points carry <span class="math inline">\(D_r = 0\)</span> and <span class="math inline">\(C_r \ne 0\)</span>. <a href="../estimands.html#theory-how-the-augmented-dataset-is-derived">Estimands</a> works through the construction.</p>
+<p>Each loss is generated by a convex, twice-differentiable function <span class="math inline">\(h\)</span> with <span class="math inline">\(h'' &gt; 0\)</span> on the loss’s <span class="math inline">\(\alpha\)</span>-domain, the set of values its <span class="math inline">\(\alpha\)</span> may take (see <a href="../losses.html">Losses</a>). Write <span class="math inline">\(h'\)</span> and <span class="math inline">\(h''\)</span> for its first two derivatives and <span class="math inline">\(\tilde h(t) = t\,h'(t) - h(t)\)</span>. The empirical Bregman-Riesz loss is</p>
 <p><span class="math display">\[
 \hat L(\alpha) \;=\; \frac{1}{n} \sum_{r=1}^M \big[\, D_r\, \tilde h(\alpha(z_r)) \;+\; C_r\, h'(\alpha(z_r)) \,\big].
 \]</span></p>
-<p>See <a href="../estimands.html">Estimands</a> for the construction. Each tree partitions the feature space and stores the loss-optimal <span class="math inline">\(\alpha\)</span> in every leaf <span class="math inline">\(\ell\)</span>:</p>
+<p>Its population counterpart is minimised at the Riesz representer <span class="math inline">\(\alpha_0\)</span> (<a href="../losses.html">Losses</a>). The sum runs over the <span class="math inline">\(M\)</span> augmented rows, but they come from <span class="math inline">\(n\)</span> observations, hence the <span class="math inline">\(1/n\)</span>. Grouped by original row <span class="math inline">\(i\)</span>, exactly one of its augmented rows has <span class="math inline">\(D_r = 1\)</span>, and by the definition of <span class="math inline">\(C_r\)</span> its <span class="math inline">\(h'\)</span> terms add up to <span class="math inline">\(-m(h' \circ \alpha)(Z_i, Y_i)\)</span>, so <span class="math inline">\(\hat L(\alpha) = \frac1n \sum_{i=1}^n \big[\tilde h(\alpha(Z_i)) - m(h' \circ \alpha)(Z_i, Y_i)\big]\)</span>.</p>
+<p><code>SquaredLoss</code> has <span class="math inline">\(h(t) = t^2\)</span>, so <span class="math inline">\(h'(t) = 2t\)</span> and <span class="math inline">\(\tilde h(t) = t \cdot 2t - t^2 = t^2\)</span>. Each summand of <span class="math inline">\(\hat L\)</span> is then <span class="math inline">\(D_r\, \alpha(z_r)^2 + 2 C_r\, \alpha(z_r)\)</span>.</p>
+<p>Each tree partitions the feature space into leaves and predicts a single value <span class="math inline">\(\alpha\)</span> for every point in leaf <span class="math inline">\(\ell\)</span>. With <span class="math inline">\(D_\ell = \sum_{r \in \ell} D_r\)</span> and <span class="math inline">\(C_\ell = \sum_{r \in \ell} C_r\)</span> summed over the augmented rows in the leaf, the leaf’s summands add up to <span class="math inline">\(\sum_{r \in \ell} \big[D_r\, \tilde h(\alpha) + C_r\, h'(\alpha)\big] = D_\ell\, \tilde h(\alpha) + C_\ell\, h'(\alpha)\)</span>. No two leaves share a value, so each leaf is optimised on its own, and the factor <span class="math inline">\(1/n\)</span> does not move the minimiser. The leaf stores</p>
 <p><span class="math display">\[
-\hat\alpha_\ell \;=\; \arg\min_{\alpha} \sum_{r \in \ell} \big[\, D_r\, \tilde h(\alpha) \;+\; C_r\, h'(\alpha) \,\big].
+\hat\alpha_\ell \;=\; \arg\min_{\alpha \text{ in the }\alpha\text{-domain}} \big[\, D_\ell\, \tilde h(\alpha) \;+\; C_\ell\, h'(\alpha) \,\big].
 \]</span></p>
-<p>For <code>SquaredLoss</code> this has the closed form <span class="math inline">\(\hat\alpha_\ell = -\sum_{r \in \ell} C_r / \sum_{r \in \ell} D_r\)</span>; for <code>KLLoss</code>, <code>BernoulliLoss</code>, and <code>BoundedSquaredLoss</code> the per-leaf optimum has its own closed form (see <a href="../backends/tree.html">Tree backend</a> for the derivations). The forest averages the per-tree predictions of <span class="math inline">\(\hat\alpha\)</span>.</p>
-<p>Because <span class="math inline">\(D_r\)</span> and <span class="math inline">\(C_r\)</span> already vary across augmented rows for every estimand — original observations have <span class="math inline">\(D_r = 1, C_r = 0\)</span> and counterfactual evaluation points have <span class="math inline">\(D_r = 0, C_r \ne 0\)</span> — the splitter learns from the full feature space directly. The user does not supply any basis functions.</p>
+<p>By the product rule, <span class="math inline">\(\tilde h'(t) = h'(t) + t\, h''(t) - h'(t) = t\, h''(t)\)</span>, so the derivative of the bracket is <span class="math inline">\(D_\ell\, \alpha\, h''(\alpha) + C_\ell\, h''(\alpha) = h''(\alpha)\,(D_\ell\, \alpha + C_\ell)\)</span>. Every leaf holds at least one original row (<code>min_samples_leaf</code>, at least 1, counts original rows), so <span class="math inline">\(D_\ell \ge 1\)</span>. Because <span class="math inline">\(h'' &gt; 0\)</span>, the derivative has the sign of <span class="math inline">\(\alpha + C_\ell / D_\ell\)</span>: the bracket decreases up to <span class="math inline">\(-C_\ell / D_\ell\)</span> and increases after it. When <span class="math inline">\(-C_\ell / D_\ell\)</span> lies in the <span class="math inline">\(\alpha\)</span>-domain it is the minimiser,</p>
+<p><span class="math display">\[
+\hat\alpha_\ell \;=\; -\,\frac{C_\ell}{D_\ell},
+\]</span></p>
+<p>and this formula is the same for every built-in loss. When <span class="math inline">\(-C_\ell / D_\ell\)</span> falls outside the <span class="math inline">\(\alpha\)</span>-domain, the bracket is monotone over the domain, so the minimum is at the nearest boundary. <code>BoundedSquaredLoss(lo, hi)</code> clips the leaf value to <span class="math inline">\([\mathrm{lo}, \mathrm{hi}]\)</span>; for the open domains of <code>KLLoss</code> (<span class="math inline">\(\alpha &gt; 0\)</span>) and <code>BernoulliLoss</code> (<span class="math inline">\(0 &lt; \alpha &lt; 1\)</span>) the leaf stores the boundary value or a point just inside it. <a href="../backends/tree.html">Tree backend</a> has the details. The forest averages the per-tree predictions of <span class="math inline">\(\hat\alpha\)</span>.</p>
+<p>The splitter can split on any feature, the treatment included, and each leaf value <span class="math inline">\(-C_\ell / D_\ell\)</span> comes straight from the weights <span class="math inline">\(D_r\)</span> and coefficients <span class="math inline">\(C_r\)</span> of the augmented rows in the leaf. So the user does not supply any basis functions.</p>
 </section>
 <section id="moment-style-forestrieszregressor" class="level3">
 <h3 class="anchored" data-anchor-id="moment-style-forestrieszregressor">Moment-style (<code>ForestRieszRegressor</code>)</h3>
-<p>The user supplies a list of functions <span class="math inline">\(\varphi = (\varphi_1, \dots, \varphi_p)\)</span> of the data. Inside each leaf <span class="math inline">\(\ell\)</span> the per-leaf parameter <span class="math inline">\(\theta_\ell \in \mathbb R^p\)</span> solves the linear-moment equation</p>
+<p>The user supplies a list of functions <span class="math inline">\(\varphi = (\varphi_1, \dots, \varphi_p)\)</span> of the features <span class="math inline">\(z\)</span>. Within each leaf <span class="math inline">\(\ell\)</span> the model is <span class="math inline">\(\alpha(z) = \theta^\top \varphi(z)\)</span> for a coefficient vector <span class="math inline">\(\theta \in \mathbb R^p\)</span>. The forest is grown on the <span class="math inline">\(n\)</span> original rows and splits on the columns in <code>split_feature_indices</code> (by default the covariates for <code>ATE</code>, <code>ATT</code>, and <code>TSM</code>, and every feature otherwise).</p>
+<p>Only <code>SquaredLoss</code> is supported. With <span class="math inline">\(h(t) = t^2\)</span>, the row-grouped form of <span class="math inline">\(\hat L\)</span> above says original row <span class="math inline">\(i\)</span> contributes <span class="math inline">\(\alpha(Z_i)^2 - 2\, m(\alpha)(Z_i, Y_i)\)</span>. Because the operator <span class="math inline">\(m\)</span> is linear, <span class="math inline">\(m(\theta^\top \varphi) = \theta^\top m(\varphi)\)</span>, where <span class="math inline">\(m(\varphi) = (m(\varphi_1), \dots, m(\varphi_p))\)</span>. Let <span class="math inline">\(n_\ell\)</span> be the number of original rows in leaf <span class="math inline">\(\ell\)</span> and <span class="math inline">\(\lambda \ge 0\)</span> the <code>l2</code> ridge (default <span class="math inline">\(0\)</span>). Substituting <span class="math inline">\(\alpha = \theta^\top \varphi\)</span>, the leaf’s squared Riesz loss with the ridge penalty is</p>
 <p><span class="math display">\[
-\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top} + n_\ell\,\lambda I\big)^{-1}
-                 \textstyle\sum_{i\in\ell} m(\varphi)(Z_i, Y_i),
+\sum_{i\in\ell} \Big[\, \big(\theta^\top \varphi(Z_i)\big)^2 - 2\, \theta^\top m(\varphi)(Z_i, Y_i) \,\Big] \;+\; n_\ell\, \lambda\, \lVert\theta\rVert^2 .
 \]</span></p>
-<p>where <span class="math inline">\(n_\ell\)</span> is the leaf size and <span class="math inline">\(\lambda\)</span> is the <code>l2</code> ridge (default <span class="math inline">\(0\)</span>).</p>
-<p>and predictions are <span class="math inline">\(\hat\alpha(z) = \hat\theta(z_{\text{split}}) \cdot \varphi(z)\)</span>. The forest is fit on the <span class="math inline">\(n\)</span> original rows, and the MSE splitting criterion picks splits to minimize the sum of in-leaf residuals against this leaf optimum.</p>
+<p>Write <span class="math inline">\(G_\ell = \sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top}\)</span> for the leaf’s Gram matrix and <span class="math inline">\(b_\ell = \sum_{i\in\ell} m(\varphi)(Z_i, Y_i)\)</span> for its moment sum. Since <span class="math inline">\(\sum_{i\in\ell} (\theta^\top \varphi(Z_i))^2 = \theta^\top G_\ell\, \theta\)</span> and <span class="math inline">\(\sum_{i\in\ell} \theta^\top m(\varphi)(Z_i, Y_i) = \theta^\top b_\ell\)</span>, the loss is <span class="math inline">\(\theta^\top (G_\ell + n_\ell \lambda I)\, \theta - 2\, \theta^\top b_\ell\)</span>. The Gram matrix is a sum of outer products, so <span class="math inline">\(G_\ell + n_\ell \lambda I\)</span> is positive semidefinite and the loss is convex in <span class="math inline">\(\theta\)</span>. Its gradient <span class="math inline">\(2\big[(G_\ell + n_\ell \lambda I)\,\theta - b_\ell\big]\)</span> vanishes at the minimiser, so the leaf solves the linear-moment equation <span class="math inline">\((G_\ell + n_\ell \lambda I)\,\theta = b_\ell\)</span>. When <span class="math inline">\(G_\ell + n_\ell \lambda I\)</span> is invertible (always when <span class="math inline">\(\lambda &gt; 0\)</span>; when <span class="math inline">\(\lambda = 0\)</span>, exactly when the Gram matrix is),</p>
+<p><span class="math display">\[
+\hat\theta_\ell \;=\; \big(G_\ell + n_\ell\,\lambda I\big)^{-1} b_\ell .
+\]</span></p>
+<p>Splits use EconML’s <code>"mse"</code> criterion, which approximately chooses the split whose children’s leaf coefficients <span class="math inline">\(\hat\theta_\ell\)</span> most lower this loss.</p>
+<p>The forest does not average the per-tree leaf coefficients <span class="math inline">\(\hat\theta_\ell\)</span>. As in <a href="https://arxiv.org/abs/1610.01271">generalized random forests</a> (GRF), it pools the leaf sums across trees. For a query point <span class="math inline">\(z\)</span> and trees <span class="math inline">\(t = 1, \dots, T\)</span>, let <span class="math inline">\(\ell_t(z)\)</span> be the leaf of tree <span class="math inline">\(t\)</span> that contains <span class="math inline">\(z\)</span>, and give original row <span class="math inline">\(i\)</span> the weight <span class="math inline">\(w_i(z) = \frac{1}{T} \sum_{t=1}^{T} \mathbf 1\{i \in \ell_t(z)\} / n_{\ell_t(z)}\)</span>. Here a leaf holds only the rows of its tree’s subsample (the estimation half when <code>honest=True</code>), and <span class="math inline">\(n_{\ell_t(z)}\)</span> counts them. In each tree the indicator picks out the <span class="math inline">\(n_{\ell_t(z)}\)</span> rows of <span class="math inline">\(z\)</span>’s leaf, each weighted <span class="math inline">\(1/n_{\ell_t(z)}\)</span>, so they total <span class="math inline">\(1\)</span>; averaging over trees keeps the total at <span class="math inline">\(1\)</span>. The weights depend on <span class="math inline">\(z\)</span> only through the split columns. The forest’s coefficient <span class="math inline">\(\hat\theta(z)\)</span> solves the weighted version of the leaf equation (with a pseudo-inverse when the left side is singular),</p>
+<p><span class="math display">\[
+\Big(\sum_{i=1}^{n} w_i(z)\, \varphi(Z_i)\,\varphi(Z_i)^{\top} + \lambda I\Big)\, \hat\theta(z) \;=\; \sum_{i=1}^{n} w_i(z)\, m(\varphi)(Z_i, Y_i),
+\]</span></p>
+<p>and the prediction is <span class="math inline">\(\hat\alpha(z) = \hat\theta(z)^\top \varphi(z)\)</span>. With a single tree, <span class="math inline">\(w_i(z) = \mathbf 1\{i \in \ell\} / n_\ell\)</span> for <span class="math inline">\(z\)</span>’s leaf <span class="math inline">\(\ell\)</span>, and this equation is the leaf equation divided by <span class="math inline">\(n_\ell\)</span>, which is why the ridge appears as <span class="math inline">\(\lambda\)</span> rather than <span class="math inline">\(n_\ell \lambda\)</span>.</p>
 <p>The list <span class="math inline">\(\varphi\)</span> has to be chosen per estimand. The default <code>riesz_feature_fns="auto"</code> picks defaults for built-in estimands:</p>
 <table class="caption-top table">
 <colgroup>
@@ -633,7 +649,11 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>For ATE the leaf solve recovers <span class="math inline">\(1/\hat P(A = a \mid X\text{-leaf})\)</span> — the IPW representer.</p>
+<p>For <code>ATE</code> with the default basis <span class="math inline">\(\varphi(a, x) = (\mathbf 1\{a = 0\}, \mathbf 1\{a = 1\})\)</span>, every row has <span class="math inline">\(m(\varphi)(Z_i, Y_i) = \varphi(1, X_i) - \varphi(0, X_i) = (0, 1) - (1, 0) = (-1, 1)\)</span>, so the moment sum is <span class="math inline">\(b_\ell = (-n_\ell, n_\ell)\)</span>. Each row’s <span class="math inline">\(\varphi(Z_i)\varphi(Z_i)^\top\)</span> is <span class="math inline">\(\operatorname{diag}(1, 0)\)</span> if untreated and <span class="math inline">\(\operatorname{diag}(0, 1)\)</span> if treated, so the Gram matrix is <span class="math inline">\(G_\ell = \operatorname{diag}(n_{\ell,0},\, n_{\ell,1})\)</span>, where <span class="math inline">\(n_{\ell,0}\)</span> and <span class="math inline">\(n_{\ell,1}\)</span> count the untreated and treated rows in the leaf. Write <span class="math inline">\(\hat P(A = a \mid \ell) = n_{\ell,a} / n_\ell\)</span> for the leaf’s share of rows with <span class="math inline">\(A = a\)</span>. With ridge <span class="math inline">\(\lambda = 0\)</span> and both arms present in the leaf (<span class="math inline">\(n_{\ell,0}, n_{\ell,1} &gt; 0\)</span>, so the Gram matrix is invertible), the leaf solve is <span class="math inline">\(\hat\theta_\ell = G_\ell^{-1} b_\ell = (-n_\ell / n_{\ell,0},\; n_\ell / n_{\ell,1})\)</span>; dividing each numerator and denominator by <span class="math inline">\(n_\ell\)</span>,</p>
+<p><span class="math display">\[
+\hat\theta_\ell \;=\; \Big(-\frac{1}{\hat P(A = 0 \mid \ell)},\; \frac{1}{\hat P(A = 1 \mid \ell)}\Big).
+\]</span></p>
+<p>Since <span class="math inline">\(\hat\alpha = \hat\theta_\ell^\top \varphi\)</span> picks out the coordinate of the point’s arm, a treated point in the leaf gets <span class="math inline">\(\hat\alpha = 1/\hat P(A = 1 \mid \ell)\)</span> and an untreated one gets <span class="math inline">\(-1/\hat P(A = 0 \mid \ell)\)</span>. The forest’s prediction follows from the same algebra with the weights <span class="math inline">\(w_i(z)\)</span> in place of <span class="math inline">\(1/n_\ell\)</span>. Let <span class="math inline">\(\hat\pi(z) = \sum_i w_i(z)\, A_i\)</span> be the forest-weighted share of treated rows. The weighted Gram matrix is <span class="math inline">\(\operatorname{diag}(1 - \hat\pi(z),\, \hat\pi(z))\)</span> and the weighted moment sum is <span class="math inline">\((-1, 1)\)</span>, so <span class="math inline">\(\hat\alpha(1, x) = 1/\hat\pi(z)\)</span> and <span class="math inline">\(\hat\alpha(0, x) = -1/(1 - \hat\pi(z))\)</span>. This is the inverse-propensity-weight representer <span class="math inline">\(\alpha_0(a, x) = a/\pi(x) - (1 - a)/(1 - \pi(x))\)</span>, with the propensity score <span class="math inline">\(\pi(x) = P(A = 1 \mid X = x)\)</span> replaced by the forest-weighted treated share <span class="math inline">\(\hat\pi(z)\)</span>.</p>
 </section>
 </section>
 <section id="how-they-differ" class="level2">
@@ -687,7 +707,7 @@ window.Quarto = {
 </section>
 <section id="bregman-losses" class="level2">
 <h2 class="anchored" data-anchor-id="bregman-losses">Bregman losses</h2>
-<p><code>AugForestRieszRegressor</code> accepts every loss <code>rieszreg</code> ships. The per-tree splitter dispatches to a per-loss leaf-loss formula (squared, KL, Bernoulli, bounded-squared) so splits are chosen against the loss the user actually supplied. The forest averages per-tree <span class="math inline">\(\hat\alpha\)</span> predictions.</p>
+<p><code>AugForestRieszRegressor</code> accepts every loss <code>rieszreg</code> ships. The per-tree splitter dispatches to a per-loss leaf-loss formula (squared, KL, Bernoulli, bounded-squared) so splits are chosen against the loss the user actually supplied. The forest averages the per-tree predictions <span class="math inline">\(\hat\alpha\)</span> of the representer.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> forestriesz <span class="im">import</span> AugForestRieszRegressor, TSM</span>
@@ -1125,10 +1145,10 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x1691a8690&gt;,
-                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x16ff934d0&gt;,
-                        n_estimators=200)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x1691a8690&gt;,
-                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x16ff934d0&gt;,
+</style><div id="sk-container-id-1" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f202f77fd10&gt;,
+                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f202fb06de0&gt;,
+                        n_estimators=200)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-1" type="checkbox" checked=""><label for="sk-estimator-id-1" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f202f77fd10&gt;,
+                        loss=&lt;rieszreg.losses.kl.KLLoss object at 0x7f202fb06de0&gt;,
                         n_estimators=200)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> est.predict(df_tsm)</span>
@@ -1137,7 +1157,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <pre><code>alpha_hat range: [0.000, 2.856]</code></pre>
 </div>
 </div>
-<p><code>KLLoss</code> and <code>BernoulliLoss</code> can’t represent <code>ATE</code> / <code>ATT</code> / shift-style estimands, because their α takes negative values; <code>fit</code> warns, and α̂ collapses to 0. <code>BoundedSquaredLoss(lo, hi)</code> with <code>lo &lt; 0</code> accepts them and clips <span class="math inline">\(\hat\alpha\)</span> into the interval.</p>
+<p><code>KLLoss</code> and <code>BernoulliLoss</code> can’t represent <code>ATE</code> / <code>ATT</code> / shift-style estimands, because their Riesz representer <span class="math inline">\(\alpha_0\)</span> takes negative values, outside both losses’ <span class="math inline">\(\alpha\)</span>-domains; <code>fit</code> warns, and the fitted <span class="math inline">\(\hat\alpha\)</span> collapses to 0. <code>BoundedSquaredLoss(lo, hi)</code> with <code>lo &lt; 0</code> accepts them and clips <span class="math inline">\(\hat\alpha\)</span> into the interval.</p>
 </section>
 <section id="quickstart-ate" class="level2">
 <h2 class="anchored" data-anchor-id="quickstart-ate">Quickstart — ATE</h2>
@@ -1579,8 +1599,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x1706a88d0&gt;,
-                     min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x1706a88d0&gt;,
+</style><div id="sk-container-id-2" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f2023b7b170&gt;,
+                     min_samples_leaf=10, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-2" type="checkbox" checked=""><label for="sk-estimator-id-2" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.ATE object at 0x7f2023b7b170&gt;,
                      min_samples_leaf=10, n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>alpha_hat  <span class="op">=</span> fr.predict(df)</span>
@@ -2055,8 +2075,8 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x1706ab990&gt;,
-                        n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x1706ab990&gt;,
+</style><div id="sk-container-id-3" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f2024ab53d0&gt;,
+                        n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-3" type="checkbox" checked=""><label for="sk-estimator-id-3" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>AugForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>AugForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.AdditiveShift object at 0x7f2024ab53d0&gt;,
                         n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> afr.predict(df_cont)</span>
@@ -2068,7 +2088,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </section>
 <section id="quickstart-tsm-with-confidence-intervals" class="level2">
 <h2 class="anchored" data-anchor-id="quickstart-tsm-with-confidence-intervals">Quickstart — TSM with confidence intervals</h2>
-<p><code>TSM</code> uses a single-basis fit, so v1’s <code>predict_interval</code> works.</p>
+<p><code>TSM</code> uses a single-basis fit, so v1’s <code>predict_interval</code> works. It returns an interval for the true representer <span class="math inline">\(\alpha_0\)</span> at each row. For <code>TSM(level=1)</code> the basis is <span class="math inline">\(0\)</span> on untreated rows, so their interval is the single point <span class="math inline">\(0 = \alpha_0\)</span>. The check below uses the treated rows, where <span class="math inline">\(\alpha_0 = 1/\pi(x)\)</span>, the inverse of the propensity score <span class="math inline">\(\pi(x) = P(A = 1 \mid X = x)\)</span> (<code>pi</code> in the ATE quickstart). The intervals reflect the forest’s sampling variance but not its smoothing bias, so pointwise coverage can fall below the nominal level.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset" data-group="lang">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Python</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">R</a></li></ul>
 <div class="tab-content" data-group="lang">
@@ -2500,19 +2520,23 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
   /* fitted */
   background-color: var(--sklearn-color-fitted-level-3);
 }
-</style><div id="sk-container-id-4" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x170723990&gt;,
-                     honest=True, inference=True, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox" checked=""><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x170723990&gt;,
+</style><div id="sk-container-id-4" class="sk-top-container"><div class="sk-text-repr-fallback"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f20239fe420&gt;,
+                     honest=True, inference=True, n_estimators=500)</pre><b>In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook. <br>On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.</b></div><div class="sk-container" hidden=""><div class="sk-item"><div class="sk-estimator fitted sk-toggleable"><input class="sk-toggleable__control sk-hidden--visually" id="sk-estimator-id-4" type="checkbox" checked=""><label for="sk-estimator-id-4" class="sk-toggleable__label fitted sk-toggleable__label-arrow"><div><div>ForestRieszRegressor</div></div><div><span class="sk-estimator-doc-link fitted">i<span>Fitted</span></span></div></label><div class="sk-toggleable__content fitted"><pre>ForestRieszRegressor(estimand=&lt;rieszreg.estimands.base.TSM object at 0x7f20239fe420&gt;,
                      honest=True, inference=True, n_estimators=500)</pre></div> </div></div></div></div>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="op">=</span> fr.predict(df)</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>lb, ub    <span class="op">=</span> fr.predict_interval(df, alpha<span class="op">=</span><span class="fl">0.05</span>)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"mean 95% CI width = </span><span class="sc">{</span>(ub <span class="op">-</span> lb)<span class="sc">.</span>mean()<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="op">=</span> a <span class="op">/</span> pi          <span class="co"># α₀ for TSM(level=1)</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>treated    <span class="op">=</span> a <span class="op">==</span> <span class="dv">1</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>covers     <span class="op">=</span> (lb <span class="op">&lt;=</span> true_alpha) <span class="op">&amp;</span> (true_alpha <span class="op">&lt;=</span> ub)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"treated rows: mean 95% CI width     = </span><span class="sc">{</span>(ub <span class="op">-</span> lb)[treated]<span class="sc">.</span>mean()<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>mean 95% CI width = 0.518</code></pre>
+<pre><code>treated rows: mean 95% CI width     = 0.981</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"mean coverage of α̂ in [lb, ub] = </span><span class="sc">{</span>((lb <span class="op">&lt;=</span> alpha_hat) <span class="op">&amp;</span> (alpha_hat <span class="op">&lt;=</span> ub))<span class="sc">.</span>mean()<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"treated rows: share covering α₀     = </span><span class="sc">{</span>covers[treated]<span class="sc">.</span>mean()<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>mean coverage of α̂ in [lb, ub] = 1.00</code></pre>
+<pre><code>treated rows: share covering α₀     = 0.88</code></pre>
 </div>
 </div>
 </div>
@@ -2530,7 +2554,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>fr<span class="sc">$</span><span class="fu">fit</span>(df)</span>
 <span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>alpha_hat <span class="ot">&lt;-</span> fr<span class="sc">$</span><span class="fu">predict</span>(df)</span>
-<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>ci <span class="ot">&lt;-</span> fr<span class="sc">$</span><span class="fu">predict_interval</span>(df, <span class="at">alpha =</span> <span class="fl">0.05</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>ci <span class="ot">&lt;-</span> fr<span class="sc">$</span><span class="fu">predict_interval</span>(df, <span class="at">alpha =</span> <span class="fl">0.05</span>)</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>true_alpha <span class="ot">&lt;-</span> a <span class="sc">/</span> pi          <span class="co"># α₀ for TSM(level = 1)</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>treated    <span class="ot">&lt;-</span> a <span class="sc">==</span> <span class="dv">1</span></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>covers     <span class="ot">&lt;-</span> ci<span class="sc">$</span>lb <span class="sc">&lt;=</span> true_alpha <span class="sc">&amp;</span> true_alpha <span class="sc">&lt;=</span> ci<span class="sc">$</span>ub</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"treated rows: mean 95%% CI width     = %.3f</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">mean</span>((ci<span class="sc">$</span>ub <span class="sc">-</span> ci<span class="sc">$</span>lb)[treated])))</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"treated rows: share covering α₀     = %.2f</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">mean</span>(covers[treated])))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 </div>
@@ -2568,12 +2598,12 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="odd">
 <td><code>min_samples_split</code></td>
 <td>2</td>
-<td>Minimum count of original (<span class="math inline">\(D &gt; 0\)</span>) augmented rows in a node before considering a split.</td>
+<td>Minimum count of original (<span class="math inline">\(D_r = 1\)</span>) augmented rows in a node before considering a split.</td>
 </tr>
 <tr class="even">
 <td><code>min_samples_leaf</code></td>
 <td>50</td>
-<td>Minimum count of original rows in each child of a candidate split. Leaves store a ratio of counts, so small leaves give noisy α̂; the best value grew with n in simulations (roughly <span class="math inline">\(2\sqrt{n}\)</span>), so raise it for large samples.</td>
+<td>Minimum count of original rows in each child of a candidate split. Leaves store a ratio of sums, <span class="math inline">\(-C_\ell / D_\ell\)</span>, so small leaves give noisy leaf values <span class="math inline">\(\hat\alpha_\ell\)</span>; the best value grew with <span class="math inline">\(n\)</span> in simulations (roughly <span class="math inline">\(2\sqrt{n}\)</span>), so raise it for large samples.</td>
 </tr>
 <tr class="odd">
 <td><code>max_features</code></td>
@@ -2628,17 +2658,13 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 </tbody>
 </table>
 <p>With <code>splitter="hist"</code>, the bin mapper is fitted once on the full augmented training data and every tree slices the shared binned matrix (the sklearn <code>HistGradientBoostingRegressor</code> convention). The win is largest at shallow depths, where per-tree binning dominates tree-build time.</p>
-<p><code>init</code> has no effect on <code>AugForestRieszRegressor</code>: each leaf stores its loss-optimal α directly.</p>
+<p><code>init</code> has no effect on <code>AugForestRieszRegressor</code>: each leaf stores its loss-optimal value <span class="math inline">\(\hat\alpha_\ell\)</span> directly.</p>
+<p><code>random_state</code> seeds the whole forest. Each tree gets two seeds derived from it: one for its bootstrap draw and one for the tree’s own randomness (per-split feature sampling when <code>max_features &lt; 1</code>, random thresholds when <code>splitter="random"</code>). The two are drawn separately, so a tree’s bootstrap sample and its feature sampling are independent, as in EconML’s GRF. sklearn’s <code>RandomForestRegressor</code> instead starts both from the same per-tree seed.</p>
 </section>
 <section id="forestrieszregressor" class="level3">
 <h3 class="anchored" data-anchor-id="forestrieszregressor"><code>ForestRieszRegressor</code></h3>
 <p>Forwarded to EconML’s <code>BaseGRF</code>:</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Knob</th>
@@ -2690,7 +2716,7 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <tr class="odd">
 <td><code>l2</code></td>
 <td>0</td>
-<td>Ridge added to the per-leaf Jacobian: each leaf solves <span class="math inline">\((\bar J + \lambda I)\theta = \bar A\)</span>. For <code>TSM</code> this gives <span class="math inline">\(\hat\theta = 1 / (\hat P(A = \text{level} \mid \text{leaf}) + \lambda)\)</span>. With <span class="math inline">\(\lambda &gt; 0\)</span> the forest can grow leaves with no treated rows, whose <span class="math inline">\(\hat\theta \approx \bar A / \lambda\)</span> gives very large weights out of sample. Leave it at 0 unless you need it.</td>
+<td>The ridge <span class="math inline">\(\lambda\)</span>: each leaf solves <span class="math inline">\((G_\ell + n_\ell \lambda I)\,\theta = b_\ell\)</span> (<a href="#moment-style-forestrieszregressor">Moment-style</a>). For <code>TSM(level=v)</code> the basis is <span class="math inline">\(\varphi = \mathbf 1\{A = v\}\)</span>, so every row has <span class="math inline">\(m(\varphi) = 1\)</span>, the moment sum is <span class="math inline">\(b_\ell = n_\ell\)</span>, and the Gram matrix is the count <span class="math inline">\(n_{\ell,v}\)</span> of rows at level <span class="math inline">\(v\)</span>. The leaf coefficient is <span class="math inline">\(\hat\theta_\ell = n_\ell / (n_{\ell,v} + n_\ell \lambda) = 1 / (\hat P(A = v \mid \ell) + \lambda)\)</span>, with <span class="math inline">\(\hat P(A = v \mid \ell) = n_{\ell,v} / n_\ell\)</span> the leaf’s share at level <span class="math inline">\(v\)</span>. With <span class="math inline">\(\lambda = 0\)</span> a leaf with no rows at level <span class="math inline">\(v\)</span> has no solution to its leaf equation. EconML’s split score counts such a child as <span class="math inline">\(0\)</span>, which puts the split below the unsplit node, so with <code>honest=False</code> the forest never grows one. With <span class="math inline">\(\lambda &gt; 0\)</span> the same child solves to <span class="math inline">\(\hat\theta_\ell = 1/\lambda\)</span> exactly, and its ridge-penalised loss is <span class="math inline">\(-n_\ell/\lambda\)</span>, so the forest favours these leaves. They pull the predicted <span class="math inline">\(\hat\alpha\)</span> of query points at level <span class="math inline">\(v\)</span> toward <span class="math inline">\(1/\lambda\)</span>, which is very large for small <span class="math inline">\(\lambda\)</span>. With <code>honest=True</code>, a leaf’s estimation half can lack rows at level <span class="math inline">\(v\)</span> even at <span class="math inline">\(\lambda = 0\)</span>. Such a leaf adds to the right side of the forest equation but not the left, which inflates <span class="math inline">\(\hat\alpha\)</span> near it. Leave it at 0 unless you need it.</td>
 </tr>
 <tr class="even">
 <td><code>n_jobs</code></td>
@@ -2722,9 +2748,83 @@ div.sk-label-container:hover .sk-estimator-doc-link.fitted:hover,
 <h2 class="anchored" data-anchor-id="sklearn-integration">Sklearn integration</h2>
 <p>Both regressors are <code>BaseEstimator</code>s, so they compose with <code>clone</code>, <code>GridSearchCV</code>, <code>cross_val_predict</code>, <code>Pipeline</code>. See <a href="../tuning-and-cross-fitting.html">Tuning and Cross-Fitting</a>.</p>
 </section>
-<section id="when-the-constant-basis-raises-moment-style-only" class="level2">
-<h2 class="anchored" data-anchor-id="when-the-constant-basis-raises-moment-style-only">When the constant basis raises (moment-style only)</h2>
-<p>For built-in estimands the per-row moment <span class="math inline">\(m(\varphi)(Z_i, Y_i)\)</span> doesn’t depend on <span class="math inline">\(Z_i\)</span> when <span class="math inline">\(\varphi \equiv 1\)</span>, so the constant basis is degenerate (every leaf would predict the same constant). <code>ForestRieszRegressor</code> detects this and raises with a hint to use <code>riesz_feature_fns="auto"</code> (the default) or supply a custom list. Explicit <code>riesz_feature_fns=None</code> is what raises. <code>AugForestRieszRegressor</code> is unaffected — its splitter does not depend on a user-supplied basis.</p>
+<section id="basis-requirements-moment-style-only" class="level2">
+<h2 class="anchored" data-anchor-id="basis-requirements-moment-style-only">Basis requirements (moment-style only)</h2>
+<p>For built-in estimands the per-row moment <span class="math inline">\(m(\varphi)(Z_i, Y_i)\)</span> doesn’t depend on <span class="math inline">\(Z_i\)</span> when <span class="math inline">\(\varphi \equiv 1\)</span>, so the constant basis is degenerate (every leaf would predict the same constant). <code>ForestRieszRegressor</code> raises on the constant basis, whether from an explicit <code>riesz_feature_fns=None</code> or from <code>"auto"</code> on an estimand with no default basis. For <code>ATE</code>, <code>ATT</code> and <code>TSM</code> the error points to <code>"auto"</code> or <code>AugForestRieszRegressor</code>; otherwise it points to a custom list or <code>AugForestRieszRegressor</code>. <code>AugForestRieszRegressor</code> is unaffected — its splitter does not depend on a user-supplied basis.</p>
+<p>For <code>ATE</code>, <code>ATT</code> and <code>TSM</code> the forest splits on the covariates only (unless you pass <code>split_feature_indices</code>), so the basis <span class="math inline">\(\varphi\)</span> has to carry all of the dependence of the representer on the treatment <span class="math inline">\(A\)</span>. For other estimands the forest also splits on <span class="math inline">\(A\)</span>, but the requirements below still apply. A custom <code>riesz_feature_fns</code> must meet both.</p>
+<p><strong>The basis must vary across the points the estimand evaluates.</strong> As on the <a href="../estimands.html">Estimands</a> page, write the estimand for row <span class="math inline">\(i\)</span>, with observation <span class="math inline">\(Z_i\)</span> and outcome <span class="math inline">\(Y_i\)</span>, as a weighted sum of its argument at evaluation points,</p>
+<p><span class="math display">\[
+m(\mu)(Z_i, Y_i) \;=\; \textstyle\sum_{j} C_{ij}\, \mu(Z_{ij}),
+\]</span></p>
+<p>with coefficients <span class="math inline">\(C_{ij}\)</span> and evaluation points <span class="math inline">\(Z_{ij}\)</span> that share the covariates <span class="math inline">\(X_i\)</span> but set the treatment: <span class="math inline">\(A = 1\)</span> and <span class="math inline">\(A = 0\)</span> for <code>ATE</code>, and for <code>ATT</code> on treated rows (<span class="math inline">\(A_i = 1\)</span>); <span class="math inline">\(A = v\)</span> for <code>TSM(level=v)</code>; <span class="math inline">\(A = A_i + \delta\)</span> (the observed treatment <span class="math inline">\(A_i\)</span> plus the shift amount <span class="math inline">\(\delta\)</span>, <code>delta</code>) and <span class="math inline">\(A = A_i\)</span> for <code>AdditiveShift</code>; and the same two points for <code>LocalShift</code> when <span class="math inline">\(A_i\)</span> is below its threshold <span class="math inline">\(t\)</span> (<code>threshold</code>). Call the basis <em>uninformative</em> if, for every row, every basis function takes the same value at the observed point <span class="math inline">\(Z_i\)</span> and at each evaluation point <span class="math inline">\(Z_{ij}\)</span>. Then <span class="math inline">\(\varphi(Z_{ij}) = \varphi(Z_i)\)</span>, so the moment of the basis factors as</p>
+<p><span class="math display">\[
+m(\varphi)(Z_i, Y_i) \;=\; \textstyle\sum_j C_{ij}\, \varphi(Z_{ij})
+\;=\; \Big(\textstyle\sum_j C_{ij}\Big)\, \varphi(Z_i)
+\;=\; m(1)(Z_i, Y_i)\, \varphi(Z_i),
+\]</span></p>
+<p>where <span class="math inline">\(m(1)\)</span> is the estimand applied to the constant function <span class="math inline">\(1\)</span>, the sum of its coefficients. For every built-in estimand <span class="math inline">\(m(1)\)</span> is a constant: <span class="math inline">\(1 - 1 = 0\)</span> for <code>ATE</code>, <code>ATT</code>, <code>AdditiveShift</code> and <code>LocalShift</code>, and <span class="math inline">\(1\)</span> for <code>TSM</code>. Substituting the factored moment into the leaf solve above gives</p>
+<p><span class="math display">\[
+\hat\theta_\ell \;=\; \big(\textstyle\sum_{i\in\ell} \varphi(Z_i)\,\varphi(Z_i)^{\top} + n_\ell\,\lambda I\big)^{-1}
+                 \textstyle\sum_{i\in\ell} \varphi(Z_i)\, m(1)(Z_i, Y_i),
+\]</span></p>
+<p>the coefficients of a least-squares regression (ridge, when <code>l2</code> <span class="math inline">\(&gt; 0\)</span>) of the known quantity <span class="math inline">\(m(1)\)</span> on the basis. When <span class="math inline">\(m(1)\)</span> is a constant, as for every built-in, that regression target carries no information about the treatment, whichever columns the forest splits on. For <code>ATE</code>, <code>ATT</code> and the shift estimands the target is <span class="math inline">\(0\)</span>, so <span class="math inline">\(\hat\theta_\ell = 0\)</span> and the fitted representer <span class="math inline">\(\hat\alpha\)</span> is <span class="math inline">\(0\)</span> everywhere. For <code>TSM</code> the target is <span class="math inline">\(1\)</span>, so with <code>l2</code> <span class="math inline">\(= 0\)</span>, <span class="math inline">\(\hat\alpha = 1\)</span> whenever the basis can express a constant within each leaf. In both cases <span class="math inline">\(\hat\alpha\)</span> equals <span class="math inline">\(\mathbb E[\alpha_0(Z) \mid X]\)</span>, the true representer <span class="math inline">\(\alpha_0\)</span> averaged over the treatment given the covariates: applying the Riesz representation <span class="math inline">\(\mathbb E[m(f)(Z, Y)] = \mathbb E[\alpha_0(Z) f(Z)]\)</span> to a function <span class="math inline">\(f\)</span> of the covariates alone, for which <span class="math inline">\(m(f) = m(1)\, f\)</span> because every evaluation point shares the covariates, gives <span class="math inline">\(\mathbb E[\alpha_0(Z) f(X)] = \mathbb E[m(1)(Z, Y) f(X)]\)</span> for every such <span class="math inline">\(f\)</span>, so <span class="math inline">\(\mathbb E[\alpha_0(Z) \mid X] = \mathbb E[m(1)(Z, Y) \mid X]\)</span>, which is <span class="math inline">\(0\)</span> or <span class="math inline">\(1\)</span>.</p>
+<p>Apart from the constant basis, which raises (above), <code>ForestRieszRegressor</code> still fits an uninformative basis but warns that <span class="math inline">\(\hat\alpha\)</span> estimates <span class="math inline">\(\mathbb E[\alpha_0(Z) \mid X]\)</span>. This check is skipped for estimands that evaluate only the observed point. Separately, if the basis is not flagged as uninformative but the moment <span class="math inline">\(m(\varphi)(Z_i, Y_i)\)</span> of every basis function is zero on every row, it warns that each leaf parameter <span class="math inline">\(\hat\theta_\ell\)</span>, and therefore the fitted representer <span class="math inline">\(\hat\alpha\)</span>, is <span class="math inline">\(0\)</span>.</p>
+<p><strong>What else the basis must represent depends on the estimand.</strong> Within a leaf, the basis must be able to express how the true representer <span class="math inline">\(\alpha_0\)</span> varies with the treatment <span class="math inline">\(A\)</span>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estimand</th>
+<th>How <span class="math inline">\(\alpha_0\)</span> depends on the treatment <span class="math inline">\(A\)</span></th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ATE</code> (binary <span class="math inline">\(A\)</span>)</td>
+<td><span class="math inline">\(\alpha_0(A, X) = \mathbb 1\{A = 1\}/\pi(X) - \mathbb 1\{A = 0\}/(1 - \pi(X))\)</span>, with propensity <span class="math inline">\(\pi(X) = P(A = 1 \mid X)\)</span></td>
+<td>The default <code>[1{A=0}, 1{A=1}]</code> represents its dependence on <span class="math inline">\(A\)</span> exactly; the forest approximates the functions of <span class="math inline">\(X\)</span>.</td>
+</tr>
+<tr class="even">
+<td><code>ATT</code> (binary <span class="math inline">\(A\)</span>)</td>
+<td><span class="math inline">\(\alpha_0(A, X) = \mathbb 1\{A = 1\} - \mathbb 1\{A = 0\}\, \pi(X)/(1 - \pi(X))\)</span>, for the unnormalized moment <span class="math inline">\(A\,(\mu(1, X) - \mu(0, X))\)</span>, without dividing by <span class="math inline">\(P(A = 1)\)</span></td>
+<td>The same default, exactly in <span class="math inline">\(A\)</span>.</td>
+</tr>
+<tr class="odd">
+<td><code>TSM(level=v)</code></td>
+<td><span class="math inline">\(\alpha_0(A, X) = \mathbb 1\{A = v\} / P(A = v \mid X)\)</span>, with <span class="math inline">\(P(A = v \mid X)\)</span> the probability of level <span class="math inline">\(v\)</span> given the covariates</td>
+<td>The default <code>[1{A=v}]</code>, exactly in <span class="math inline">\(A\)</span>.</td>
+</tr>
+<tr class="even">
+<td><code>AdditiveShift</code> (continuous <span class="math inline">\(A\)</span>)</td>
+<td><span class="math inline">\(\alpha_0(A, X) = p(A - \delta \mid X)/p(A \mid X) - 1\)</span>, with <span class="math inline">\(p(\cdot \mid X)\)</span> the conditional density of the treatment</td>
+<td>No default. Without knowing the conditional density, no fixed basis represents this exactly in general: pass a sieve in <span class="math inline">\(A\)</span>, such as polynomials or splines, and accept some approximation error.</td>
+</tr>
+<tr class="odd">
+<td><code>LocalShift(threshold=t)</code> (continuous <span class="math inline">\(A\)</span>)</td>
+<td><span class="math inline">\(\alpha_0(A, X) = \mathbb 1\{A &lt; t + \delta\}\, p(A - \delta \mid X)/p(A \mid X) - \mathbb 1\{A &lt; t\}\)</span></td>
+<td>No default. As for <code>AdditiveShift</code>, and include the indicators <span class="math inline">\(\mathbb 1\{A &lt; t\}\)</span> and <span class="math inline">\(\mathbb 1\{A &lt; t + \delta\}\)</span>, where the representer jumps.</td>
+</tr>
+</tbody>
+</table>
+<p>A basis that adds covariate-only functions to these still fits, provided the functions are linearly independent within each leaf. The <code>ATE</code> and <code>ATT</code> default already sums to the constant function, so adding a covariate function that is constant, or nearly constant, within a leaf makes the leaf solve singular or unstable; small leaves make this more likely.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Not stated in the ForestRiesz paper
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><a href="https://proceedings.mlr.press/v162/chernozhukov22a/chernozhukov22a.pdf">Chernozhukov et al.&nbsp;(2022)</a>, Section 4, allow splits on the covariates only and write the basis as <span class="math inline">\(\varphi(T, X)\)</span>, a function of the treatment <span class="math inline">\(T\)</span> (called <span class="math inline">\(A\)</span> on this page) and the covariates <span class="math inline">\(X\)</span>, but state neither requirement above. The first follows from the leaf solve: with an uninformative basis, each leaf regresses the known quantity <span class="math inline">\(m(1)\)</span> on the basis, and for every estimand on this page <span class="math inline">\(m(1)\)</span> is a constant, so no split can recover how the representer depends on the treatment. (For a derivative functional, which the paper also considers, a basis that does not depend on the treatment has moment <span class="math inline">\(0\)</span> directly.)</p>
+</div>
+</div>
 
 
 </section>
